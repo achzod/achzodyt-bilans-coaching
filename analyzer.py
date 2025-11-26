@@ -15,19 +15,14 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
 def detect_image_type(b64_data: str) -> Optional[str]:
-    """Detecte le vrai type d'image depuis les magic bytes"""
     try:
         raw = base64.b64decode(b64_data[:32])
-        # JPEG: FF D8 FF
         if raw[0] == 0xFF and raw[1] == 0xD8 and raw[2] == 0xFF:
             return 'image/jpeg'
-        # PNG: 89 50 4E 47
         if raw[0] == 0x89 and raw[1] == 0x50 and raw[2] == 0x4E and raw[3] == 0x47:
             return 'image/png'
-        # GIF: 47 49 46 38
         if raw[0] == 0x47 and raw[1] == 0x49 and raw[2] == 0x46 and raw[3] == 0x38:
             return 'image/gif'
-        # WEBP: RIFF...WEBP
         if raw[0] == 0x52 and raw[1] == 0x49 and raw[2] == 0x46 and raw[3] == 0x46:
             if len(raw) > 11 and raw[8] == 0x57 and raw[9] == 0x45:
                 return 'image/webp'
@@ -36,76 +31,59 @@ def detect_image_type(b64_data: str) -> Optional[str]:
     return None
 
 
-def analyze_coaching_bilan(
-    current_email: Dict[str, Any],
-    conversation_history: List[Dict[str, Any]],
-    client_name: str = ""
-) -> Dict[str, Any]:
-    """Analyse complete d'un bilan de coaching"""
-
+def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     history_text = _build_history_context(conversation_history)
     photos = [att for att in current_email.get("attachments", []) if att["content_type"].startswith("image/")]
     pdfs = [att for att in current_email.get("attachments", []) if "pdf" in att["content_type"].lower()]
 
     content = []
 
-    prompt = f"""Tu es Achzod, coach expert en transformation physique.
+    date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
+    
+    prompt = f"""Tu es Achzod, coach de HAUT NIVEAU avec 10+ ans en transformation physique et optimisation hormonale.
 
-Tu recois un bilan de coaching. Fais une analyse COMPLETE.
+REGLES STRICTES:
+- JAMAIS d asterisques ou etoiles dans tes reponses
+- Sois DETAILLE et EXPERT, explique le POURQUOI de chaque conseil
+- Utilise ton expertise: anatomie, physiologie, nutrition, hormones
+- Ecris comme un vrai coach humain, pas comme une IA
+- Tutoiement obligatoire, emojis ok avec moderation
+- Email de reponse: MINIMUM 500 mots, hyper detaille et personnalise
 
-## HISTORIQUE
+HISTORIQUE CLIENT:
 {history_text}
 
-## BILAN ACTUEL
-Date: {current_email['date'].strftime('%d/%m/%Y %H:%M') if current_email.get('date') else 'N/A'}
-Sujet: {current_email.get('subject', 'Sans sujet')}
+BILAN A ANALYSER:
+Date: {date_str}
+Sujet: {current_email.get("subject", "Sans sujet")}
 
-Message:
-\"\"\"
-{current_email.get('body', '')}
-\"\"\"
+Message du client:
+{current_email.get("body", "")}
 
 Pieces jointes: {len(photos)} photo(s), {len(pdfs)} PDF(s)
 
----
+CE QUE TU DOIS FAIRE:
 
-## TA MISSION
+1. PHOTOS (si presentes): estime masse grasse (ex: 14-16 pourcent), decris chaque zone musculaire en detail, points forts avec explications, zones a bosser avec conseils precis
 
-1. ANALYSE DES PHOTOS: composition corporelle, masse grasse %, points forts, zones a travailler
-2. METRIQUES: poids, energie, sommeil, performances
-3. REPONSES AUX QUESTIONS du client
-4. KPIs (note sur 10): adherence training, nutrition, sommeil, energie, progression
-5. POINTS POSITIFS
-6. POINTS A AMELIORER avec solutions
-7. EMAIL DE REPONSE complet et personnalise
+2. METRIQUES: analyse poids, energie, sommeil, perfs avec interpretation et tendances
 
-Style: Direct, expert, bienveillant, tutoiement, emojis ok.
+3. QUESTIONS: reponds a CHAQUE question du client avec PROFONDEUR et expertise, explique les mecanismes physiologiques
 
-REPONDS EN JSON:
-{{
-    "resume": "Resume en 2-3 phrases",
-    "analyse_photos": {{
-        "masse_grasse_estimee": "X%",
-        "masse_musculaire": "Description",
-        "points_forts": ["zone1"],
-        "zones_a_travailler": ["zone1"],
-        "evolution_visuelle": "Description",
-        "note_physique": 7
-    }},
-    "metriques": {{"poids": "Xkg", "energie": "X/10", "sommeil": "Xh", "autres": []}},
-    "evolution": {{"poids": "...", "energie": "...", "performance": "...", "adherence": "...", "global": "..."}},
-    "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "progression": 8}},
-    "points_positifs": ["Point 1", "Point 2"],
-    "points_ameliorer": [{{"probleme": "...", "solution": "...", "priorite": "haute"}}],
-    "questions_reponses": [{{"question": "...", "reponse": "..."}}],
-    "ajustements": ["Ajustement 1"],
-    "draft_email": "Email complet..."
-}}"""
+4. KPIs sur 10 avec justification pour chaque note
+
+5. POINTS POSITIFS: celebre les victoires meme petites, sois specifique sur ce qui est bien
+
+6. A AMELIORER: probleme + pourquoi important physiologiquement + solution detaillee + resultat attendu
+
+7. EMAIL DE REPONSE: 500+ mots minimum, structure complete, ZERO asterisque, reponds a TOUT en detail
+
+Reponds en JSON valide avec cette structure:
+{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL COMPLET 500+ mots sans asterisques"}}"""
 
     content.append({"type": "text", "text": prompt})
 
-    # Ajout des images (max 5)
-    VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
     images_added = 0
     for att in current_email.get("attachments", []):
         if att["content_type"].startswith("image/") and images_added < 5:
@@ -114,29 +92,21 @@ REPONDS EN JSON:
                 if real_type and real_type in VALID_IMAGE_TYPES:
                     content.append({
                         "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": real_type,
-                            "data": att["data"]
-                        }
+                        "source": {"type": "base64", "media_type": real_type, "data": att["data"]}
                     })
                     images_added += 1
-            except Exception as e:
-                print(f"Erreur image: {e}")
+            except:
+                pass
 
     if images_added > 0:
-        content.append({
-            "type": "text",
-            "text": f"{images_added} PHOTO(S) - Analyse composition corporelle, masse grasse, zones a travailler."
-        })
+        content.append({"type": "text", "text": f"{images_added} PHOTO(S) - Analyse en DETAIL: masse grasse, zones musculaires, points forts, zones a travailler."})
 
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=4000,
+            max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
-
         response_text = response.content[0].text
 
         try:
@@ -148,58 +118,38 @@ REPONDS EN JSON:
                     if "{" in part and "}" in part:
                         json_match = part
                         break
-
             analysis = json.loads(json_match.strip())
-
-            defaults = {
-                "resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
-                "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "progression": 7},
-                "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""
-            }
-            for key, default in defaults.items():
-                if key not in analysis:
-                    analysis[key] = default
-
+            defaults = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""}
+            for k, v in defaults.items():
+                if k not in analysis:
+                    analysis[k] = v
         except:
-            analysis = {
-                "resume": "Analyse disponible", "analyse_photos": {}, "metriques": {}, "evolution": {},
-                "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "progression": 7},
-                "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [],
-                "draft_email": response_text
-            }
+            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": response_text}
 
         return {"success": True, "analysis": analysis, "raw_response": response_text, "photos_analyzed": images_added}
-
     except Exception as e:
         return {"success": False, "error": str(e), "analysis": None}
 
 
-def _build_history_context(history: List[Dict[str, Any]]) -> str:
+def _build_history_context(history):
     if not history:
-        return "Aucun historique (premier contact)."
-    context_parts = [f"=== {len(history)} EMAILS ==="]
-    for i, email_data in enumerate(history[-10:], 1):
-        direction = "CLIENT" if email_data.get("direction") == "received" else "TOI"
-        date = email_data.get("date")
-        date_str = date.strftime("%d/%m/%Y") if date else "?"
-        body = email_data.get("body", "")[:500]
-        context_parts.append(f"--- {direction} ({date_str}) ---\n{body}")
-    return "\n".join(context_parts)
+        return "Aucun historique - premier contact."
+    parts = [f"=== {len(history)} EMAILS ==="]
+    for i, e in enumerate(history[-10:], 1):
+        d = "CLIENT" if e.get("direction") == "received" else "TOI"
+        dt = e.get("date").strftime("%d/%m/%Y") if e.get("date") else "?"
+        parts.append(f"--- {d} ({dt}) ---" + chr(10) + e.get('body', '')[:800])
+    return chr(10).join(parts)
 
 
-def regenerate_email_draft(analysis: Dict[str, Any], instructions: str, current_draft: str) -> str:
-    prompt = f"""Tu es Achzod, coach fitness.
-Analyse: {json.dumps(analysis, ensure_ascii=False)[:2000]}
-Draft: \"\"\"{current_draft}\"\"\"
+def regenerate_email_draft(analysis, instructions, current_draft):
+    prompt = f"""Tu es Achzod, coach expert. JAMAIS d asterisques.
+Analyse: {json.dumps(analysis, ensure_ascii=False)[:3000]}
+Draft actuel: {current_draft}
 Instructions: {instructions}
-Reecris l'email. Style direct, tutoiement, emojis ok. Retourne UNIQUEMENT le texte."""
-
+Reecris email 500+ mots, sans asterisques, style direct expert tutoiement."""
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.content[0].text
+        r = client.messages.create(model="claude-sonnet-4-20250514", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+        return r.content[0].text
     except Exception as e:
         return f"Erreur: {e}"
