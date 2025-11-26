@@ -168,7 +168,7 @@ def main():
                     st.session_state.reader = EmailReader()
 
                 if st.session_state.reader.connect():
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
+                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unanswered_only=True)
                     st.session_state.connected = True
                     st.success(f"✅ {len(st.session_state.emails)} emails")
                 else:
@@ -178,7 +178,7 @@ def main():
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
+                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unanswered_only=True)
 
         st.divider()
 

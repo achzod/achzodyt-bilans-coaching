@@ -161,7 +161,7 @@ class EmailReader:
                         pass
         return attachments
 
-    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True) -> List[Dict[str, Any]]:
+    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False) -> List[Dict[str, Any]]:
         """
         Recupere les emails recents NON LUS (potentiels bilans)
         """
@@ -175,7 +175,10 @@ class EmailReader:
 
             # Recherche emails recents NON LUS
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
-            if unread_only:
+            if unanswered_only:
+                # UNANSWERED = emails sans reponse (RAPIDE ~1s!)
+                status, messages = self.connection.search(None, f'(UNANSWERED SINCE "{since_date}")')
+            elif unread_only:
                 status, messages = self.connection.search(None, f'(UNSEEN SINCE "{since_date}")')
             else:
                 status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
