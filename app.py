@@ -8,6 +8,7 @@ from datetime import datetime
 from email_reader import EmailReader
 from analyzer import analyze_coaching_bilan, regenerate_email_draft
 from email_sender import send_email, preview_email
+from clients import get_client, save_client, get_jours_restants
 
 # Config page
 st.set_page_config(
@@ -226,6 +227,25 @@ def main():
         with col1:
             st.subheader(f"📧 {email_data['subject']}")
             st.caption(f"De: {email_data['from']} | {email_data['date'].strftime('%d/%m/%Y %H:%M') if email_data.get('date') else ''}")
+            
+            # Infos client
+            client_info = get_client(email_data['from_email'])
+            if client_info:
+                jours = get_jours_restants(client_info)
+                color = "green" if jours > 14 else "orange" if jours > 0 else "red"
+                st.markdown(f"**Commande:** {client_info.get('commande', 'N/A')} | **Jours restants:** :{color}[{jours}j]")
+            else:
+                st.caption("Client non enregistre")
+            
+            # Editer client
+            with st.expander("Modifier infos client"):
+                c_commande = st.text_input("Commande", value=client_info.get('commande', '') if client_info else '', key="c_cmd")
+                c_date = st.date_input("Date debut", key="c_date")
+                c_duree = st.number_input("Duree (semaines)", min_value=1, max_value=52, value=client_info.get('duree_semaines', 12) if client_info else 12, key="c_dur")
+                if st.button("Sauvegarder client"):
+                    save_client(email_data['from_email'], c_commande, c_date.strftime('%Y-%m-%d'), c_duree)
+                    st.success("Client sauvegarde!")
+                    st.rerun()
         with col2:
             if st.button("📜 Historique", use_container_width=True):
                 with st.spinner("Chargement historique..."):
