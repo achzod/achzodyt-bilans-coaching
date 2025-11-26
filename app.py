@@ -232,10 +232,7 @@ def main():
                                     e["attachments"] = c.get("attachments", [])
                                     e["loaded"] = True
                             # Fusionner avec l'email actuel
-                            email_data["body"] += "
-
---- EMAIL SUIVANT ---
-" + e.get("body", "")
+                            email_data["body"] += chr(10)*2 + "--- EMAIL SUIVANT ---" + chr(10) + e.get("body", "")
                             email_data["attachments"].extend(e.get("attachments", []))
                             st.success("Email fusionne!")
                             st.rerun()
