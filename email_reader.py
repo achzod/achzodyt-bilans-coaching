@@ -187,7 +187,7 @@ class EmailReader:
 
             # OPTIMISE: headers seulement pour liste rapide
             for email_id in email_ids[-30:]:
-                status, msg_data = self.connection.fetch(email_id, "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
                 if status != "OK":
                     continue
                 header_data = msg_data[0][1]
@@ -230,7 +230,7 @@ class EmailReader:
                 return {}
         try:
             self.connection.select(folder)
-            status, msg_data = self.connection.fetch(email_id.encode(), "(RFC822)")
+            status, msg_data = self.connection.fetch(email_id.encode(), "(BODY.PEEK[])")
             if status != "OK":
                 return {}
             raw_email = msg_data[0][1]
