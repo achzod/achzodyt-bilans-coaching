@@ -201,7 +201,8 @@ REPONDS EN JSON VALIDE avec cette structure exacte:
             raw = base64.b64decode(b64_data[:32])  # Premiers bytes suffisent
             if raw[:3] == b'ÿØÿ':
                 return 'image/jpeg'
-            elif raw[:8] == b'PNG
+            elif raw[:8] == b'PNG
+
 
 ':
                 return 'image/png'
@@ -216,7 +217,7 @@ REPONDS EN JSON VALIDE avec cette structure exacte:
     VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     images_added = 0
     for att in current_email.get("attachments", []):
-        if att["content_type"].startswith("image/") and images_added < 10:
+        if att["content_type"].startswith("image/") and images_added < 5:
             try:
                 # Detecter le VRAI type depuis les donnees (pas le header email)
                 real_type = detect_image_type(att["data"])
@@ -263,7 +264,7 @@ Sois PRECIS et HONNETE dans ton analyse visuelle."""
     # Appel Claude avec plus de tokens
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
+            model="claude-sonnet-4-20250514",
             max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
@@ -393,7 +394,7 @@ Retourne UNIQUEMENT le nouveau texte de l'email, rien d'autre."""
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
+            model="claude-sonnet-4-20250514",
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}]
         )
