@@ -176,12 +176,12 @@ def main():
                 progress.progress(30)
                 status.text("Chargement emails...")
 
-                st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
+                st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
                 progress.progress(100)
 
                 st.session_state.connected = True
-                bilans = [e for e in st.session_state.emails if e.get("is_potential_bilan")]
-                status.text(f"✅ {len(st.session_state.emails)} emails, {len(bilans)} bilans")
+                all_emails = st.session_state.emails
+                status.text(f"✅ {len(st.session_state.emails)} emails sans reponse")
 
             else:
                 status.error("❌ Erreur connexion")
@@ -192,15 +192,15 @@ def main():
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
 
         st.divider()
 
         # Liste des bilans
-        bilans = [e for e in st.session_state.emails if e.get("is_potential_bilan")]
-        st.subheader(f"📋 Bilans ({len(bilans)})")
+        all_emails = st.session_state.emails
+        st.subheader(f"📋 Sans reponse ({len(all_emails)})")
 
-        for email_data in bilans:
+        for email_data in all_emails:
             date_str = email_data['date'].strftime('%d/%m %H:%M') if email_data.get('date') else ''
             attachments_count = len(email_data.get('attachments', []))
             att_icon = f" 📷{attachments_count}" if attachments_count else ""
