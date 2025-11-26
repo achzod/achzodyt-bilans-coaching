@@ -185,8 +185,13 @@ def main():
 
         st.divider()
 
-        # Liste des bilans
-        all_emails = st.session_state.emails
+        # Liste des bilans (filtrer typeform et newsletters)
+        EXCLUDE_PATTERNS = ['typeform', 'newsletter', 'noreply', 'no-reply', 'mailer-daemon']
+        all_emails = [
+            e for e in st.session_state.emails 
+            if not any(p in e.get('from_email', '').lower() or p in e.get('subject', '').lower() 
+                      for p in EXCLUDE_PATTERNS)
+        ]
         st.subheader(f"📋 Sans reponse ({len(all_emails)})")
 
         for email_data in all_emails:

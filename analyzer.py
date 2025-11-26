@@ -193,21 +193,33 @@ REPONDS EN JSON VALIDE avec cette structure exacte:
 
     content.append({"type": "text", "text": prompt})
 
-    # Ajout des images (jusqu'a 10 photos)
+    # Ajout des images (jusqu'a 10 photos) - formats acceptes par Claude
+    VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     images_added = 0
     for att in current_email.get("attachments", []):
         if att["content_type"].startswith("image/") and images_added < 10:
             try:
+                # Normaliser le media_type (ex: image/jpg -> image/jpeg)
+                media_type = att["content_type"].lower()
+                if media_type == "image/jpg":
+                    media_type = "image/jpeg"
+                
+                # Skip si type non supporte
+                if media_type not in VALID_IMAGE_TYPES:
+                    print(f"Image ignoree: {media_type} non supporte")
+                    continue
+                    
                 content.append({
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": att["content_type"],
+                        "media_type": media_type,
                         "data": att["data"]
                     }
                 })
                 images_added += 1
-            except:
+            except Exception as img_err:
+                print(f"Erreur image: {img_err}")
                 pass
 
     if images_added > 0:
