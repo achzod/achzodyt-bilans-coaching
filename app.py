@@ -163,32 +163,22 @@ def main():
             days = st.selectbox("Jours", [3, 7, 14, 30], index=1, label_visibility="collapsed")
 
         if connect_btn:
-            with st.status("Chargement en cours...", expanded=True) as loading_status:
-                st.write("🔌 Connexion Gmail...")
-
+            with st.spinner("Chargement rapide (~5s)..."):
                 if st.session_state.reader is None:
                     st.session_state.reader = EmailReader()
 
                 if st.session_state.reader.connect():
-                    st.write("✅ Connexion OK")
-                    st.write("📤 Analyse emails envoyes (~30s)...")
-                    st.write("📥 Puis chargement emails recus...")
-                    st.write("⏳ Patience, ca prend 30-60 secondes...")
-
-                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
-
+                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
                     st.session_state.connected = True
-                    all_emails = st.session_state.emails
-                    loading_status.update(label=f"✅ {len(st.session_state.emails)} emails", state="complete")
-
+                    st.success(f"✅ {len(st.session_state.emails)} emails")
                 else:
-                    loading_status.update(label="❌ Erreur connexion", state="error")
+                    st.error("❌ Erreur connexion")
 
         # Bouton rafraichir
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
 
         st.divider()
 
