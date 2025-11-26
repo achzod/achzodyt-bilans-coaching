@@ -212,6 +212,34 @@ def main():
     if st.session_state.selected_email:
         email_data = st.session_state.selected_email
 
+        # Emails du meme client (pour regrouper metriques, photos, questions)
+        same_client_emails = [e for e in st.session_state.emails if e['from_email'] == email_data['from_email']]
+        
+        if len(same_client_emails) > 1:
+            st.warning(f"Ce client a {len(same_client_emails)} emails non traites!")
+            with st.expander(f"Voir tous les emails de {email_data['from_email']}"):
+                for e in same_client_emails:
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.write(f"{e['date'].strftime('%d/%m %H:%M') if e.get('date') else ''} - {e['subject'][:50]}")
+                    with col2:
+                        if st.button("Ajouter", key=f"add_{e['id']}"):
+                            # Charger le contenu et fusionner
+                            if not e.get("loaded"):
+                                c = st.session_state.reader.load_email_content(e["id"])
+                                if c:
+                                    e["body"] = c.get("body", "")
+                                    e["attachments"] = c.get("attachments", [])
+                                    e["loaded"] = True
+                            # Fusionner avec l'email actuel
+                            email_data["body"] += "
+
+--- EMAIL SUIVANT ---
+" + e.get("body", "")
+                            email_data["attachments"].extend(e.get("attachments", []))
+                            st.success("Email fusionne!")
+                            st.rerun()
+
         # Lazy loading: charger contenu si pas encore fait
         if not email_data.get("loaded", True):
             with st.spinner("Chargement du contenu..."):
