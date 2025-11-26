@@ -199,8 +199,9 @@ REPONDS EN JSON VALIDE avec cette structure exacte:
     for att in current_email.get("attachments", []):
         if att["content_type"].startswith("image/") and images_added < 10:
             try:
-                # Normaliser le media_type (ex: image/jpg -> image/jpeg)
-                media_type = att["content_type"].lower()
+                # Normaliser le media_type - extraire juste le type MIME base
+                # ex: 'image/jpeg; name=file.jpg' -> 'image/jpeg'
+                media_type = att["content_type"].lower().split(';')[0].strip()
                 if media_type == "image/jpg":
                     media_type = "image/jpeg"
                 

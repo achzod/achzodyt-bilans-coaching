@@ -186,7 +186,7 @@ def main():
         st.divider()
 
         # Liste des bilans (filtrer typeform et newsletters)
-        EXCLUDE_PATTERNS = ['typeform', 'newsletter', 'noreply', 'no-reply', 'mailer-daemon']
+        EXCLUDE_PATTERNS = ['typeform', 'newsletter', 'noreply', 'no-reply', 'mailer-daemon', 'notification', 'followup', 'follow-up', 'unsubscribe', 'notifications']
         all_emails = [
             e for e in st.session_state.emails 
             if not any(p in e.get('from_email', '').lower() or p in e.get('subject', '').lower() 
