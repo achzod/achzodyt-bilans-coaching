@@ -194,27 +194,46 @@ REPONDS EN JSON VALIDE avec cette structure exacte:
     content.append({"type": "text", "text": prompt})
 
     # Ajout des images (jusqu'a 10 photos) - formats acceptes par Claude
+    # Detecter le vrai type depuis les magic bytes
+    def detect_image_type(b64_data):
+        try:
+            import base64
+            raw = base64.b64decode(b64_data[:32])  # Premiers bytes suffisent
+            if raw[:3] == b'ÿØÿ':
+                return 'image/jpeg'
+            elif raw[:8] == b'PNG
+
+':
+                return 'image/png'
+            elif raw[:6] in (b'GIF87a', b'GIF89a'):
+                return 'image/gif'
+            elif raw[:4] == b'RIFF' and raw[8:12] == b'WEBP':
+                return 'image/webp'
+        except:
+            pass
+        return None
+    
     VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     images_added = 0
     for att in current_email.get("attachments", []):
         if att["content_type"].startswith("image/") and images_added < 10:
             try:
-                # Normaliser le media_type - extraire juste le type MIME base
-                # ex: 'image/jpeg; name=file.jpg' -> 'image/jpeg'
-                media_type = att["content_type"].lower().split(';')[0].strip()
-                if media_type == "image/jpg":
-                    media_type = "image/jpeg"
+                # Detecter le VRAI type depuis les donnees (pas le header email)
+                real_type = detect_image_type(att["data"])
                 
-                # Skip si type non supporte
-                if media_type not in VALID_IMAGE_TYPES:
-                    print(f"Image ignoree: {media_type} non supporte")
+                if real_type is None:
+                    print(f"Image ignoree: type non detecte")
+                    continue
+                
+                if real_type not in VALID_IMAGE_TYPES:
+                    print(f"Image ignoree: {real_type} non supporte")
                     continue
                     
                 content.append({
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": media_type,
+                        "media_type": real_type,
                         "data": att["data"]
                     }
                 })
