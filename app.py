@@ -176,7 +176,7 @@ def main():
                 progress.progress(30)
                 status.text("Chargement emails...")
 
-                st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
+                st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
                 progress.progress(100)
 
                 st.session_state.connected = True
@@ -192,7 +192,7 @@ def main():
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False)
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
 
         st.divider()
 

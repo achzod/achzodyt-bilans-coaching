@@ -280,6 +280,94 @@ class EmailReader:
 
         return score >= 2
 
+
+    def get_unanswered_emails(self, days: int = 14, folder: str = "INBOX") -> List[Dict[str, Any]]:
+        """
+        Recupere les emails auxquels on n'a PAS encore repondu
+        (verifie si on a envoye un email au meme expediteur apres reception)
+        """
+        if not self.connection:
+            if not self.connect():
+                return []
+
+        emails = []
+        answered_senders = set()
+
+        try:
+            # D'abord, recuperer les emails envoyes pour savoir a qui on a repondu
+            sent_folders = ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent", "[Gmail]/Sent"]
+            since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+            
+            for sent_folder in sent_folders:
+                try:
+                    status, _ = self.connection.select(f'"{sent_folder}"')
+                    if status == "OK":
+                        status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
+                        if status == "OK":
+                            for email_id in messages[0].split():
+                                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (TO)])")
+                                if status == "OK":
+                                    header = msg_data[0][1]
+                                    msg = email.message_from_bytes(header)
+                                    to = self._decode_header_value(msg["To"] or "")
+                                    to_email = self._extract_email_address(to)
+                                    if to_email:
+                                        answered_senders.add(to_email.lower())
+                        break
+                except:
+                    continue
+
+            # Maintenant recuperer les emails recus et filtrer ceux sans reponse
+            self.connection.select(folder)
+            status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
+
+            if status != "OK":
+                return []
+
+            email_ids = messages[0].split()
+
+            for email_id in email_ids[-50:]:
+                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                if status != "OK":
+                    continue
+                header_data = msg_data[0][1]
+                msg = email.message_from_bytes(header_data)
+                from_header = self._decode_header_value(msg["From"])
+                from_email = self._extract_email_address(from_header)
+                
+                # Skip si on a deja repondu a cet expediteur
+                if from_email.lower() in answered_senders:
+                    continue
+                    
+                subject = self._decode_header_value(msg["Subject"])
+                date_str = msg["Date"]
+                try:
+                    date = parsedate_to_datetime(date_str)
+                except:
+                    date = datetime.now()
+                
+                text = subject.lower()
+                is_potential_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+                
+                emails.append({
+                    "id": email_id.decode(),
+                    "from": from_header,
+                    "from_email": from_email,
+                    "subject": subject,
+                    "date": date,
+                    "body": "",
+                    "attachments": [],
+                    "is_potential_bilan": is_potential_bilan,
+                    "message_id": msg["Message-ID"],
+                    "loaded": False
+                })
+
+        except Exception as e:
+            print(f"Erreur get_unanswered: {e}")
+
+        emails.sort(key=lambda x: x["date"], reverse=True)
+        return emails
+
     def get_conversation_history(self, email_address: str, days: int = 90) -> List[Dict[str, Any]]:
         """
         Recupere tout l'historique de conversation avec un client
