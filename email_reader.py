@@ -281,7 +281,7 @@ class EmailReader:
         return score >= 2
 
 
-    def get_unanswered_emails(self, days: int = 14, folder: str = "INBOX") -> List[Dict[str, Any]]:
+    def get_unanswered_emails(self, days: int = 14, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
         """
         Recupere les emails auxquels on n'a PAS encore repondu
         (verifie si on a envoye un email au meme expediteur apres reception)

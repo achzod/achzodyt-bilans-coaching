@@ -163,30 +163,26 @@ def main():
             days = st.selectbox("Jours", [3, 7, 14, 30], index=1, label_visibility="collapsed")
 
         if connect_btn:
-            status = st.empty()
-            progress = st.progress(0)
+            with st.status("Chargement en cours...", expanded=True) as loading_status:
+                st.write("🔌 Connexion Gmail...")
 
-            status.text("Connexion Gmail...")
-            progress.progress(10)
+                if st.session_state.reader is None:
+                    st.session_state.reader = EmailReader()
 
-            if st.session_state.reader is None:
-                st.session_state.reader = EmailReader()
+                if st.session_state.reader.connect():
+                    st.write("✅ Connexion OK")
+                    st.write("📤 Analyse emails envoyes (~30s)...")
+                    st.write("📥 Puis chargement emails recus...")
+                    st.write("⏳ Patience, ca prend 30-60 secondes...")
 
-            if st.session_state.reader.connect():
-                progress.progress(30)
-                status.text("Chargement emails...")
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
 
-                st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
-                progress.progress(100)
+                    st.session_state.connected = True
+                    all_emails = st.session_state.emails
+                    loading_status.update(label=f"✅ {len(st.session_state.emails)} emails", state="complete")
 
-                st.session_state.connected = True
-                all_emails = st.session_state.emails
-                status.text(f"✅ {len(st.session_state.emails)} emails sans reponse")
-
-            else:
-                status.error("❌ Erreur connexion")
-
-            progress.empty()
+                else:
+                    loading_status.update(label="❌ Erreur connexion", state="error")
 
         # Bouton rafraichir
         if st.session_state.connected:
