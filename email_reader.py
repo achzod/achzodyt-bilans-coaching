@@ -188,8 +188,8 @@ class EmailReader:
 
             email_ids = messages[0].split()
 
-            # OPTIMISE: headers seulement pour liste rapide (50 max)
-            for email_id in email_ids[-50:]:
+            # OPTIMISE: headers seulement pour liste rapide (200 max)
+            for email_id in email_ids[-200:]:
                 status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
                 if status != "OK":
                     continue
@@ -329,7 +329,7 @@ class EmailReader:
 
             email_ids = messages[0].split()
 
-            for email_id in email_ids[-50:]:
+            for email_id in email_ids[-200:]:
                 status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
                 if status != "OK":
                     continue
