@@ -231,7 +231,7 @@ Sois PRECIS et HONNETE dans ton analyse visuelle."""
     # Appel Claude avec plus de tokens
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
@@ -361,7 +361,7 @@ Retourne UNIQUEMENT le nouveau texte de l'email, rien d'autre."""
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}]
         )
