@@ -185,41 +185,34 @@ class EmailReader:
 
             email_ids = messages[0].split()
 
-            for email_id in email_ids[-50:]:  # Max 50 emails
-                status, msg_data = self.connection.fetch(email_id, "(RFC822)")
+            # OPTIMISE: headers seulement pour liste rapide
+            for email_id in email_ids[-30:]:
+                status, msg_data = self.connection.fetch(email_id, "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
                 if status != "OK":
                     continue
-
-                raw_email = msg_data[0][1]
-                msg = email.message_from_bytes(raw_email)
-
-                # Extraction des infos
+                header_data = msg_data[0][1]
+                msg = email.message_from_bytes(header_data)
                 subject = self._decode_header_value(msg["Subject"])
                 from_header = self._decode_header_value(msg["From"])
                 from_email = self._extract_email_address(from_header)
                 date_str = msg["Date"]
-
                 try:
                     date = parsedate_to_datetime(date_str)
                 except:
                     date = datetime.now()
-
-                body = self._get_email_body(msg)
-                attachments = self._get_attachments(msg)
-
-                # Detection si c'est potentiellement un bilan
-                is_potential_bilan = self._is_potential_bilan(subject, body, attachments)
-
+                text = subject.lower()
+                is_potential_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
                 emails.append({
                     "id": email_id.decode(),
                     "from": from_header,
                     "from_email": from_email,
                     "subject": subject,
                     "date": date,
-                    "body": body,
-                    "attachments": attachments,
+                    "body": "",
+                    "attachments": [],
                     "is_potential_bilan": is_potential_bilan,
-                    "message_id": msg["Message-ID"]
+                    "message_id": msg["Message-ID"],
+                    "loaded": False
                 })
 
         except Exception as e:
@@ -228,6 +221,28 @@ class EmailReader:
         # Tri par date decroissante
         emails.sort(key=lambda x: x["date"], reverse=True)
         return emails
+
+
+    def load_email_content(self, email_id: str, folder: str = "INBOX") -> Dict[str, Any]:
+        """Charge le contenu complet d'un email (lazy loading)"""
+        if not self.connection:
+            if not self.connect():
+                return {}
+        try:
+            self.connection.select(folder)
+            status, msg_data = self.connection.fetch(email_id.encode(), "(RFC822)")
+            if status != "OK":
+                return {}
+            raw_email = msg_data[0][1]
+            msg = email.message_from_bytes(raw_email)
+            return {
+                "body": self._get_email_body(msg),
+                "attachments": self._get_attachments(msg),
+                "loaded": True
+            }
+        except Exception as e:
+            print(f"Erreur chargement contenu: {e}")
+            return {}
 
     def _is_potential_bilan(self, subject: str, body: str, attachments: List) -> bool:
         """

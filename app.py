@@ -217,6 +217,16 @@ def main():
     if st.session_state.selected_email:
         email_data = st.session_state.selected_email
 
+        # Lazy loading: charger contenu si pas encore fait
+        if not email_data.get("loaded", True):
+            with st.spinner("Chargement du contenu..."):
+                content = st.session_state.reader.load_email_content(email_data["id"])
+                if content:
+                    email_data["body"] = content.get("body", "")
+                    email_data["attachments"] = content.get("attachments", [])
+                    email_data["loaded"] = True
+                    st.session_state.selected_email = email_data
+
         # Header
         col1, col2, col3 = st.columns([3, 1, 1])
         with col1:
