@@ -9,6 +9,7 @@ from email_reader import EmailReader
 from analyzer import analyze_coaching_bilan, regenerate_email_draft
 from email_sender import send_email, preview_email
 from clients import get_client, save_client, get_jours_restants
+import html
 
 # Config page
 st.set_page_config(
@@ -319,7 +320,7 @@ def main():
 
         # Tab 1: Email actuel
         with tab1:
-            st.markdown(f'<div class="bilan-card">{email_data["body"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="bilan-card">{html.escape(email_data["body"])}</div>', unsafe_allow_html=True)
 
             if email_data.get("attachments"):
                 st.subheader("📎 Pieces jointes")
