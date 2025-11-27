@@ -287,17 +287,17 @@ class EmailReader:
     def get_unanswered_emails(self, days: int = 14, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
         """
         Recupere les emails auxquels on n'a PAS encore repondu
-        (verifie si on a envoye un email au meme expediteur apres reception)
+        Logique: pour chaque email recu, verifier si on a envoye un email a cette personne APRES la date de reception
         """
         if not self.connection:
             if not self.connect():
                 return []
 
         emails = []
-        answered_senders = set()
+        sent_emails = {}  # {email_dest: [dates d'envoi]}
 
         try:
-            # D'abord, recuperer les emails envoyes pour savoir a qui on a repondu
+            # 1. Collecter TOUS les emails envoyes avec leur date
             sent_folders = ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent", "[Gmail]/Sent"]
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
             
@@ -308,19 +308,27 @@ class EmailReader:
                         status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
                         if status == "OK":
                             for email_id in messages[0].split():
-                                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (TO)])")
+                                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
                                 if status == "OK":
                                     header = msg_data[0][1]
                                     msg = email.message_from_bytes(header)
                                     to = self._decode_header_value(msg["To"] or "")
                                     to_email = self._extract_email_address(to)
+                                    date_str = msg["Date"]
+                                    try:
+                                        sent_date = parsedate_to_datetime(date_str)
+                                    except:
+                                        sent_date = datetime.now()
+                                    
                                     if to_email:
-                                        answered_senders.add(to_email.lower())
+                                        if to_email.lower() not in sent_emails:
+                                            sent_emails[to_email.lower()] = []
+                                        sent_emails[to_email.lower()].append(sent_date)
                         break
                 except:
                     continue
 
-            # Maintenant recuperer les emails recus et filtrer ceux sans reponse
+            # 2. Recuperer les emails recus et filtrer ceux sans reponse
             self.connection.select(folder)
             status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
 
@@ -337,18 +345,24 @@ class EmailReader:
                 msg = email.message_from_bytes(header_data)
                 from_header = self._decode_header_value(msg["From"])
                 from_email = self._extract_email_address(from_header)
-                
-                # Skip si on a deja repondu a cet expediteur
-                if from_email.lower() in answered_senders:
-                    continue
-                    
-                subject = self._decode_header_value(msg["Subject"])
                 date_str = msg["Date"]
                 try:
-                    date = parsedate_to_datetime(date_str)
+                    received_date = parsedate_to_datetime(date_str)
                 except:
-                    date = datetime.now()
+                    received_date = datetime.now()
                 
+                # Verifier si on a repondu APRES cette date
+                has_replied = False
+                if from_email.lower() in sent_emails:
+                    for sent_date in sent_emails[from_email.lower()]:
+                        if sent_date > received_date:
+                            has_replied = True
+                            break
+                
+                if has_replied:
+                    continue  # On a repondu, skip
+                    
+                subject = self._decode_header_value(msg["Subject"])
                 text = subject.lower()
                 is_potential_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
                 
@@ -357,7 +371,7 @@ class EmailReader:
                     "from": from_header,
                     "from_email": from_email,
                     "subject": subject,
-                    "date": date,
+                    "date": received_date,
                     "body": "",
                     "attachments": [],
                     "is_potential_bilan": is_potential_bilan,
@@ -370,6 +384,7 @@ class EmailReader:
 
         emails.sort(key=lambda x: x["date"], reverse=True)
         return emails
+
 
     def get_conversation_history(self, email_address: str, days: int = 90) -> List[Dict[str, Any]]:
         """

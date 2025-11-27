@@ -174,7 +174,7 @@ def main():
                 if st.session_state.reader.connect():
                     st.write("📬 Recherche emails sans reponse...")
                     st.write("⏳ Cela peut prendre 1-2 minutes pour charger tous les emails")
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False, unanswered_only=False)
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
                     st.session_state.connected = True
                     status.update(label=f"✅ {len(st.session_state.emails)} emails charges!", state="complete", expanded=False)
                 else:
@@ -184,7 +184,7 @@ def main():
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False, unanswered_only=False)
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
 
         st.divider()
 
