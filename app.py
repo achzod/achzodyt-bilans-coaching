@@ -458,6 +458,17 @@ def main():
                     height=400
                 )
 
+                # Bouton ajouter KPIs
+                col_kpi1, col_kpi2 = st.columns([1, 3])
+                with col_kpi1:
+                    if st.button("📊 Ajouter KPIs", use_container_width=True):
+                        kpis = st.session_state.analysis.get("kpis", {})
+                        kpi_text = generate_kpi_table(kpis)
+                        st.session_state.draft = st.session_state.draft + kpi_text
+                        st.rerun()
+                with col_kpi2:
+                    st.caption("Insere le tableau KPIs a la fin de ton email")
+
                 # Regeneration avec instructions
                 with st.expander("🔄 Regenerer avec instructions"):
                     instructions = st.text_input("Instructions de modification")
