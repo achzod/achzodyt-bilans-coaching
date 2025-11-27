@@ -351,13 +351,22 @@ class EmailReader:
                 except:
                     received_date = datetime.now()
                 
-                # Verifier si on a repondu APRES cette date
+                # Verifier si on a repondu APRES cette date (en timestamp pour gerer les fuseaux horaires)
                 has_replied = False
                 if from_email.lower() in sent_emails:
+                    # Convertir en timestamp pour comparaison fiable
+                    try:
+                        recv_ts = received_date.timestamp()
+                    except:
+                        recv_ts = 0
                     for sent_date in sent_emails[from_email.lower()]:
-                        if sent_date > received_date:
-                            has_replied = True
-                            break
+                        try:
+                            sent_ts = sent_date.timestamp()
+                            if sent_ts > recv_ts:
+                                has_replied = True
+                                break
+                        except:
+                            pass
                 
                 if has_replied:
                     continue  # On a repondu, skip
