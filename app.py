@@ -174,7 +174,7 @@ def main():
                 if st.session_state.reader.connect():
                     st.write("📬 Recherche emails sans reponse...")
                     st.write("⏳ Cela peut prendre 1-2 minutes pour charger tous les emails")
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unanswered_only=True)
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
                     st.session_state.connected = True
                     status.update(label=f"✅ {len(st.session_state.emails)} emails charges!", state="complete", expanded=False)
                 else:
@@ -184,7 +184,7 @@ def main():
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unanswered_only=True)
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
 
         st.divider()
 
@@ -250,7 +250,7 @@ def main():
                     st.session_state.selected_email = email_data
 
         # Header
-        col1, col2, col3 = st.columns([3, 1, 1])
+        col1, col2, col3, col4 = st.columns([3, 1, 1, 0.5])
         with col1:
             st.subheader(f"📧 {email_data['subject']}")
             st.caption(f"De: {email_data['from']} | {email_data['date'].strftime('%d/%m/%Y %H:%M') if email_data.get('date') else ''}")
@@ -308,6 +308,11 @@ def main():
                     else:
                         status.update(label="❌ Erreur", state="error")
                         st.error(f"Erreur: {result.get('error')}")
+        with col4:
+            if st.button("❌", help="Ignorer cet email"):
+                st.session_state.emails = [e for e in st.session_state.emails if e["id"] != email_data["id"]]
+                st.session_state.selected_email = None
+                st.rerun()
 
         # Tabs
         tab1, tab2, tab3, tab4 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse"])
