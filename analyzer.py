@@ -5,13 +5,52 @@ Module d'analyse IA des bilans de coaching avec Claude
 import os
 import base64
 import json
+import io
 from typing import List, Dict, Any, Optional
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from PIL import Image
 
 load_dotenv()
 
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+MAX_IMAGE_SIZE = 4 * 1024 * 1024  # 4 MB (marge sous les 5 MB de Claude)
+
+
+def compress_image_if_needed(b64_data: str, media_type: str) -> tuple:
+    raw_size = len(base64.b64decode(b64_data))
+    if raw_size <= MAX_IMAGE_SIZE:
+        return b64_data, media_type
+    try:
+        img_bytes = base64.b64decode(b64_data)
+        img = Image.open(io.BytesIO(img_bytes))
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        quality = 85
+        max_dimension = 2000
+        while True:
+            if max(img.size) > max_dimension:
+                ratio = max_dimension / max(img.size)
+                new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                img_resized = img.resize(new_size, Image.LANCZOS)
+            else:
+                img_resized = img
+            buffer = io.BytesIO()
+            img_resized.save(buffer, format='JPEG', quality=quality, optimize=True)
+            compressed_data = buffer.getvalue()
+            if len(compressed_data) <= MAX_IMAGE_SIZE:
+                return base64.b64encode(compressed_data).decode('utf-8'), 'image/jpeg'
+            quality -= 10
+            max_dimension -= 200
+            if quality < 30 or max_dimension < 800:
+                img_resized = img.resize((800, int(800 * img.size[1] / img.size[0])), Image.LANCZOS)
+                buffer = io.BytesIO()
+                img_resized.save(buffer, format='JPEG', quality=30, optimize=True)
+                return base64.b64encode(buffer.getvalue()).decode('utf-8'), 'image/jpeg'
+    except Exception as e:
+        print(f"Erreur compression: {e}")
+        return b64_data, media_type
 
 
 def detect_image_type(b64_data: str) -> Optional[str]:
@@ -97,9 +136,10 @@ Reponds en JSON valide avec cette structure:
             try:
                 real_type = detect_image_type(att["data"])
                 if real_type and real_type in VALID_IMAGE_TYPES:
+                    compressed_data, final_type = compress_image_if_needed(att["data"], real_type)
                     content.append({
                         "type": "image",
-                        "source": {"type": "base64", "media_type": real_type, "data": att["data"]}
+                        "source": {"type": "base64", "media_type": final_type, "data": compressed_data}
                     })
                     images_added += 1
             except:
