@@ -124,12 +124,14 @@ def display_attachments(attachments):
 
 def display_kpis(kpis):
     """Affiche les KPIs"""
-    cols = st.columns(5)
+    cols = st.columns(7)
     kpi_labels = {
         "adherence_training": "Training",
         "adherence_nutrition": "Nutrition",
         "sommeil": "Sommeil",
         "energie": "Energie",
+        "sante": "Sante",
+        "mindset": "Mindset",
         "progression": "Progression"
     }
 

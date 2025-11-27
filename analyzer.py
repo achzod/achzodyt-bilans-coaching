@@ -70,7 +70,14 @@ CE QUE TU DOIS FAIRE:
 
 3. QUESTIONS: reponds a CHAQUE question du client avec PROFONDEUR et expertise, explique les mecanismes physiologiques
 
-4. KPIs sur 10 avec justification pour chaque note
+4. KPIs sur 10 avec justification pour chaque note:
+   - adherence_training: respect du programme entrainement
+   - adherence_nutrition: respect du plan alimentaire
+   - sommeil: qualite et quantite de sommeil
+   - energie: niveau energie ressenti
+   - sante: indicateurs sante (digestion, libido, stress, douleurs)
+   - mindset: mental, motivation, discipline, confiance
+   - progression: evolution globale vers objectifs
 
 5. POINTS POSITIFS: celebre les victoires meme petites, sois specifique sur ce qui est bien
 
@@ -79,7 +86,7 @@ CE QUE TU DOIS FAIRE:
 7. EMAIL DE REPONSE: 500+ mots minimum, structure complete, ZERO asterisque, reponds a TOUT en detail
 
 Reponds en JSON valide avec cette structure:
-{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL COMPLET 500+ mots sans asterisques"}}"""
+{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "sante": 7, "mindset": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL COMPLET 500+ mots sans asterisques"}}"""
 
     content.append({"type": "text", "text": prompt})
 
@@ -119,12 +126,12 @@ Reponds en JSON valide avec cette structure:
                         json_match = part
                         break
             analysis = json.loads(json_match.strip())
-            defaults = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""}
+            defaults = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""}
             for k, v in defaults.items():
                 if k not in analysis:
                     analysis[k] = v
         except:
-            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": response_text}
+            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": response_text}
 
         return {"success": True, "analysis": analysis, "raw_response": response_text, "photos_analyzed": images_added}
     except Exception as e:
