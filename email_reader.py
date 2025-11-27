@@ -284,112 +284,102 @@ class EmailReader:
         return score >= 2
 
 
-    def get_unanswered_emails(self, days: int = 14, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
-        """
-        Recupere les emails auxquels on n'a PAS encore repondu
-        Logique: pour chaque email recu, verifier si on a envoye un email a cette personne APRES la date de reception
-        """
+    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
+        """VERSION RAPIDE avec batch fetching - 5-10 secondes max"""
         if not self.connection:
             if not self.connect():
                 return []
 
         emails = []
-        sent_emails = {}  # {email_dest: [dates d'envoi]}
+        sent_to = {}
 
         try:
-            # 1. Collecter TOUS les emails envoyes avec leur date
-            sent_folders = ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent", "[Gmail]/Sent"]
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
-            
-            for sent_folder in sent_folders:
+
+            # 1. BATCH: emails envoyes
+            for sf in ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent"]:
                 try:
-                    status, _ = self.connection.select(f'"{sent_folder}"')
-                    if status == "OK":
-                        status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
-                        if status == "OK":
-                            for email_id in messages[0].split():
-                                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
-                                if status == "OK":
-                                    header = msg_data[0][1]
-                                    msg = email.message_from_bytes(header)
-                                    to = self._decode_header_value(msg["To"] or "")
-                                    to_email = self._extract_email_address(to)
-                                    date_str = msg["Date"]
-                                    try:
-                                        sent_date = parsedate_to_datetime(date_str)
-                                    except:
-                                        sent_date = datetime.now()
-                                    
-                                    if to_email:
-                                        if to_email.lower() not in sent_emails:
-                                            sent_emails[to_email.lower()] = []
-                                        sent_emails[to_email.lower()].append(sent_date)
+                    st, _ = self.connection.select(f'"{sf}"')
+                    if st == "OK":
+                        st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
+                        if st == "OK" and msgs[0]:
+                            ids = msgs[0].split()[-150:]
+                            if ids:
+                                st, data = self.connection.fetch(b",".join(ids), "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
+                                if st == "OK":
+                                    for item in data:
+                                        if isinstance(item, tuple) and len(item) >= 2:
+                                            try:
+                                                m = email.message_from_bytes(item[1])
+                                                to_e = self._extract_email_address(self._decode_header_value(m["To"] or "")).lower()
+                                                if to_e:
+                                                    try:
+                                                        ts = parsedate_to_datetime(m["Date"]).timestamp()
+                                                    except:
+                                                        ts = datetime.now().timestamp()
+                                                    if to_e not in sent_to or ts > sent_to[to_e]:
+                                                        sent_to[to_e] = ts
+                                            except:
+                                                pass
                         break
                 except:
                     continue
 
-            # 2. Recuperer les emails recus et filtrer ceux sans reponse
+            # 2. BATCH: emails recus
             self.connection.select(folder)
-            status, messages = self.connection.search(None, f'(SINCE "{since_date}")')
-
-            if status != "OK":
+            st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
+            if st != "OK" or not msgs[0]:
                 return []
 
-            email_ids = messages[0].split()
+            ids = msgs[0].split()[-100:]
+            if not ids:
+                return []
 
-            for email_id in email_ids[-200:]:
-                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                if status != "OK":
+            st, data = self.connection.fetch(b",".join(ids), "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+            if st != "OK":
+                return []
+
+            idx = 0
+            for item in data:
+                if not isinstance(item, tuple) or len(item) < 2:
                     continue
-                header_data = msg_data[0][1]
-                msg = email.message_from_bytes(header_data)
-                from_header = self._decode_header_value(msg["From"])
-                from_email = self._extract_email_address(from_header)
-                date_str = msg["Date"]
                 try:
-                    received_date = parsedate_to_datetime(date_str)
-                except:
-                    received_date = datetime.now()
-                
-                # Verifier si on a repondu APRES cette date (en timestamp pour gerer les fuseaux horaires)
-                has_replied = False
-                if from_email.lower() in sent_emails:
-                    # Convertir en timestamp pour comparaison fiable
+                    m = email.message_from_bytes(item[1])
+                    fr = self._decode_header_value(m["From"])
+                    fe = self._extract_email_address(fr).lower()
                     try:
-                        recv_ts = received_date.timestamp()
+                        rd = parsedate_to_datetime(m["Date"])
+                        rt = rd.timestamp()
                     except:
-                        recv_ts = 0
-                    for sent_date in sent_emails[from_email.lower()]:
-                        try:
-                            sent_ts = sent_date.timestamp()
-                            if sent_ts > recv_ts:
-                                has_replied = True
-                                break
-                        except:
-                            pass
-                
-                if has_replied:
-                    continue  # On a repondu, skip
-                    
-                subject = self._decode_header_value(msg["Subject"])
-                text = subject.lower()
-                is_potential_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
-                
-                emails.append({
-                    "id": email_id.decode(),
-                    "from": from_header,
-                    "from_email": from_email,
-                    "subject": subject,
-                    "date": received_date,
-                    "body": "",
-                    "attachments": [],
-                    "is_potential_bilan": is_potential_bilan,
-                    "message_id": msg["Message-ID"],
-                    "loaded": False
-                })
+                        rd = datetime.now()
+                        rt = rd.timestamp()
+
+                    if fe in sent_to and sent_to[fe] > rt:
+                        idx += 1
+                        continue
+
+                    subj = self._decode_header_value(m["Subject"])
+                    is_b = any(k in subj.lower() for k in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+
+                    eid = ids[idx] if idx < len(ids) else b"0"
+                    emails.append({
+                        "id": eid.decode() if isinstance(eid, bytes) else str(eid),
+                        "from": fr,
+                        "from_email": fe,
+                        "subject": subj,
+                        "date": rd,
+                        "body": "",
+                        "attachments": [],
+                        "is_potential_bilan": is_b,
+                        "message_id": m.get("Message-ID", ""),
+                        "loaded": False
+                    })
+                    idx += 1
+                except:
+                    idx += 1
 
         except Exception as e:
-            print(f"Erreur get_unanswered: {e}")
+            print(f"Erreur: {e}")
 
         emails.sort(key=lambda x: x["date"], reverse=True)
         return emails
