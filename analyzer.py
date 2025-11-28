@@ -150,7 +150,7 @@ Reponds en JSON valide avec cette structure:
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
@@ -196,7 +196,7 @@ Draft actuel: {current_draft}
 Instructions: {instructions}
 Reecris email 500+ mots, sans asterisques, style direct expert tutoiement."""
     try:
-        r = client.messages.create(model="claude-sonnet-4-20250514", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+        r = client.messages.create(model="claude-sonnet-4-5-20250929", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
         return r.content[0].text
     except Exception as e:
         return f"Erreur: {e}"
