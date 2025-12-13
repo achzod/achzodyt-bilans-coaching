@@ -466,6 +466,65 @@ def main():
             if st.session_state.analysis:
                 st.subheader("✉️ Email de reponse")
 
+                # === BOUTONS RAPIDES COACH PRO ===
+                st.markdown("##### 🎯 Ajouts rapides")
+
+                # Row 1: Motivation & Celebration
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                with col_m1:
+                    if st.button("🔥 Motivation", use_container_width=True, help="Ajouter encouragement"):
+                        st.session_state.draft += "\n\nContinue comme ca, tu es sur la bonne voie! Chaque effort compte et je vois que tu donnes le meilleur de toi-meme. La regularite paie toujours."
+                        st.rerun()
+                with col_m2:
+                    if st.button("🏆 Bravo!", use_container_width=True, help="Celebrer une victoire"):
+                        st.session_state.draft += "\n\nJe tiens a te feliciter pour cette progression! C'est exactement ce type de travail qui fait la difference sur le long terme. Tu peux etre fier de toi."
+                        st.rerun()
+                with col_m3:
+                    if st.button("💪 Push", use_container_width=True, help="Pousser a l'action"):
+                        st.session_state.draft += "\n\nC'est le moment de mettre un coup d'accelerateur! Tu as pose les bases, maintenant on passe a la vitesse superieure. Je compte sur toi pour donner 100% cette semaine."
+                        st.rerun()
+                with col_m4:
+                    if st.button("🎯 Focus", use_container_width=True, help="Recentrer sur objectif"):
+                        st.session_state.draft += "\n\nGarde ton objectif en tete a chaque instant. Chaque repas, chaque training, chaque nuit de sommeil te rapproche de ta meilleure version. Stay focused!"
+                        st.rerun()
+
+                # Row 2: Conseils techniques
+                col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+                with col_t1:
+                    if st.button("😴 Sommeil", use_container_width=True, help="Conseil sommeil"):
+                        st.session_state.draft += "\n\nRappel important sur le sommeil: c'est pendant que tu dors que ton corps se repare et construit du muscle. Vise 7-8h minimum, chambre fraiche, pas d'ecran 1h avant. C'est non negociable pour tes resultats."
+                        st.rerun()
+                with col_t2:
+                    if st.button("💧 Hydratation", use_container_width=True, help="Conseil hydratation"):
+                        st.session_state.draft += "\n\nN'oublie pas ton hydratation! Minimum 2-3L d'eau par jour, davantage les jours d'entrainement. Une bonne hydratation optimise tes performances et ta recuperation."
+                        st.rerun()
+                with col_t3:
+                    if st.button("🍗 Proteines", use_container_width=True, help="Rappel proteines"):
+                        st.session_state.draft += "\n\nAssure-toi d'atteindre ton quota de proteines chaque jour (1.6-2g/kg). Repartis-les sur tes repas pour une meilleure absorption. C'est la base pour construire et maintenir ta masse musculaire."
+                        st.rerun()
+                with col_t4:
+                    if st.button("⚡ Recuperation", use_container_width=True, help="Conseil recup"):
+                        st.session_state.draft += "\n\nLa recuperation est aussi importante que l'entrainement! Ecoute ton corps, n'hesite pas a prendre un jour de repos actif si tu sens la fatigue s'accumuler. Mieux vaut un jour de moins que risquer le surentrainement."
+                        st.rerun()
+
+                # Row 3: Closings professionnels
+                st.markdown("##### ✍️ Signatures")
+                col_s1, col_s2, col_s3 = st.columns(3)
+                with col_s1:
+                    if st.button("📝 Standard", use_container_width=True):
+                        st.session_state.draft += "\n\nOn se retrouve au prochain bilan. D'ici la, applique bien les ajustements et n'hesite pas si tu as des questions.\n\nA fond!\nAchzod"
+                        st.rerun()
+                with col_s2:
+                    if st.button("🚀 Motivant", use_container_width=True):
+                        st.session_state.draft += "\n\nJe suis convaincu que tu vas tout dechirer cette semaine! Reste focus, reste discipline, et les resultats suivront.\n\nLet's go!\nAchzod 💪"
+                        st.rerun()
+                with col_s3:
+                    if st.button("🤝 Supportif", use_container_width=True):
+                        st.session_state.draft += "\n\nJe suis la si tu as besoin de quoi que ce soit. On avance ensemble vers ton objectif, etape par etape.\n\nA tres vite,\nAchzod"
+                        st.rerun()
+
+                st.divider()
+
                 # Zone d'edition
                 st.session_state.draft = st.text_area(
                     "Draft (modifiable)",
@@ -484,9 +543,53 @@ def main():
                 with col_kpi2:
                     st.caption("Insere le tableau KPIs a la fin de ton email")
 
-                # Regeneration avec instructions
-                with st.expander("🔄 Regenerer avec instructions"):
-                    instructions = st.text_input("Instructions de modification")
+                # Ajustement de ton avec IA
+                st.markdown("##### 🎨 Ajuster le ton")
+                col_tone1, col_tone2, col_tone3, col_tone4 = st.columns(4)
+                with col_tone1:
+                    if st.button("🦁 Plus direct", use_container_width=True, help="Ton plus cash, coach strict"):
+                        with st.spinner("Ajustement..."):
+                            new_draft = regenerate_email_draft(
+                                st.session_state.analysis,
+                                "Rends le ton BEAUCOUP plus direct, cash, coach strict qui ne laisse pas passer les excuses. Style sergent instructeur bienveillant mais ferme.",
+                                st.session_state.draft
+                            )
+                            st.session_state.draft = new_draft
+                            st.rerun()
+                with col_tone2:
+                    if st.button("🤗 Plus doux", use_container_width=True, help="Ton plus encourageant"):
+                        with st.spinner("Ajustement..."):
+                            new_draft = regenerate_email_draft(
+                                st.session_state.analysis,
+                                "Rends le ton plus doux, encourageant et bienveillant. Mets l'accent sur le positif et le soutien emotionnel.",
+                                st.session_state.draft
+                            )
+                            st.session_state.draft = new_draft
+                            st.rerun()
+                with col_tone3:
+                    if st.button("🧠 Plus technique", use_container_width=True, help="Plus de details scientifiques"):
+                        with st.spinner("Ajustement..."):
+                            new_draft = regenerate_email_draft(
+                                st.session_state.analysis,
+                                "Ajoute plus d'explications techniques et scientifiques. Explique le POURQUOI physiologique de chaque conseil. Montre ton expertise.",
+                                st.session_state.draft
+                            )
+                            st.session_state.draft = new_draft
+                            st.rerun()
+                with col_tone4:
+                    if st.button("🔥 Plus hype", use_container_width=True, help="Plus d'energie"):
+                        with st.spinner("Ajustement..."):
+                            new_draft = regenerate_email_draft(
+                                st.session_state.analysis,
+                                "Rends le message BEAUCOUP plus energique et motivant! Style coach americain, hype, qui donne envie de tout casser a la salle!",
+                                st.session_state.draft
+                            )
+                            st.session_state.draft = new_draft
+                            st.rerun()
+
+                # Regeneration avec instructions custom
+                with st.expander("🔄 Regenerer avec instructions personnalisees"):
+                    instructions = st.text_input("Instructions de modification", placeholder="Ex: Insiste plus sur l'importance du sommeil...")
                     if st.button("Regenerer"):
                         with st.spinner("Regeneration..."):
                             new_draft = regenerate_email_draft(
