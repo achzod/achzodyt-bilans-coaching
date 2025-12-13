@@ -122,10 +122,10 @@ CE QUE TU DOIS FAIRE:
 
 6. A AMELIORER: probleme + pourquoi important physiologiquement + solution detaillee + resultat attendu
 
-7. EMAIL DE REPONSE: 500+ mots minimum, structure complete, ZERO asterisque, reponds a TOUT en detail
+7. EMAIL DE REPONSE: 250-400 mots MAXIMUM, structure claire, ZERO asterisque, va a l'essentiel
 
 Reponds en JSON valide avec cette structure:
-{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "sante": 7, "mindset": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL COMPLET 500+ mots sans asterisques"}}"""
+{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "sante": 7, "mindset": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL 250-400 mots sans asterisques"}}"""
 
     content.append({"type": "text", "text": prompt})
 
@@ -234,7 +234,7 @@ def regenerate_email_draft(analysis, instructions, current_draft):
 Analyse: {json.dumps(analysis, ensure_ascii=False)[:3000]}
 Draft actuel: {current_draft}
 Instructions: {instructions}
-Reecris email 500+ mots, sans asterisques, style direct expert tutoiement."""
+Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement. Va a l'essentiel."""
     try:
         r = client.messages.create(model="claude-sonnet-4-5-20250929", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
         return r.content[0].text
