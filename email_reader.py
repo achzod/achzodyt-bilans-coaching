@@ -313,7 +313,7 @@ class EmailReader:
 
 
     def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
-        """VERSION RAPIDE avec batch fetching - 5-10 secondes max"""
+        """VERSION SIMPLIFIEE - emails recus sans reponse"""
         if not self.connection:
             if not self.connect():
                 return []
@@ -323,58 +323,59 @@ class EmailReader:
 
         try:
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+            print(f"Recherche emails depuis {since_date}...")
 
-            # 1. BATCH: emails envoyes
+            # 1. Recuperer les emails envoyes (rapide, un par un si batch echoue)
             for sf in ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent"]:
                 try:
                     st, _ = self.connection.select(f'"{sf}"')
                     if st == "OK":
                         st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
                         if st == "OK" and msgs[0]:
-                            ids = msgs[0].split()[-150:]
-                            if ids:
-                                st, data = self.connection.fetch(b",".join(ids), "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
-                                if st == "OK":
-                                    for item in data:
-                                        if isinstance(item, tuple) and len(item) >= 2:
+                            ids = msgs[0].split()[-50:]  # Limite a 50
+                            print(f"Sent folder: {len(ids)} emails")
+                            for eid in ids:
+                                try:
+                                    st, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
+                                    if st == "OK" and data and data[0]:
+                                        m = email.message_from_bytes(data[0][1])
+                                        to_e = self._extract_email_address(self._decode_header_value(m["To"] or "")).lower()
+                                        if to_e:
                                             try:
-                                                m = email.message_from_bytes(item[1])
-                                                to_e = self._extract_email_address(self._decode_header_value(m["To"] or "")).lower()
-                                                if to_e:
-                                                    try:
-                                                        ts = parsedate_to_datetime(m["Date"]).timestamp()
-                                                    except:
-                                                        ts = datetime.now().timestamp()
-                                                    if to_e not in sent_to or ts > sent_to[to_e]:
-                                                        sent_to[to_e] = ts
+                                                ts = parsedate_to_datetime(m["Date"]).timestamp()
                                             except:
-                                                pass
+                                                ts = datetime.now().timestamp()
+                                            if to_e not in sent_to or ts > sent_to[to_e]:
+                                                sent_to[to_e] = ts
+                                except:
+                                    pass
                         break
-                except:
+                except Exception as e:
+                    print(f"Sent folder error: {e}")
                     continue
 
-            # 2. BATCH: emails recus
+            print(f"Emails envoyes a {len(sent_to)} contacts")
+
+            # 2. Emails recus - un par un pour eviter timeout
             self.connection.select(folder)
             st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
             if st != "OK" or not msgs[0]:
+                print("Aucun email recu")
                 return []
 
-            ids = msgs[0].split()[-100:]
-            if not ids:
-                return []
+            ids = msgs[0].split()[-50:]  # Limite a 50 max
+            print(f"INBOX: {len(ids)} emails a traiter")
 
-            st, data = self.connection.fetch(b",".join(ids), "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-            if st != "OK":
-                return []
-
-            idx = 0
-            for item in data:
-                if not isinstance(item, tuple) or len(item) < 2:
-                    continue
+            for eid in ids:
                 try:
-                    m = email.message_from_bytes(item[1])
+                    st, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    if st != "OK" or not data or not data[0]:
+                        continue
+
+                    m = email.message_from_bytes(data[0][1])
                     fr = self._decode_header_value(m["From"])
                     fe = self._extract_email_address(fr).lower()
+
                     try:
                         rd = parsedate_to_datetime(m["Date"])
                         rt = rd.timestamp()
@@ -382,14 +383,13 @@ class EmailReader:
                         rd = datetime.now()
                         rt = rd.timestamp()
 
+                    # Skip si on a deja repondu
                     if fe in sent_to and sent_to[fe] > rt:
-                        idx += 1
                         continue
 
                     subj = self._decode_header_value(m["Subject"])
                     is_b = any(k in subj.lower() for k in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
 
-                    eid = ids[idx] if idx < len(ids) else b"0"
                     emails.append({
                         "id": eid.decode() if isinstance(eid, bytes) else str(eid),
                         "from": fr,
@@ -402,12 +402,14 @@ class EmailReader:
                         "message_id": m.get("Message-ID", ""),
                         "loaded": False
                     })
-                    idx += 1
-                except:
-                    idx += 1
+                except Exception as e:
+                    print(f"Erreur email {eid}: {e}")
+                    continue
+
+            print(f"Total: {len(emails)} emails sans reponse")
 
         except Exception as e:
-            print(f"Erreur: {e}")
+            print(f"Erreur get_unanswered_emails: {e}")
 
         emails.sort(key=lambda x: x["date"], reverse=True)
         return emails
