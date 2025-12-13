@@ -315,8 +315,26 @@ def main():
                         )
 
                         if result["success"]:
-                            st.session_state.analysis = result["analysis"]
-                            st.session_state.draft = result["analysis"].get("draft_email", "")
+                            analysis = result["analysis"]
+                            # S'assurer que c'est un dict, pas une string JSON
+                            if isinstance(analysis, str):
+                                try:
+                                    import json
+                                    analysis = json.loads(analysis)
+                                except:
+                                    pass
+                            st.session_state.analysis = analysis
+                            # Extraire draft_email proprement
+                            draft = ""
+                            if isinstance(analysis, dict):
+                                draft = analysis.get("draft_email", "")
+                            elif isinstance(analysis, str) and "draft_email" in analysis:
+                                # Essayer d'extraire le draft_email du JSON string
+                                import re
+                                match = re.search(r'"draft_email"\s*:\s*"(.*?)"(?=\s*[,}])', analysis, re.DOTALL)
+                                if match:
+                                    draft = match.group(1).replace('\\n', '\n').replace('\\"', '"')
+                            st.session_state.draft = draft if draft else "Email a rediger manuellement."
                             status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
                             st.rerun()
                         else:
