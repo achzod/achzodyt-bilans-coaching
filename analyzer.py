@@ -156,62 +156,101 @@ Reponds en JSON valide avec cette structure:
         )
         response_text = response.content[0].text
 
+        # Parser le JSON de maniere robuste
+        analysis = None
         try:
-            json_match = response_text
-            # Essayer d'extraire le JSON
-            if "```json" in response_text:
-                json_match = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                for part in response_text.split("```"):
-                    if "{" in part and "}" in part:
-                        json_match = part
-                        break
-            # Chercher le JSON entre { et }
-            import re
-            json_pattern = re.search(r'\{[\s\S]*\}', json_match)
-            if json_pattern:
-                json_match = json_pattern.group()
+            # Nettoyer la reponse
+            text = response_text.strip()
 
-            analysis = json.loads(json_match.strip())
+            # Enlever les blocs de code markdown
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0]
+            elif "```" in text:
+                parts = text.split("```")
+                for p in parts:
+                    if "{" in p and "draft_email" in p:
+                        text = p
+                        break
+
+            # Trouver le JSON complet avec regex
+            import re
+            # Trouver le premier { et le dernier }
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                json_str = text[start:end+1]
+                analysis = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
+            analysis = None
+        except Exception as e:
+            print(f"Erreur parsing: {e}")
+            analysis = None
+
+        # Si parsing echoue, extraire draft_email manuellement
+        if analysis is None or not isinstance(analysis, dict):
+            print("Fallback: extraction manuelle du draft_email")
+            import re
+            # Chercher draft_email dans le texte brut
+            draft_match = re.search(r'"draft_email"\s*:\s*"((?:[^"\\]|\\.)*)"\s*}', response_text, re.DOTALL)
+            if draft_match:
+                draft = draft_match.group(1)
+                # Decoder les escapes
+                draft = draft.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+            else:
+                # Dernier recours: chercher le texte apres "draft_email":
+                draft_start = response_text.find('"draft_email"')
+                if draft_start != -1:
+                    # Chercher le debut de la valeur
+                    colon = response_text.find(':', draft_start)
+                    if colon != -1:
+                        # Chercher les guillemets
+                        quote1 = response_text.find('"', colon + 1)
+                        if quote1 != -1:
+                            # Trouver la fin (guillemet non escape avant } ou fin)
+                            rest = response_text[quote1+1:]
+                            # Chercher le pattern de fin: " suivi de } ou fin de JSON
+                            end_match = re.search(r'(?<!\\)"\s*}?\s*$', rest)
+                            if end_match:
+                                draft = rest[:end_match.start()]
+                                draft = draft.replace('\\n', '\n').replace('\\"', '"')
+                            else:
+                                draft = "Email a rediger manuellement."
+                        else:
+                            draft = "Email a rediger manuellement."
+                    else:
+                        draft = "Email a rediger manuellement."
+                else:
+                    draft = "Email a rediger manuellement."
+
+            analysis = {
+                "resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
+                "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7},
+                "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [],
+                "draft_email": draft
+            }
+        else:
+            # Ajouter les defaults manquants
             defaults = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""}
             for k, v in defaults.items():
                 if k not in analysis:
                     analysis[k] = v
 
-            # Si draft_email est vide ou contient du JSON, generer un email propre
-            draft = analysis.get("draft_email", "")
-            if not draft or draft.startswith("{") or draft.startswith("```"):
-                # Construire un email a partir des donnees
-                parts = []
-                if analysis.get("resume"):
-                    parts.append(analysis["resume"])
+        # Verifier que draft_email est une string propre
+        draft = analysis.get("draft_email", "")
+        if not isinstance(draft, str):
+            draft = str(draft) if draft else ""
+        if not draft or draft.startswith("{") or draft.startswith("["):
+            # Generer email depuis les donnees
+            parts = ["Bonjour,", ""]
+            if analysis.get("resume"):
+                parts.append(analysis["resume"])
                 parts.append("")
-                if analysis.get("points_positifs"):
-                    parts.append("Points positifs:")
-                    for p in analysis["points_positifs"][:5]:
-                        parts.append(f"- {p}")
-                    parts.append("")
-                if analysis.get("points_ameliorer"):
-                    parts.append("A ameliorer:")
-                    for p in analysis["points_ameliorer"][:5]:
-                        if isinstance(p, dict):
-                            parts.append(f"- {p.get('probleme', '')}: {p.get('solution', '')}")
-                        else:
-                            parts.append(f"- {p}")
-                    parts.append("")
-                if analysis.get("ajustements"):
-                    parts.append("Ajustements:")
-                    for a in analysis["ajustements"][:5]:
-                        parts.append(f"- {a}")
-                analysis["draft_email"] = chr(10).join(parts) if parts else "Email a rediger manuellement."
+            parts.append("A bientot,")
+            parts.append("Achzod")
+            analysis["draft_email"] = chr(10).join(parts)
 
-        except Exception as e:
-            print(f"Erreur parsing JSON: {e}")
-            # Fallback: utiliser le texte brut comme email
-            clean_text = response_text
-            if "```" in clean_text:
-                clean_text = clean_text.replace("```json", "").replace("```", "")
-            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": clean_text}
+        print(f"Draft email extrait: {len(analysis.get('draft_email', ''))} chars")
 
         return {"success": True, "analysis": analysis, "raw_response": response_text, "photos_analyzed": images_added}
     except Exception as e:
