@@ -282,34 +282,40 @@ def main():
                         days=90
                     )
         with col3:
-            if st.button("🤖 Analyser", type="primary", use_container_width=True):
-                with st.status("Analyse IA en cours...", expanded=True) as status:
-                    st.write("🔄 Chargement du contenu email...")
-                    # S'assurer que le contenu est charge (FIX: default False, pas True)
-                    if not email_data.get("loaded", False):
+            analyze_clicked = st.button("🤖 Analyser", type="primary", use_container_width=True, key=f"analyze_{email_data['id']}")
+            if analyze_clicked:
+                # Forcer le chargement du contenu d'abord
+                if not email_data.get("loaded", False) or not email_data.get("body"):
+                    with st.spinner("Chargement du contenu email..."):
                         content_data = st.session_state.reader.load_email_content(email_data["id"])
                         if content_data:
                             email_data["body"] = content_data.get("body", "")
                             email_data["attachments"] = content_data.get("attachments", [])
                             email_data["loaded"] = True
                             st.session_state.selected_email = email_data
-                    
+
+                with st.status("Analyse IA en cours...", expanded=True) as status:
                     st.write(f"📧 Email: {len(email_data.get('body', ''))} chars, {len(email_data.get('attachments', []))} pieces jointes")
-                    st.write("🤖 Appel Claude API...")
-                    
-                    result = analyze_coaching_bilan(
-                        email_data,
-                        st.session_state.history
-                    )
-                    
-                    if result["success"]:
-                        st.session_state.analysis = result["analysis"]
-                        st.session_state.draft = result["analysis"].get("draft_email", "")
-                        status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
-                        st.rerun()
-                    else:
+
+                    if not email_data.get("body"):
                         status.update(label="❌ Erreur", state="error")
-                        st.error(f"Erreur: {result.get('error')}")
+                        st.error("Impossible de charger le contenu de l'email")
+                    else:
+                        st.write("🤖 Appel Claude API...")
+
+                        result = analyze_coaching_bilan(
+                            email_data,
+                            st.session_state.history
+                        )
+
+                        if result["success"]:
+                            st.session_state.analysis = result["analysis"]
+                            st.session_state.draft = result["analysis"].get("draft_email", "")
+                            status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
+                            st.rerun()
+                        else:
+                            status.update(label="❌ Erreur", state="error")
+                            st.error(f"Erreur: {result.get('error')}")
         with col4:
             if st.button("❌", help="Ignorer cet email"):
                 st.session_state.emails = [e for e in st.session_state.emails if e["id"] != email_data["id"]]
