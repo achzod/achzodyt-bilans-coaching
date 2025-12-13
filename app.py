@@ -240,8 +240,8 @@ def main():
                             st.success("Email fusionne!")
                             st.rerun()
 
-        # Lazy loading: charger contenu si pas encore fait
-        if not email_data.get("loaded", True):
+        # Lazy loading: charger contenu si pas encore fait (FIX: default False)
+        if not email_data.get("loaded", False):
             with st.spinner("Chargement du contenu..."):
                 content = st.session_state.reader.load_email_content(email_data["id"])
                 if content:
@@ -285,13 +285,14 @@ def main():
             if st.button("🤖 Analyser", type="primary", use_container_width=True):
                 with st.status("Analyse IA en cours...", expanded=True) as status:
                     st.write("🔄 Chargement du contenu email...")
-                    # S'assurer que le contenu est charge
-                    if not email_data.get("loaded", True):
+                    # S'assurer que le contenu est charge (FIX: default False, pas True)
+                    if not email_data.get("loaded", False):
                         content_data = st.session_state.reader.load_email_content(email_data["id"])
                         if content_data:
                             email_data["body"] = content_data.get("body", "")
                             email_data["attachments"] = content_data.get("attachments", [])
                             email_data["loaded"] = True
+                            st.session_state.selected_email = email_data
                     
                     st.write(f"📧 Email: {len(email_data.get('body', ''))} chars, {len(email_data.get('attachments', []))} pieces jointes")
                     st.write("🤖 Appel Claude API...")
