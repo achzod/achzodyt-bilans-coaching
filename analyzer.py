@@ -158,6 +158,7 @@ Reponds en JSON valide avec cette structure:
 
         try:
             json_match = response_text
+            # Essayer d'extraire le JSON
             if "```json" in response_text:
                 json_match = response_text.split("```json")[1].split("```")[0]
             elif "```" in response_text:
@@ -165,13 +166,52 @@ Reponds en JSON valide avec cette structure:
                     if "{" in part and "}" in part:
                         json_match = part
                         break
+            # Chercher le JSON entre { et }
+            import re
+            json_pattern = re.search(r'\{[\s\S]*\}', json_match)
+            if json_pattern:
+                json_match = json_pattern.group()
+
             analysis = json.loads(json_match.strip())
             defaults = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""}
             for k, v in defaults.items():
                 if k not in analysis:
                     analysis[k] = v
-        except:
-            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": response_text}
+
+            # Si draft_email est vide ou contient du JSON, generer un email propre
+            draft = analysis.get("draft_email", "")
+            if not draft or draft.startswith("{") or draft.startswith("```"):
+                # Construire un email a partir des donnees
+                parts = []
+                if analysis.get("resume"):
+                    parts.append(analysis["resume"])
+                parts.append("")
+                if analysis.get("points_positifs"):
+                    parts.append("Points positifs:")
+                    for p in analysis["points_positifs"][:5]:
+                        parts.append(f"- {p}")
+                    parts.append("")
+                if analysis.get("points_ameliorer"):
+                    parts.append("A ameliorer:")
+                    for p in analysis["points_ameliorer"][:5]:
+                        if isinstance(p, dict):
+                            parts.append(f"- {p.get('probleme', '')}: {p.get('solution', '')}")
+                        else:
+                            parts.append(f"- {p}")
+                    parts.append("")
+                if analysis.get("ajustements"):
+                    parts.append("Ajustements:")
+                    for a in analysis["ajustements"][:5]:
+                        parts.append(f"- {a}")
+                analysis["draft_email"] = chr(10).join(parts) if parts else "Email a rediger manuellement."
+
+        except Exception as e:
+            print(f"Erreur parsing JSON: {e}")
+            # Fallback: utiliser le texte brut comme email
+            clean_text = response_text
+            if "```" in clean_text:
+                clean_text = clean_text.replace("```json", "").replace("```", "")
+            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": clean_text}
 
         return {"success": True, "analysis": analysis, "raw_response": response_text, "photos_analyzed": images_added}
     except Exception as e:
