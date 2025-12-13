@@ -228,23 +228,51 @@ class EmailReader:
 
     def load_email_content(self, email_id: str, folder: str = "INBOX") -> Dict[str, Any]:
         """Charge le contenu complet d'un email (lazy loading)"""
+        # Toujours reconnecter pour eviter connexion expiree
+        try:
+            self.connection.noop()
+        except:
+            self.connection = None
+
         if not self.connection:
             if not self.connect():
+                print(f"Erreur: impossible de se connecter")
                 return {}
+
         try:
-            self.connection.select(folder)
-            status, msg_data = self.connection.fetch(email_id.encode(), "(BODY.PEEK[])")
+            status, _ = self.connection.select(folder)
             if status != "OK":
+                print(f"Erreur: impossible de selectionner {folder}")
                 return {}
+
+            # Essayer avec l'ID tel quel
+            eid = email_id.encode() if isinstance(email_id, str) else email_id
+            status, msg_data = self.connection.fetch(eid, "(BODY.PEEK[])")
+
+            if status != "OK" or not msg_data or not msg_data[0]:
+                print(f"Erreur: fetch failed pour ID {email_id}")
+                return {}
+
             raw_email = msg_data[0][1]
+            if not raw_email:
+                print(f"Erreur: email vide pour ID {email_id}")
+                return {}
+
             msg = email.message_from_bytes(raw_email)
+            body = self._get_email_body(msg)
+            attachments = self._get_attachments(msg)
+
+            print(f"Charge email {email_id}: {len(body)} chars, {len(attachments)} attachments")
+
             return {
-                "body": self._get_email_body(msg),
-                "attachments": self._get_attachments(msg),
+                "body": body,
+                "attachments": attachments,
                 "loaded": True
             }
         except Exception as e:
             print(f"Erreur chargement contenu: {e}")
+            # Tenter reconnexion
+            self.connection = None
             return {}
 
     def _is_potential_bilan(self, subject: str, body: str, attachments: List) -> bool:

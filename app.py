@@ -284,11 +284,17 @@ def main():
         with col3:
             analyze_clicked = st.button("🤖 Analyser", type="primary", use_container_width=True, key=f"analyze_{email_data['id']}")
             if analyze_clicked:
-                # Forcer le chargement du contenu d'abord
+                # Forcer le chargement du contenu d'abord - avec reconnexion
                 if not email_data.get("loaded", False) or not email_data.get("body"):
                     with st.spinner("Chargement du contenu email..."):
+                        # Reconnexion forcee si besoin
+                        if st.session_state.reader:
+                            try:
+                                st.session_state.reader.connection.noop()
+                            except:
+                                st.session_state.reader.connect()
                         content_data = st.session_state.reader.load_email_content(email_data["id"])
-                        if content_data:
+                        if content_data and content_data.get("body"):
                             email_data["body"] = content_data.get("body", "")
                             email_data["attachments"] = content_data.get("attachments", [])
                             email_data["loaded"] = True
@@ -299,7 +305,7 @@ def main():
 
                     if not email_data.get("body"):
                         status.update(label="❌ Erreur", state="error")
-                        st.error("Impossible de charger le contenu de l'email")
+                        st.error("Impossible de charger le contenu de l'email. Clique sur 'Recharger' puis re-essaie.")
                     else:
                         st.write("🤖 Appel Claude API...")
 
@@ -317,10 +323,29 @@ def main():
                             status.update(label="❌ Erreur", state="error")
                             st.error(f"Erreur: {result.get('error')}")
         with col4:
-            if st.button("❌", help="Ignorer cet email"):
-                st.session_state.emails = [e for e in st.session_state.emails if e["id"] != email_data["id"]]
-                st.session_state.selected_email = None
-                st.rerun()
+            col4a, col4b = st.columns(2)
+            with col4a:
+                if st.button("🔄", help="Recharger contenu email"):
+                    with st.spinner("Rechargement..."):
+                        # Forcer reconnexion
+                        if st.session_state.reader:
+                            st.session_state.reader.connection = None
+                            st.session_state.reader.connect()
+                        content_data = st.session_state.reader.load_email_content(email_data["id"])
+                        if content_data and content_data.get("body"):
+                            email_data["body"] = content_data.get("body", "")
+                            email_data["attachments"] = content_data.get("attachments", [])
+                            email_data["loaded"] = True
+                            st.session_state.selected_email = email_data
+                            st.success(f"Charge: {len(email_data['body'])} chars")
+                        else:
+                            st.error("Echec rechargement")
+                        st.rerun()
+            with col4b:
+                if st.button("❌", help="Ignorer cet email"):
+                    st.session_state.emails = [e for e in st.session_state.emails if e["id"] != email_data["id"]]
+                    st.session_state.selected_email = None
+                    st.rerun()
 
         # Tabs
         tab1, tab2, tab3, tab4 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse"])
