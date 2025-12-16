@@ -173,9 +173,9 @@ def main():
                     
                 st.write("🔌 Connexion Gmail...")
                 if st.session_state.reader.connect():
-                    st.write("📬 Recherche emails sans reponse...")
-                    st.write("⏳ Cela peut prendre 1-2 minutes pour charger tous les emails")
-                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                    st.write("📬 Recherche emails non lus...")
+                    st.write("⏳ Chargement en cours...")
+                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=True)
                     st.session_state.connected = True
                     status.update(label=f"✅ {len(st.session_state.emails)} emails charges!", state="complete", expanded=False)
                 else:
@@ -185,7 +185,7 @@ def main():
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
                 with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=True)
 
         st.divider()
 
@@ -196,7 +196,7 @@ def main():
             if not any(p in e.get('from_email', '').lower() or p in e.get('subject', '').lower() 
                       for p in EXCLUDE_PATTERNS)
         ]
-        st.subheader(f"📋 Sans reponse ({len(all_emails)})")
+        st.subheader(f"📋 Non lus ({len(all_emails)})")
 
         for email_data in all_emails:
             date_str = email_data['date'].strftime('%d/%m %H:%M') if email_data.get('date') else ''

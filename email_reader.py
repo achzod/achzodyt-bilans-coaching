@@ -29,6 +29,8 @@ class EmailReader:
     def connect(self) -> bool:
         """Connexion au serveur IMAP Gmail"""
         try:
+            import socket
+            socket.setdefaulttimeout(30)  # Timeout 30 secondes
             self.connection = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
             self.connection.login(MAIL_USER, MAIL_PASS)
             return True
@@ -187,14 +189,26 @@ class EmailReader:
                 return []
 
             email_ids = messages[0].split()
+            total_ids = len(email_ids)
+            print(f"Trouve {total_ids} emails non lus")
 
             # OPTIMISE: headers seulement pour liste rapide (200 max)
-            for email_id in email_ids[-200:]:
-                status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                if status != "OK":
+            for idx, email_id in enumerate(email_ids[-200:], 1):
+                try:
+                    status, msg_data = self.connection.fetch(email_id, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    if status != "OK" or not msg_data or not msg_data[0]:
+                        continue
+                except Exception as e:
+                    print(f"Erreur fetch email {idx}/{min(200, total_ids)}: {e}")
                     continue
-                header_data = msg_data[0][1]
-                msg = email.message_from_bytes(header_data)
+                try:
+                    header_data = msg_data[0][1]
+                    if not header_data:
+                        continue
+                    msg = email.message_from_bytes(header_data)
+                except Exception as e:
+                    print(f"Erreur parsing email: {e}")
+                    continue
                 subject = self._decode_header_value(msg["Subject"])
                 from_header = self._decode_header_value(msg["From"])
                 from_email = self._extract_email_address(from_header)
@@ -332,7 +346,7 @@ class EmailReader:
                     if st == "OK":
                         st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
                         if st == "OK" and msgs[0]:
-                            ids = msgs[0].split()[-50:]  # Limite a 50
+                            ids = msgs[0].split()[-200:]  # Limite a 200
                             print(f"Sent folder: {len(ids)} emails")
                             for eid in ids:
                                 try:
@@ -363,7 +377,7 @@ class EmailReader:
                 print("Aucun email recu")
                 return []
 
-            ids = msgs[0].split()[-50:]  # Limite a 50 max
+            ids = msgs[0].split()[-200:]  # Limite a 200 max
             print(f"INBOX: {len(ids)} emails a traiter")
 
             for eid in ids:
