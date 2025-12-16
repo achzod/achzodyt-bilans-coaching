@@ -167,31 +167,31 @@ class EmailReader:
         try:
             if msg.is_multipart():
                 for part in msg.walk():
-                content_disposition = str(part.get("Content-Disposition", ""))
-                content_type = part.get_content_type()
+                    content_disposition = str(part.get("Content-Disposition", ""))
+                    content_type = part.get_content_type()
 
-                is_attachment = "attachment" in content_disposition
-                is_inline_image = content_type.startswith("image/")
+                    is_attachment = "attachment" in content_disposition
+                    is_inline_image = content_type.startswith("image/")
 
-                if is_attachment or is_inline_image:
-                    filename = part.get_filename()
-                    if filename:
-                        filename = self._decode_header_value(filename)
-                    else:
-                        ext = content_type.split("/")[-1]
-                        filename = f"image_{len(attachments)}.{ext}"
+                    if is_attachment or is_inline_image:
+                        filename = part.get_filename()
+                        if filename:
+                            filename = self._decode_header_value(filename)
+                        else:
+                            ext = content_type.split("/")[-1]
+                            filename = f"image_{len(attachments)}.{ext}"
 
-                    try:
-                        data = part.get_payload(decode=True)
-                        if data:
-                            attachments.append({
-                                "filename": filename,
-                                "content_type": content_type,
-                                "data": base64.b64encode(data).decode('utf-8'),
-                                "size": len(data)
-                            })
-                    except:
-                        pass
+                        try:
+                            data = part.get_payload(decode=True)
+                            if data:
+                                attachments.append({
+                                    "filename": filename,
+                                    "content_type": content_type,
+                                    "data": base64.b64encode(data).decode('utf-8'),
+                                    "size": len(data)
+                                })
+                        except:
+                            pass
         except:
             pass
         return attachments
@@ -210,7 +210,7 @@ class EmailReader:
             print(f"Erreur mark_as_read: {e}")
             try:
                 conn.logout()
-        except:
+            except:
                 pass
             return False
 
