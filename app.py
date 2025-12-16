@@ -214,6 +214,17 @@ class DatabaseManager:
 
 # --- FIN GESTION DB ---
 
+# Liste des patterns a exclure (spam, notifs, etc)
+EXCLUDE_PATTERNS = [
+    'typeform', 'followup', 'newsletter', 'noreply', 'no-reply', 
+    'stripe', 'paypal', 'billing', 'invoice', 'facture', 'recu', 'receipt',
+    'confirmation', 'commande', 'order', 'shipping', 'livraison',
+    'publicite', 'promo', 'soldes', 'unsubscribe', 'desinscription',
+    'linkedin', 'instagram', 'facebook', 'twitter', 'youtube', 'pinterest',
+    'notification', 'alert', 'security', 'securite', 'connexion', 'login',
+    'calendly', 'google calendar', 'invitation', 'rappel'
+]
+
 # Config page
 st.set_page_config(
     page_title="Achzod - Bilans Coaching",
@@ -316,13 +327,13 @@ def display_attachments(attachments):
             # Support Base64 (nouveau) ou Path (DB)
             if "data" in att:
                 # Ancienne methode (memoire)
-                if att["content_type"].startswith("image/"):
-                    try:
-                        img_data = base64.b64decode(att["data"])
-                        st.image(img_data, caption=att["filename"], use_container_width=True)
-                    except:
-                        st.write(f"📷 {att['filename']}")
-                else:
+            if att["content_type"].startswith("image/"):
+                try:
+                    img_data = base64.b64decode(att["data"])
+                    st.image(img_data, caption=att["filename"], use_container_width=True)
+                except:
+                    st.write(f"📷 {att['filename']}")
+            else:
                     st.write(f"📎 {att['filename']}")
             elif "filepath" in att and att.get("filepath"):
                 # Nouvelle methode (DB/Fichier)
@@ -377,9 +388,9 @@ def main():
         days = st.selectbox("Jours a scanner", [1, 3, 7, 30], index=1)
         
         if st.button("📥 Synchroniser Gmail", use_container_width=True, type="primary"):
-            if st.session_state.reader is None:
-                st.session_state.reader = EmailReader()
-            
+                if st.session_state.reader is None:
+                    st.session_state.reader = EmailReader()
+                    
             with st.status("Synchronisation en cours...", expanded=True) as status:
                 st.write("🔌 Connexion Gmail...")
                 
@@ -387,12 +398,23 @@ def main():
                 new_emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False) # On scanne tout
                 st.write(f"📨 {len(new_emails)} emails trouves sur Gmail")
                 
-                # 2. Sauvegarder en DB (uniquement les nouveaux)
+                # 2. Sauvegarder en DB (uniquement les nouveaux et pertinents)
                 saved_count = 0
+                ignored_count = 0
+                
                 for email in new_emails:
+                    # Filtre anti-spam AVANT tout traitement lourd
+                    subject = email.get('subject', '').lower()
+                    sender = email.get('from_email', '').lower()
+                    
+                    if any(p in subject for p in EXCLUDE_PATTERNS) or any(p in sender for p in EXCLUDE_PATTERNS):
+                        # print(f"Ignored: {subject}")
+                        ignored_count += 1
+                        continue
+
                     if not st.session_state.db.email_exists(email['message_id']):
                         # Besoin de charger le contenu complet pour sauvegarder
-                        st.write(f"📥 Telechargement: {email['subject'][:30]}...")
+                        st.write(f"📥 Telechargement: {email['subject'][:40]}...")
                         content = st.session_state.reader.load_email_content(email['id'])
                         if content and content.get("loaded"):
                             email['body'] = content.get('body', '')
@@ -400,7 +422,7 @@ def main():
                             if st.session_state.db.save_email(email):
                                 saved_count += 1
                 
-                status.update(label=f"✅ {saved_count} nouveaux emails sauvegardes!", state="complete", expanded=False)
+                status.update(label=f"✅ {saved_count} nouveaux emails sauvegardes ({ignored_count} ignores)", state="complete", expanded=False)
                 st.success(f"Base de donnees a jour (+{saved_count} emails)")
                 st.rerun()
 
@@ -478,9 +500,9 @@ def main():
             # Si c'est un mail recu, on peut analyser
             if email_data.get('direction', 'received') == 'received':
                 if st.button("🤖 Analyser", type="primary", use_container_width=True):
-                    with st.status("Analyse IA en cours...", expanded=True) as status:
+                with st.status("Analyse IA en cours...", expanded=True) as status:
                         st.write(f"🧠 Analyse avec {len(st.session_state.history)} emails de contexte...")
-                        
+
                         result = analyze_coaching_bilan(
                             email_data,
                             st.session_state.history # On envoie tout l'historique local !
@@ -522,16 +544,16 @@ def main():
                 display_attachments(email_data["attachments"])
 
         with tab2:
-            for hist_email in st.session_state.history:
-                direction = hist_email.get("direction", "received")
-                icon = "📥" if direction == "received" else "📤"
+                for hist_email in st.session_state.history:
+                    direction = hist_email.get("direction", "received")
+                    icon = "📥" if direction == "received" else "📤"
                 date_val = hist_email['date']
                 date_str = date_val.strftime('%d/%m/%Y') if isinstance(date_val, datetime) else str(date_val)[:10]
 
-                with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
-                    st.write(hist_email.get("body", "")[:1000])
-                    if hist_email.get("attachments"):
-                        st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
+                    with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
+                        st.write(hist_email.get("body", "")[:1000])
+                        if hist_email.get("attachments"):
+                            st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
                         display_attachments(hist_email["attachments"])
 
         with tab3:
@@ -541,7 +563,7 @@ def main():
                 st.info(analysis.get("resume", ""))
                 st.subheader("📊 KPIs")
                 display_kpis(analysis.get("kpis", {}))
-                
+
             else:
                 st.info("👆 Clique sur 'Analyser' pour lancer l'analyse IA")
 
