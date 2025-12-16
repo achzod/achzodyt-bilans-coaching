@@ -9,6 +9,7 @@ from email_reader import EmailReader
 from analyzer import analyze_coaching_bilan, regenerate_email_draft
 from email_sender import send_email, preview_email
 from clients import get_client, save_client, get_jours_restants
+from dashboard_generator import generate_client_dashboard
 import html
 
 # Config page
@@ -400,7 +401,7 @@ def main():
                     st.rerun()
 
         # Tabs
-        tab1, tab2, tab3, tab4 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse", "🏆 Dashboard"])
 
         # Tab 1: Email actuel
         with tab1:
@@ -729,6 +730,49 @@ def main():
 
             else:
                 st.info("👆 Lance d'abord l'analyse pour generer la reponse")
+
+        # Tab 5: Dashboard Evolution
+        with tab5:
+            st.subheader("🏆 Dashboard Evolution Client")
+            st.caption(f"Analyse complete de l'evolution de {email_data['from_email']}")
+
+            if st.button("📊 Generer Dashboard", type="primary", use_container_width=True):
+                with st.status("Generation du dashboard...", expanded=True) as dash_status:
+                    st.write("📜 Chargement historique complet...")
+
+                    # Charger l'historique si pas fait
+                    if not st.session_state.history:
+                        st.session_state.history = st.session_state.reader.get_conversation_history(
+                            email_data['from_email'],
+                            days=180  # 6 mois d'historique
+                        )
+
+                    st.write(f"📧 {len(st.session_state.history)} emails trouves")
+                    st.write("🤖 Analyse IA en cours...")
+
+                    # Generer le dashboard
+                    dashboard_html = generate_client_dashboard(
+                        email_data['from_email'],
+                        st.session_state.history
+                    )
+
+                    st.session_state.dashboard_html = dashboard_html
+                    dash_status.update(label="✅ Dashboard genere!", state="complete", expanded=False)
+
+            # Afficher le dashboard si genere
+            if st.session_state.get("dashboard_html"):
+                st.components.v1.html(st.session_state.dashboard_html, height=2000, scrolling=True)
+
+                # Bouton telecharger
+                st.download_button(
+                    label="📥 Telecharger HTML",
+                    data=st.session_state.dashboard_html,
+                    file_name=f"dashboard_{email_data['from_email'].split('@')[0]}_{datetime.now().strftime('%Y%m%d')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+            else:
+                st.info("👆 Clique sur 'Generer Dashboard' pour creer le rapport d'evolution complet")
 
     else:
         # Page d'accueil
