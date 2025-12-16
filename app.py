@@ -9,6 +9,7 @@ from email_reader import EmailReader
 from analyzer import analyze_coaching_bilan, regenerate_email_draft
 from email_sender import send_email, preview_email
 from clients import get_client, save_client, get_jours_restants
+from dashboard_generator import generate_client_dashboard
 import html
 
 # Config page
@@ -162,30 +163,53 @@ def main():
         # Bouton connexion
         col1, col2 = st.columns(2)
         with col1:
-            connect_btn = st.button("🔄 Connecter", use_container_width=True)
+            connect_btn = st.button("🔄 Charger", use_container_width=True)
         with col2:
             days = st.selectbox("Jours", [3, 7, 14, 30], index=1, label_visibility="collapsed")
+
+        # Mode de chargement
+        load_mode = st.radio(
+            "Mode",
+            ["Sans reponse", "Non lus", "Tous"],
+            horizontal=True,
+            help="Sans reponse = emails auxquels tu n'as pas repondu"
+        )
 
         if connect_btn:
             with st.status("Chargement emails...", expanded=True) as status:
                 if st.session_state.reader is None:
                     st.session_state.reader = EmailReader()
-                    
+
                 st.write("🔌 Connexion Gmail...")
-                if st.session_state.reader.connect():
+
+                if load_mode == "Sans reponse":
+                    st.write("📬 Recherche emails sans reponse...")
+                    st.write("⏳ Comparaison avec emails envoyes...")
+                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                elif load_mode == "Non lus":
                     st.write("📬 Recherche emails non lus...")
-                    st.write("⏳ Chargement en cours...")
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=True)
+                    st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=True)
+                else:
+                    st.write("📬 Recherche tous les emails...")
+                    st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=False)
+
+                if st.session_state.emails:
                     st.session_state.connected = True
                     status.update(label=f"✅ {len(st.session_state.emails)} emails charges!", state="complete", expanded=False)
                 else:
-                    status.update(label="❌ Erreur connexion", state="error")
+                    status.update(label="⚠️ Aucun email trouve", state="complete", expanded=False)
 
         # Bouton rafraichir
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
-                with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_recent_emails(days=days, unread_only=True)
+                with st.spinner("Rechargement..."):
+                    if load_mode == "Sans reponse":
+                        st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                    elif load_mode == "Non lus":
+                        st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=True)
+                    else:
+                        st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=False)
+                    st.rerun()
 
         st.divider()
 
@@ -196,7 +220,7 @@ def main():
             if not any(p in e.get('from_email', '').lower() or p in e.get('subject', '').lower() 
                       for p in EXCLUDE_PATTERNS)
         ]
-        st.subheader(f"📋 Non lus ({len(all_emails)})")
+        st.subheader(f"📋 Sans reponse ({len(all_emails)})")
 
         for email_data in all_emails:
             date_str = email_data['date'].strftime('%d/%m %H:%M') if email_data.get('date') else ''
@@ -240,15 +264,22 @@ def main():
                             st.success("Email fusionne!")
                             st.rerun()
 
-        # Lazy loading: charger contenu si pas encore fait (FIX: default False)
-        if not email_data.get("loaded", False):
-            with st.spinner("Chargement du contenu..."):
+        # Lazy loading: charger contenu si pas encore fait (avec retry automatique)
+        if not email_data.get("loaded", False) or not email_data.get("body"):
+            with st.status("Chargement du contenu email...", expanded=True) as load_status:
+                st.write("📧 Connexion au serveur...")
                 content = st.session_state.reader.load_email_content(email_data["id"])
-                if content:
+
+                if content and content.get("loaded"):
                     email_data["body"] = content.get("body", "")
                     email_data["attachments"] = content.get("attachments", [])
                     email_data["loaded"] = True
                     st.session_state.selected_email = email_data
+                    load_status.update(label=f"✅ Charge: {len(email_data['body'])} caracteres", state="complete", expanded=False)
+                else:
+                    error_msg = content.get("error", "Erreur inconnue") if content else "Pas de reponse serveur"
+                    load_status.update(label=f"⚠️ Chargement partiel", state="error", expanded=False)
+                    st.warning(f"Le contenu n'a pas pu etre charge completement: {error_msg}. Clique sur 🔄 pour reessayer.")
 
         # Header
         col1, col2, col3, col4 = st.columns([3, 1, 1, 0.5])
@@ -344,21 +375,25 @@ def main():
             col4a, col4b = st.columns(2)
             with col4a:
                 if st.button("🔄", help="Recharger contenu email"):
-                    with st.spinner("Rechargement..."):
+                    with st.status("Rechargement...", expanded=True) as reload_status:
+                        st.write("🔌 Force reconnexion...")
                         # Forcer reconnexion
                         if st.session_state.reader:
-                            st.session_state.reader.connection = None
-                            st.session_state.reader.connect()
+                            st.session_state.reader.connect(force=True)
+
+                        st.write("📧 Chargement contenu...")
                         content_data = st.session_state.reader.load_email_content(email_data["id"])
-                        if content_data and content_data.get("body"):
+
+                        if content_data and content_data.get("loaded") and content_data.get("body"):
                             email_data["body"] = content_data.get("body", "")
                             email_data["attachments"] = content_data.get("attachments", [])
                             email_data["loaded"] = True
                             st.session_state.selected_email = email_data
-                            st.success(f"Charge: {len(email_data['body'])} chars")
+                            reload_status.update(label=f"✅ Charge: {len(email_data['body'])} chars, {len(email_data.get('attachments', []))} PJ", state="complete")
                         else:
-                            st.error("Echec rechargement")
-                        st.rerun()
+                            error = content_data.get("error", "Erreur inconnue") if content_data else "Pas de reponse"
+                            reload_status.update(label=f"❌ Echec: {error}", state="error")
+                    st.rerun()
             with col4b:
                 if st.button("❌", help="Ignorer cet email"):
                     st.session_state.emails = [e for e in st.session_state.emails if e["id"] != email_data["id"]]
@@ -366,7 +401,7 @@ def main():
                     st.rerun()
 
         # Tabs
-        tab1, tab2, tab3, tab4 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse", "🏆 Dashboard"])
 
         # Tab 1: Email actuel
         with tab1:
@@ -695,6 +730,49 @@ def main():
 
             else:
                 st.info("👆 Lance d'abord l'analyse pour generer la reponse")
+
+        # Tab 5: Dashboard Evolution
+        with tab5:
+            st.subheader("🏆 Dashboard Evolution Client")
+            st.caption(f"Analyse complete de l'evolution de {email_data['from_email']}")
+
+            if st.button("📊 Generer Dashboard", type="primary", use_container_width=True):
+                with st.status("Generation du dashboard...", expanded=True) as dash_status:
+                    st.write("📜 Chargement historique complet...")
+
+                    # Charger l'historique si pas fait
+                    if not st.session_state.history:
+                        st.session_state.history = st.session_state.reader.get_conversation_history(
+                            email_data['from_email'],
+                            days=180  # 6 mois d'historique
+                        )
+
+                    st.write(f"📧 {len(st.session_state.history)} emails trouves")
+                    st.write("🤖 Analyse IA en cours...")
+
+                    # Generer le dashboard
+                    dashboard_html = generate_client_dashboard(
+                        email_data['from_email'],
+                        st.session_state.history
+                    )
+
+                    st.session_state.dashboard_html = dashboard_html
+                    dash_status.update(label="✅ Dashboard genere!", state="complete", expanded=False)
+
+            # Afficher le dashboard si genere
+            if st.session_state.get("dashboard_html"):
+                st.components.v1.html(st.session_state.dashboard_html, height=2000, scrolling=True)
+
+                # Bouton telecharger
+                st.download_button(
+                    label="📥 Telecharger HTML",
+                    data=st.session_state.dashboard_html,
+                    file_name=f"dashboard_{email_data['from_email'].split('@')[0]}_{datetime.now().strftime('%Y%m%d')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+            else:
+                st.info("👆 Clique sur 'Generer Dashboard' pour creer le rapport d'evolution complet")
 
     else:
         # Page d'accueil
