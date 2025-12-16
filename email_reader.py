@@ -66,14 +66,14 @@ class EmailReader:
         if value is None:
             return ""
         try:
-        decoded_parts = decode_header(value)
-        result = ""
-        for part, encoding in decoded_parts:
-            if isinstance(part, bytes):
-                result += part.decode(encoding or 'utf-8', errors='ignore')
-            else:
+            decoded_parts = decode_header(value)
+            result = ""
+            for part, encoding in decoded_parts:
+                if isinstance(part, bytes):
+                    result += part.decode(encoding or 'utf-8', errors='ignore')
+                else:
                     result += str(part)
-        return result
+            return result
         except:
             return str(value) if value else ""
 
