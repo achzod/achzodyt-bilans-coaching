@@ -246,44 +246,70 @@ class EmailReader:
                 email_ids = email_ids[-200:]
 
             # Charger les headers un par un (plus lent mais plus fiable)
-            for i, eid in enumerate(email_ids):
+            # Charger par lots (Batch Fetching) - BEAUCOUP plus rapide
+            # On decoupe par paquets de 50
+            batch_size = 50
+            for i in range(0, len(email_ids), batch_size):
+                batch_ids = email_ids[i:i + batch_size]
+                batch_ids_str = b",".join(batch_ids).decode()
+                
+                print(f"[EMAILS] Chargement batch {i}-{i+len(batch_ids)}...")
+                
                 try:
-                    status, msg_data = conn.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                    if status != "OK" or not msg_data or not msg_data[0]:
+                    # FETCH multiple IDs en une seule fois
+                    status, data = conn.fetch(batch_ids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    
+                    if status != "OK":
                         continue
-
-                    header_data = msg_data[0][1]
-                    msg = email.message_from_bytes(header_data)
-
-                    subject = self._decode_header_value(msg["Subject"])
-                    from_header = self._decode_header_value(msg["From"])
-                    from_email = self._extract_email_address(from_header)
-
-                    try:
-                        date = parsedate_to_datetime(msg["Date"])
-                    except:
-                        date = datetime.now()
-
-                    is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
-
-                    emails.append({
-                        "id": eid.decode() if isinstance(eid, bytes) else str(eid),
-                        "from": from_header,
-                        "from_email": from_email,
-                        "subject": subject,
-                        "date": date,
-                        "body": "",
-                        "attachments": [],
-                        "is_potential_bilan": is_bilan,
-                        "message_id": msg.get("Message-ID", ""),
-                        "loaded": False
-                    })
-
-                    # Log progress
-                    if (i + 1) % 20 == 0:
-                        print(f"[EMAILS] {i + 1}/{len(email_ids)} charges...")
-
+                        
+                    # Traitement de la reponse batch
+                    # La reponse est une liste ou chaque email a 2 elements (header, separateur)
+                    for response_part in data:
+                        if isinstance(response_part, tuple):
+                            try:
+                                # response_part[0] contient l'ID et la commande FETCH
+                                # response_part[1] contient le contenu (headers)
+                                msg_data = response_part[1]
+                                msg = email.message_from_bytes(msg_data)
+                                
+                                # Extraire l'ID du message depuis la reponse brute si besoin
+                                # Mais on a juste besoin des headers ici
+                                
+                                subject = self._decode_header_value(msg["Subject"])
+                                from_header = self._decode_header_value(msg["From"])
+                                from_email = self._extract_email_address(from_header)
+                                
+                                try:
+                                    date = parsedate_to_datetime(msg["Date"])
+                                except:
+                                    date = datetime.now()
+                                    
+                                is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+                                
+                                # L'ID est au debut de la chaine de reponse, ex: b'1234 (BODY...)'
+                                # On peut essayer de le recuperer, ou utiliser une methode plus simple
+                                # Ici on va juste stocker sans ID precis si on peut pas le parser facilement du batch
+                                # C'est le seul defaut du batch, mapping ID <-> Contenu
+                                # Astuce: On parse la premiere partie de la tuple: b'123 (BODY...'
+                                current_id = str(response_part[0]).split()[0].replace("b'", "").replace("'", "")
+                                
+                                emails.append({
+                                    "id": current_id,
+                                    "from": from_header,
+                                    "from_email": from_email,
+                                    "subject": subject,
+                                    "date": date,
+                                    "body": "",
+                                    "attachments": [],
+                                    "is_potential_bilan": is_bilan,
+                                    "message_id": msg.get("Message-ID", ""),
+                                    "loaded": False
+                                })
+                            except Exception as e:
+                                continue
+                                
                 except Exception as e:
+                    print(f"[EMAILS] Erreur batch: {e}")
                     continue
 
             conn.logout()
