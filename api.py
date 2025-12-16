@@ -15,6 +15,7 @@ import os
 import json
 import base64
 import shutil
+import sqlite3
 
 from models import (
     init_platform_db, create_user, authenticate_user, get_user_by_id, get_user_by_email,
@@ -22,7 +23,7 @@ from models import (
     send_message, get_user_messages, get_conversation, mark_messages_read, get_unread_count,
     submit_bilan, get_user_bilans, get_bilan_by_id, update_bilan_analysis,
     log_daily_metric, get_daily_metrics, get_notifications, mark_notification_read,
-    get_client_stats, get_coach_dashboard, create_notification
+    get_client_stats, get_coach_dashboard, create_notification, DB_PATH
 )
 
 # Import AI analyzer
@@ -324,7 +325,19 @@ async def create_message(data: MessageCreate, user: Dict = Depends(get_current_u
 async def send_to_coach(body: str = Form(...), subject: str = Form(""),
                        user: Dict = Depends(get_current_user)):
     """Raccourci pour envoyer au coach"""
+    # Try specific coach email first
     coach = get_user_by_email(os.getenv("COACH_EMAIL", "coach@achzod.com"))
+
+    if not coach:
+        # Try to find any coach in the system
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE role = 'coach' LIMIT 1")
+        row = c.fetchone()
+        conn.close()
+        if row:
+            coach = dict(row)
 
     if not coach:
         # Creer le coach si n'existe pas
