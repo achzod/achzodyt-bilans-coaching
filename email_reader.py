@@ -25,16 +25,51 @@ MAIL_PASS = os.getenv("MAIL_PASS")
 class EmailReader:
     def __init__(self):
         self.connection = None
+        self._last_connect_time = None
 
-    def connect(self) -> bool:
-        """Connexion au serveur IMAP Gmail"""
+    def connect(self, force: bool = False) -> bool:
+        """Connexion au serveur IMAP Gmail avec retry"""
+        # Fermer connexion existante si force reconnexion
+        if force and self.connection:
+            try:
+                self.connection.logout()
+            except:
+                pass
+            self.connection = None
+
+        # Tenter connexion avec retry
+        for attempt in range(3):
+            try:
+                self.connection = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+                self.connection.login(MAIL_USER, MAIL_PASS)
+                self._last_connect_time = datetime.now()
+                print(f"Connexion IMAP OK (tentative {attempt + 1})")
+                return True
+            except Exception as e:
+                print(f"Erreur connexion IMAP (tentative {attempt + 1}): {e}")
+                self.connection = None
+                if attempt < 2:
+                    import time
+                    time.sleep(1)
+        return False
+
+    def ensure_connected(self) -> bool:
+        """Verifie et retablit la connexion si necessaire"""
+        if not self.connection:
+            return self.connect()
+
+        # Test connexion avec NOOP
         try:
-            self.connection = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
-            self.connection.login(MAIL_USER, MAIL_PASS)
-            return True
-        except Exception as e:
-            print(f"Erreur connexion IMAP: {e}")
-            return False
+            status, _ = self.connection.noop()
+            if status == "OK":
+                return True
+        except:
+            pass
+
+        # Reconnexion necessaire
+        print("Connexion IMAP expiree, reconnexion...")
+        self.connection = None
+        return self.connect()
 
     def disconnect(self):
         """Deconnexion propre"""
@@ -43,13 +78,13 @@ class EmailReader:
                 self.connection.logout()
             except:
                 pass
+            self.connection = None
 
     def mark_as_read(self, email_id: str, folder: str = "INBOX") -> bool:
         """Marque un email comme lu"""
         try:
-            if not self.connection:
-                if not self.connect():
-                    return False
+            if not self.ensure_connected():
+                return False
             self.connection.select(folder)
             self.connection.store(email_id.encode(), '+FLAGS', '\\Seen')
             return True
@@ -60,9 +95,8 @@ class EmailReader:
     def mark_as_unread(self, email_id: str, folder: str = "INBOX") -> bool:
         """Marque un email comme non lu"""
         try:
-            if not self.connection:
-                if not self.connect():
-                    return False
+            if not self.ensure_connected():
+                return False
             self.connection.select(folder)
             self.connection.store(email_id.encode(), '-FLAGS', '\\Seen')
             return True
@@ -165,9 +199,8 @@ class EmailReader:
         """
         Recupere les emails recents NON LUS (potentiels bilans)
         """
-        if not self.connection:
-            if not self.connect():
-                return []
+        if not self.ensure_connected():
+            return []
 
         emails = []
         try:
@@ -226,54 +259,64 @@ class EmailReader:
         return emails
 
 
-    def load_email_content(self, email_id: str, folder: str = "INBOX") -> Dict[str, Any]:
-        """Charge le contenu complet d'un email (lazy loading)"""
-        # Toujours reconnecter pour eviter connexion expiree
-        try:
-            self.connection.noop()
-        except:
-            self.connection = None
+    def load_email_content(self, email_id: str, folder: str = "INBOX", max_retries: int = 3) -> Dict[str, Any]:
+        """Charge le contenu complet d'un email (lazy loading) avec retries"""
+        last_error = None
 
-        if not self.connection:
-            if not self.connect():
-                print(f"Erreur: impossible de se connecter")
-                return {}
+        for attempt in range(max_retries):
+            try:
+                # Toujours verifier/retablir la connexion
+                if not self.ensure_connected():
+                    print(f"Erreur: impossible de se connecter (tentative {attempt + 1})")
+                    import time
+                    time.sleep(1)
+                    continue
 
-        try:
-            status, _ = self.connection.select(folder)
-            if status != "OK":
-                print(f"Erreur: impossible de selectionner {folder}")
-                return {}
+                status, _ = self.connection.select(folder)
+                if status != "OK":
+                    print(f"Erreur: impossible de selectionner {folder}")
+                    self.connection = None
+                    continue
 
-            # Essayer avec l'ID tel quel
-            eid = email_id.encode() if isinstance(email_id, str) else email_id
-            status, msg_data = self.connection.fetch(eid, "(BODY.PEEK[])")
+                # Essayer avec l'ID tel quel
+                eid = email_id.encode() if isinstance(email_id, str) else email_id
+                status, msg_data = self.connection.fetch(eid, "(BODY.PEEK[])")
 
-            if status != "OK" or not msg_data or not msg_data[0]:
-                print(f"Erreur: fetch failed pour ID {email_id}")
-                return {}
+                if status != "OK" or not msg_data or not msg_data[0]:
+                    print(f"Erreur: fetch failed pour ID {email_id} (tentative {attempt + 1})")
+                    # Forcer reconnexion
+                    self.connection = None
+                    import time
+                    time.sleep(0.5)
+                    continue
 
-            raw_email = msg_data[0][1]
-            if not raw_email:
-                print(f"Erreur: email vide pour ID {email_id}")
-                return {}
+                raw_email = msg_data[0][1]
+                if not raw_email:
+                    print(f"Erreur: email vide pour ID {email_id}")
+                    continue
 
-            msg = email.message_from_bytes(raw_email)
-            body = self._get_email_body(msg)
-            attachments = self._get_attachments(msg)
+                msg = email.message_from_bytes(raw_email)
+                body = self._get_email_body(msg)
+                attachments = self._get_attachments(msg)
 
-            print(f"Charge email {email_id}: {len(body)} chars, {len(attachments)} attachments")
+                print(f"Charge email {email_id}: {len(body)} chars, {len(attachments)} attachments")
 
-            return {
-                "body": body,
-                "attachments": attachments,
-                "loaded": True
-            }
-        except Exception as e:
-            print(f"Erreur chargement contenu: {e}")
-            # Tenter reconnexion
-            self.connection = None
-            return {}
+                return {
+                    "body": body,
+                    "attachments": attachments,
+                    "loaded": True
+                }
+
+            except Exception as e:
+                last_error = str(e)
+                print(f"Erreur chargement contenu (tentative {attempt + 1}): {e}")
+                # Forcer reconnexion pour prochaine tentative
+                self.connection = None
+                import time
+                time.sleep(1)
+
+        print(f"Echec chargement apres {max_retries} tentatives: {last_error}")
+        return {"error": last_error or "Echec chargement", "loaded": False}
 
     def _is_potential_bilan(self, subject: str, body: str, attachments: List) -> bool:
         """
@@ -313,60 +356,86 @@ class EmailReader:
 
 
     def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
-        """VERSION SIMPLIFIEE - emails recus sans reponse"""
-        if not self.connection:
-            if not self.connect():
-                return []
+        """
+        Recupere les emails recus auxquels on n'a PAS repondu.
+        Ameliore: compare chaque email recu avec les reponses envoyees APRES cet email specifique.
+        """
+        if not self.ensure_connected():
+            return []
 
         emails = []
-        sent_to = {}
+        # Dict: email_address -> list of (timestamp, subject_normalized)
+        sent_responses = {}
 
         try:
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
             print(f"Recherche emails depuis {since_date}...")
 
-            # 1. Recuperer les emails envoyes (rapide, un par un si batch echoue)
+            # 1. Recuperer TOUS les emails envoyes (avec sujet pour matcher les threads)
             for sf in ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent"]:
                 try:
                     st, _ = self.connection.select(f'"{sf}"')
                     if st == "OK":
                         st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
                         if st == "OK" and msgs[0]:
-                            ids = msgs[0].split()[-50:]  # Limite a 50
+                            ids = msgs[0].split()[-200:]  # Augmente a 200
                             print(f"Sent folder: {len(ids)} emails")
                             for eid in ids:
                                 try:
-                                    st, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
+                                    st, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (TO DATE SUBJECT IN-REPLY-TO)])")
                                     if st == "OK" and data and data[0]:
                                         m = email.message_from_bytes(data[0][1])
                                         to_e = self._extract_email_address(self._decode_header_value(m["To"] or "")).lower()
+                                        subj = self._decode_header_value(m["Subject"] or "")
+                                        # Normaliser le sujet (enlever Re:, Fwd:, etc)
+                                        subj_norm = re.sub(r'^(re|fwd|fw|tr):\s*', '', subj.lower().strip(), flags=re.IGNORECASE).strip()
+                                        in_reply = m.get("In-Reply-To", "")
+
                                         if to_e:
                                             try:
                                                 ts = parsedate_to_datetime(m["Date"]).timestamp()
                                             except:
                                                 ts = datetime.now().timestamp()
-                                            if to_e not in sent_to or ts > sent_to[to_e]:
-                                                sent_to[to_e] = ts
-                                except:
-                                    pass
+
+                                            if to_e not in sent_responses:
+                                                sent_responses[to_e] = []
+                                            sent_responses[to_e].append({
+                                                "timestamp": ts,
+                                                "subject": subj_norm,
+                                                "in_reply_to": in_reply
+                                            })
+                                except Exception as e:
+                                    print(f"Erreur sent email: {e}")
+                                    continue
                         break
                 except Exception as e:
                     print(f"Sent folder error: {e}")
                     continue
 
-            print(f"Emails envoyes a {len(sent_to)} contacts")
+            print(f"Emails envoyes a {len(sent_responses)} contacts")
 
-            # 2. Emails recus - un par un pour eviter timeout
+            # 2. Emails recus - augmente la limite!
+            if not self.ensure_connected():
+                return []
             self.connection.select(folder)
             st, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
             if st != "OK" or not msgs[0]:
                 print("Aucun email recu")
                 return []
 
-            ids = msgs[0].split()[-50:]  # Limite a 50 max
+            ids = msgs[0].split()[-150:]  # Augmente a 150 max
             print(f"INBOX: {len(ids)} emails a traiter")
 
-            for eid in ids:
+            for idx, eid in enumerate(ids):
+                # Progress indicator
+                if idx > 0 and idx % 20 == 0:
+                    print(f"  Traitement {idx}/{len(ids)}...")
+                    # Verifier connexion periodiquement
+                    if not self.ensure_connected():
+                        print("Connexion perdue, arret")
+                        break
+                    self.connection.select(folder)
+
                 try:
                     st, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
                     if st != "OK" or not data or not data[0]:
@@ -375,6 +444,9 @@ class EmailReader:
                     m = email.message_from_bytes(data[0][1])
                     fr = self._decode_header_value(m["From"])
                     fe = self._extract_email_address(fr).lower()
+                    subj = self._decode_header_value(m["Subject"] or "")
+                    subj_norm = re.sub(r'^(re|fwd|fw|tr):\s*', '', subj.lower().strip(), flags=re.IGNORECASE).strip()
+                    msg_id = m.get("Message-ID", "")
 
                     try:
                         rd = parsedate_to_datetime(m["Date"])
@@ -383,11 +455,27 @@ class EmailReader:
                         rd = datetime.now()
                         rt = rd.timestamp()
 
-                    # Skip si on a deja repondu
-                    if fe in sent_to and sent_to[fe] > rt:
+                    # Verifier si on a repondu A CET EMAIL specifique
+                    # Conditions:
+                    # 1. Email envoye APRES reception
+                    # 2. Sujet similaire (meme thread) OU In-Reply-To match
+                    has_reply = False
+                    if fe in sent_responses:
+                        for sent in sent_responses[fe]:
+                            # Reponse envoyee apres reception?
+                            if sent["timestamp"] > rt:
+                                # Meme thread (sujet similaire)?
+                                if sent["subject"] == subj_norm or subj_norm in sent["subject"] or sent["subject"] in subj_norm:
+                                    has_reply = True
+                                    break
+                                # Ou In-Reply-To correspond au Message-ID?
+                                if msg_id and sent.get("in_reply_to") == msg_id:
+                                    has_reply = True
+                                    break
+
+                    if has_reply:
                         continue
 
-                    subj = self._decode_header_value(m["Subject"])
                     is_b = any(k in subj.lower() for k in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
 
                     emails.append({
@@ -399,7 +487,7 @@ class EmailReader:
                         "body": "",
                         "attachments": [],
                         "is_potential_bilan": is_b,
-                        "message_id": m.get("Message-ID", ""),
+                        "message_id": msg_id,
                         "loaded": False
                     })
                 except Exception as e:
@@ -410,6 +498,8 @@ class EmailReader:
 
         except Exception as e:
             print(f"Erreur get_unanswered_emails: {e}")
+            import traceback
+            traceback.print_exc()
 
         emails.sort(key=lambda x: x["date"], reverse=True)
         return emails
@@ -420,9 +510,8 @@ class EmailReader:
         Recupere tout l'historique de conversation avec un client
         (emails envoyes ET recus)
         """
-        if not self.connection:
-            if not self.connect():
-                return []
+        if not self.ensure_connected():
+            return []
 
         all_emails = []
 

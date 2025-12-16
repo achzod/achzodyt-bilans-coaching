@@ -156,10 +156,12 @@ Reponds en JSON valide avec cette structure:
         )
         response_text = response.content[0].text
 
-        # Parser le JSON de maniere robuste
+        # Parser le JSON de maniere robuste avec plusieurs strategies
         analysis = None
+        json_str = ""
+
+        # Strategy 1: Nettoyer et parser directement
         try:
-            # Nettoyer la reponse
             text = response_text.strip()
 
             # Enlever les blocs de code markdown
@@ -172,69 +174,106 @@ Reponds en JSON valide avec cette structure:
                         text = p
                         break
 
-            # Trouver le JSON complet avec regex
-            import re
-            # Trouver le premier { et le dernier }
+            # Trouver le JSON complet
             start = text.find("{")
             end = text.rfind("}")
             if start != -1 and end != -1 and end > start:
                 json_str = text[start:end+1]
                 analysis = json.loads(json_str)
+                print("JSON parse OK (strategy 1)")
         except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}")
-            analysis = None
-        except Exception as e:
-            print(f"Erreur parsing: {e}")
+            print(f"JSON decode error (strategy 1): {e}")
             analysis = None
 
-        # Si parsing echoue, extraire draft_email manuellement
-        if analysis is None or not isinstance(analysis, dict):
-            print("Fallback: extraction manuelle du draft_email")
-            import re
-            # Chercher draft_email dans le texte brut
-            draft_match = re.search(r'"draft_email"\s*:\s*"((?:[^"\\]|\\.)*)"\s*}', response_text, re.DOTALL)
+        # Strategy 2: Fixer les problemes courants de JSON
+        if analysis is None and json_str:
+            try:
+                # Fixer les newlines non echappees dans les strings
+                fixed = json_str
+                # Remplacer les vrais newlines par \\n dans les valeurs de string
+                fixed = re.sub(r'(?<!\\)\n', '\\\\n', fixed)
+                # Fixer les guillemets non echappes
+                fixed = re.sub(r'(?<!\\)"(?=[^:,\[\]{}]*[,\]}])', '\\"', fixed)
+                analysis = json.loads(fixed)
+                print("JSON parse OK (strategy 2 - fixed)")
+            except:
+                analysis = None
+
+        # Strategy 3: Extraire champ par champ avec regex
+        if analysis is None:
+            print("Fallback: extraction champ par champ")
+            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
+                       "kpis": {}, "points_positifs": [], "points_ameliorer": [],
+                       "questions_reponses": [], "ajustements": [], "draft_email": ""}
+
+            # Extraire resume
+            resume_match = re.search(r'"resume"\s*:\s*"([^"]*(?:\\"[^"]*)*)"', response_text)
+            if resume_match:
+                analysis["resume"] = resume_match.group(1).replace('\\"', '"').replace('\\n', '\n')
+
+            # Extraire KPIs (chercher les nombres)
+            for kpi in ["adherence_training", "adherence_nutrition", "sommeil", "energie", "sante", "mindset", "progression"]:
+                kpi_match = re.search(rf'"{kpi}"\s*:\s*(\d+)', response_text)
+                if kpi_match:
+                    analysis["kpis"][kpi] = int(kpi_match.group(1))
+                else:
+                    analysis["kpis"][kpi] = 7  # default
+
+        # Assurer que analysis est un dict avec tous les champs
+        defaults = {
+            "resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
+            "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7},
+            "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""
+        }
+
+        if not isinstance(analysis, dict):
+            analysis = defaults.copy()
+
+        # Ajouter les champs manquants
+        for k, v in defaults.items():
+            if k not in analysis:
+                analysis[k] = v
+            # S'assurer que kpis est un dict avec tous les kpis
+            if k == "kpis" and isinstance(analysis.get("kpis"), dict):
+                for kpi_key, kpi_default in v.items():
+                    if kpi_key not in analysis["kpis"]:
+                        analysis["kpis"][kpi_key] = kpi_default
+
+        # Extraire draft_email si manquant ou invalide
+        draft = analysis.get("draft_email", "")
+        if not draft or not isinstance(draft, str) or len(draft) < 50:
+            print("Extraction draft_email depuis reponse brute...")
+            # Methode 1: Regex standard
+            draft_match = re.search(r'"draft_email"\s*:\s*"((?:[^"\\]|\\.)*)"', response_text, re.DOTALL)
             if draft_match:
                 draft = draft_match.group(1)
-                # Decoder les escapes
                 draft = draft.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                print(f"Draft extrait (methode 1): {len(draft)} chars")
             else:
-                # Dernier recours: chercher le texte apres "draft_email":
+                # Methode 2: Chercher entre "draft_email": " et la fin du JSON
                 draft_start = response_text.find('"draft_email"')
                 if draft_start != -1:
-                    # Chercher le debut de la valeur
-                    colon = response_text.find(':', draft_start)
-                    if colon != -1:
-                        # Chercher les guillemets
-                        quote1 = response_text.find('"', colon + 1)
-                        if quote1 != -1:
-                            # Trouver la fin (guillemet non escape avant } ou fin)
-                            rest = response_text[quote1+1:]
-                            # Chercher le pattern de fin: " suivi de } ou fin de JSON
-                            end_match = re.search(r'(?<!\\)"\s*}?\s*$', rest)
-                            if end_match:
-                                draft = rest[:end_match.start()]
+                    after = response_text[draft_start:]
+                    # Trouver le debut de la valeur (apres : ")
+                    colon_idx = after.find(':')
+                    if colon_idx != -1:
+                        after_colon = after[colon_idx+1:].lstrip()
+                        if after_colon.startswith('"'):
+                            # Chercher la fin de la string
+                            content = after_colon[1:]  # Apres le premier "
+                            # Trouver le " de fermeture (pas precede de \)
+                            end_idx = 0
+                            while end_idx < len(content):
+                                if content[end_idx] == '"' and (end_idx == 0 or content[end_idx-1] != '\\'):
+                                    break
+                                end_idx += 1
+                            if end_idx > 0:
+                                draft = content[:end_idx]
                                 draft = draft.replace('\\n', '\n').replace('\\"', '"')
-                            else:
-                                draft = "Email a rediger manuellement."
-                        else:
-                            draft = "Email a rediger manuellement."
-                    else:
-                        draft = "Email a rediger manuellement."
-                else:
-                    draft = "Email a rediger manuellement."
+                                print(f"Draft extrait (methode 2): {len(draft)} chars")
 
-            analysis = {
-                "resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
-                "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7},
-                "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [],
-                "draft_email": draft
-            }
-        else:
-            # Ajouter les defaults manquants
-            defaults = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {}, "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}, "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""}
-            for k, v in defaults.items():
-                if k not in analysis:
-                    analysis[k] = v
+            if draft and len(draft) > 50:
+                analysis["draft_email"] = draft
 
         # Verifier que draft_email est une string propre
         draft = analysis.get("draft_email", "")

@@ -240,15 +240,22 @@ def main():
                             st.success("Email fusionne!")
                             st.rerun()
 
-        # Lazy loading: charger contenu si pas encore fait (FIX: default False)
-        if not email_data.get("loaded", False):
-            with st.spinner("Chargement du contenu..."):
+        # Lazy loading: charger contenu si pas encore fait (avec retry automatique)
+        if not email_data.get("loaded", False) or not email_data.get("body"):
+            with st.status("Chargement du contenu email...", expanded=True) as load_status:
+                st.write("📧 Connexion au serveur...")
                 content = st.session_state.reader.load_email_content(email_data["id"])
-                if content:
+
+                if content and content.get("loaded"):
                     email_data["body"] = content.get("body", "")
                     email_data["attachments"] = content.get("attachments", [])
                     email_data["loaded"] = True
                     st.session_state.selected_email = email_data
+                    load_status.update(label=f"✅ Charge: {len(email_data['body'])} caracteres", state="complete", expanded=False)
+                else:
+                    error_msg = content.get("error", "Erreur inconnue") if content else "Pas de reponse serveur"
+                    load_status.update(label=f"⚠️ Chargement partiel", state="error", expanded=False)
+                    st.warning(f"Le contenu n'a pas pu etre charge completement: {error_msg}. Clique sur 🔄 pour reessayer.")
 
         # Header
         col1, col2, col3, col4 = st.columns([3, 1, 1, 0.5])
@@ -344,21 +351,25 @@ def main():
             col4a, col4b = st.columns(2)
             with col4a:
                 if st.button("🔄", help="Recharger contenu email"):
-                    with st.spinner("Rechargement..."):
+                    with st.status("Rechargement...", expanded=True) as reload_status:
+                        st.write("🔌 Force reconnexion...")
                         # Forcer reconnexion
                         if st.session_state.reader:
-                            st.session_state.reader.connection = None
-                            st.session_state.reader.connect()
+                            st.session_state.reader.connect(force=True)
+
+                        st.write("📧 Chargement contenu...")
                         content_data = st.session_state.reader.load_email_content(email_data["id"])
-                        if content_data and content_data.get("body"):
+
+                        if content_data and content_data.get("loaded") and content_data.get("body"):
                             email_data["body"] = content_data.get("body", "")
                             email_data["attachments"] = content_data.get("attachments", [])
                             email_data["loaded"] = True
                             st.session_state.selected_email = email_data
-                            st.success(f"Charge: {len(email_data['body'])} chars")
+                            reload_status.update(label=f"✅ Charge: {len(email_data['body'])} chars, {len(email_data.get('attachments', []))} PJ", state="complete")
                         else:
-                            st.error("Echec rechargement")
-                        st.rerun()
+                            error = content_data.get("error", "Erreur inconnue") if content_data else "Pas de reponse"
+                            reload_status.update(label=f"❌ Echec: {error}", state="error")
+                    st.rerun()
             with col4b:
                 if st.button("❌", help="Ignorer cet email"):
                     st.session_state.emails = [e for e in st.session_state.emails if e["id"] != email_data["id"]]
