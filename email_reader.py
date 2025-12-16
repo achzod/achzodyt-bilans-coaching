@@ -165,7 +165,7 @@ class EmailReader:
         """Extrait les pieces jointes"""
         attachments = []
         try:
-        if msg.is_multipart():
+            if msg.is_multipart():
             for part in msg.walk():
                 content_disposition = str(part.get("Content-Disposition", ""))
                 content_type = part.get_content_type()
@@ -190,10 +190,10 @@ class EmailReader:
                                 "data": base64.b64encode(data).decode('utf-8'),
                                 "size": len(data)
                             })
-                        except:
-                            pass
                     except:
                         pass
+        except:
+            pass
         return attachments
 
     def mark_as_read(self, email_id: str, folder: str = "INBOX") -> bool:
