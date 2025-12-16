@@ -360,43 +360,66 @@ class EmailReader:
             if len(email_ids) > max_emails:
                 email_ids = email_ids[-max_emails:]
 
-            for i, eid in enumerate(email_ids):
+            # Charger par lots (Batch Fetching)
+            batch_size = 50
+            total_emails = len(email_ids)
+            
+            for i in range(0, total_emails, batch_size):
+                batch_ids = email_ids[i:i + batch_size]
+                # Convertir les IDs en une chaine separee par des virgules
+                batch_ids_str = b",".join(batch_ids).decode()
+                
+                print(f"[EMAILS] Chargement batch {i+1}-{min(i+batch_size, total_emails)}...")
+                
                 try:
-                    status, msg_data = conn.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                    if status != "OK" or not msg_data or not msg_data[0]:
+                    # FETCH multiple IDs en une seule fois
+                    status, data = conn.fetch(batch_ids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    
+                    if status != "OK":
+                        print(f"[EMAILS] Erreur status batch: {status}")
                         continue
-
-                    header_data = msg_data[0][1]
-                    msg = email.message_from_bytes(header_data)
-
-                    subject = self._decode_header_value(msg["Subject"])
-                    from_header = self._decode_header_value(msg["From"])
-                    from_email = self._extract_email_address(from_header)
-
-                    try:
-                        date = parsedate_to_datetime(msg["Date"])
-                    except:
-                        date = datetime.now()
-
-                    is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
-
-                    emails.append({
-                        "id": eid.decode() if isinstance(eid, bytes) else str(eid),
-                        "from": from_header,
-                        "from_email": from_email,
-                        "subject": subject,
-                        "date": date,
-                        "body": "",
-                        "attachments": [],
-                        "is_potential_bilan": is_bilan,
-                        "message_id": msg.get("Message-ID", ""),
-                        "loaded": False
-                    })
-
-                    if (i + 1) % 20 == 0:
-                        print(f"[EMAILS] {i + 1}/{len(email_ids)} charges...")
-
-                except:
+                        
+                    # Traitement de la reponse batch
+                    for response_part in data:
+                        if isinstance(response_part, tuple):
+                            try:
+                                # response_part[0] contient l'ID et la commande FETCH
+                                raw_response = response_part[0]
+                                current_id = ""
+                                if isinstance(raw_response, bytes):
+                                    current_id = raw_response.split()[0].decode()
+                                
+                                msg_data = response_part[1]
+                                msg = email.message_from_bytes(msg_data)
+                                
+                                subject = self._decode_header_value(msg["Subject"])
+                                from_header = self._decode_header_value(msg["From"])
+                                from_email = self._extract_email_address(from_header)
+                                
+                                try:
+                                    date = parsedate_to_datetime(msg["Date"])
+                                except:
+                                    date = datetime.now()
+                                    
+                                is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+                                
+                                emails.append({
+                                    "id": current_id,
+                                    "from": from_header,
+                                    "from_email": from_email,
+                                    "subject": subject,
+                                    "date": date,
+                                    "body": "",
+                                    "attachments": [],
+                                    "is_potential_bilan": is_bilan,
+                                    "message_id": msg.get("Message-ID", ""),
+                                    "loaded": False
+                                })
+                            except Exception as e:
+                                continue
+                                
+                except Exception as e:
+                    print(f"[EMAILS] Erreur batch fetch: {e}")
                     continue
 
             conn.logout()
