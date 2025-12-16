@@ -1,6 +1,6 @@
 """
 Interface Streamlit pour la gestion des bilans coaching
-Version Database-First (CRM)
+Version Database-First (CRM) - Monolithique
 """
 
 import streamlit as st
@@ -11,9 +11,190 @@ from analyzer import analyze_coaching_bilan, regenerate_email_draft
 from email_sender import send_email, preview_email
 from clients import get_client, save_client, get_jours_restants
 from dashboard_generator import generate_client_dashboard
-from database import DatabaseManager
 import html
 import json
+import sqlite3
+import os
+from typing import List, Dict, Any, Optional
+
+# --- GESTION DATABASE (Intégré pour eviter erreurs d'import) ---
+
+# Chemin de la DB: sur disque persistant /data si dispo, sinon local
+DB_PATH = "/data/coaching.db" if os.path.exists("/data") else "coaching.db"
+ATTACHMENTS_DIR = "/data/attachments" if os.path.exists("/data") else "attachments"
+
+class DatabaseManager:
+    def __init__(self):
+        self._init_db()
+        self._init_dirs()
+
+    def _init_db(self):
+        """Cree les tables si elles n'existent pas"""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            
+            # Table Clients
+            c.execute('''CREATE TABLE IF NOT EXISTS clients
+                        (email TEXT PRIMARY KEY, 
+                        nom TEXT, 
+                        objectif TEXT, 
+                        date_debut TEXT,
+                        duree_semaines INTEGER,
+                        notes TEXT,
+                        last_updated TIMESTAMP)''')
+            
+            # Table Emails (Historique complet)
+            c.execute('''CREATE TABLE IF NOT EXISTS emails
+                        (message_id TEXT PRIMARY KEY,
+                        client_email TEXT,
+                        subject TEXT,
+                        date TIMESTAMP,
+                        body TEXT,
+                        direction TEXT, -- 'received' ou 'sent'
+                        is_bilan BOOLEAN,
+                        analysis_json TEXT, -- Resultat analyse IA stocke
+                        FOREIGN KEY(client_email) REFERENCES clients(email))''')
+                        
+            # Table Attachments
+            c.execute('''CREATE TABLE IF NOT EXISTS attachments
+                        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        message_id TEXT,
+                        filename TEXT,
+                        filepath TEXT,
+                        content_type TEXT,
+                        FOREIGN KEY(message_id) REFERENCES emails(message_id))''')
+                        
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            st.error(f"Erreur init DB: {e}")
+
+    def _init_dirs(self):
+        """Cree le dossier pieces jointes"""
+        try:
+            os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+        except:
+            pass
+
+    def get_client(self, email: str) -> Optional[Dict]:
+        """Recupere infos client"""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute("SELECT * FROM clients WHERE email = ?", (email,))
+            row = c.fetchone()
+            conn.close()
+            return dict(row) if row else None
+        except:
+            return None
+
+    def save_client(self, email: str, nom: str = "", objectif: str = "", date_debut: str = "", duree: int = 12):
+        """Sauvegarde/Update client"""
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("""INSERT OR REPLACE INTO clients (email, nom, objectif, date_debut, duree_semaines, last_updated)
+                     VALUES (?, ?, ?, ?, ?, ?)""",
+                  (email, nom, objectif, date_debut, duree, datetime.now()))
+        conn.commit()
+        conn.close()
+
+    def save_email(self, email_data: Dict) -> bool:
+        """Sauvegarde un email et ses pieces jointes"""
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        try:
+            # 1. Sauvegarder l'email
+            date_val = email_data['date']
+            if isinstance(date_val, datetime):
+                date_val = date_val.isoformat()
+                
+            c.execute("""INSERT OR IGNORE INTO emails 
+                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                      (email_data['message_id'], 
+                       email_data.get('from_email') if email_data.get('direction') == 'received' else email_data.get('to_email'),
+                       email_data['subject'], 
+                       date_val, 
+                       email_data.get('body', ''),
+                       email_data.get('direction', 'received'),
+                       email_data.get('is_potential_bilan', False),
+                       json.dumps(email_data.get('analysis', {})) if email_data.get('analysis') else None
+                      ))
+            
+            # 2. Sauvegarder les pieces jointes
+            for att in email_data.get('attachments', []):
+                safe_filename = "".join([c for c in att['filename'] if c.isalpha() or c.isdigit() or c in '._- ']).strip()
+                file_path = os.path.join(ATTACHMENTS_DIR, f"{email_data['message_id']}_{safe_filename}")
+                
+                if 'data' in att and not os.path.exists(file_path):
+                    try:
+                        with open(file_path, "wb") as f:
+                            f.write(base64.b64decode(att['data']))
+                    except:
+                        pass
+                
+                c.execute("""INSERT OR IGNORE INTO attachments (message_id, filename, filepath, content_type)
+                             VALUES (?, ?, ?, ?)""",
+                          (email_data['message_id'], att['filename'], file_path, att['content_type']))
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erreur save DB: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_client_history(self, client_email: str) -> List[Dict]:
+        """Recupere tout l'historique d'un client depuis la DB"""
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Recherche flexible (contient)
+        if client_email:
+            c.execute("""SELECT * FROM emails 
+                        WHERE client_email LIKE ? OR client_email LIKE ?
+                        ORDER BY date ASC""", (f"%{client_email}%", client_email))
+        else:
+            # Si vide, on ne renvoie rien ou les recents (limit 50)
+            c.execute("SELECT * FROM emails ORDER BY date DESC LIMIT 50")
+
+        rows = c.fetchall()
+        
+        history = []
+        for row in rows:
+            email_dict = dict(row)
+            try:
+                email_dict['date'] = datetime.fromisoformat(email_dict['date'])
+            except:
+                pass
+                
+            c.execute("SELECT * FROM attachments WHERE message_id = ?", (email_dict['message_id'],))
+            att_rows = c.fetchall()
+            email_dict['attachments'] = [dict(att) for att in att_rows]
+            
+            history.append(email_dict)
+            
+        conn.close()
+        
+        # Tri final par date
+        history.sort(key=lambda x: x['date'] if isinstance(x['date'], datetime) else datetime.min)
+        return history
+
+    def email_exists(self, message_id: str) -> bool:
+        """Verifie si un email est deja en base"""
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM emails WHERE message_id = ?", (message_id,))
+        exists = c.fetchone() is not None
+        conn.close()
+        return exists
+
+# --- FIN GESTION DB ---
 
 # Config page
 st.set_page_config(
@@ -162,8 +343,7 @@ def display_kpis(kpis):
 
 
 def main():
-    import os
-    st.markdown('<div class="main-header">💪 Bilans Coaching - CRM v2.0</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">💪 Bilans Coaching - CRM v3.0 (Monolith)</div>', unsafe_allow_html=True)
 
     # Sidebar - Synchro
     with st.sidebar:
@@ -172,8 +352,7 @@ def main():
         # Stats DB
         try:
             # Petite requete rapide pour savoir combien on a d'emails
-            conn = st.session_state.db._init_db() # Juste pour verifier connexion
-            # Pas ideal d'appeler _init_db ici, mais passons
+            pass
         except:
             pass
 
@@ -210,24 +389,10 @@ def main():
         st.divider()
         st.header("📂 Clients")
         
-        # Liste des clients (simulee depuis les emails pour l'instant)
-        # Idealement on aurait une table Clients remplie
-        # Pour l'instant on liste les emails stockes
-        # On va lister les emails NON LUS / A TRAITER en priorité
+        # Vue Inbox / Recherche
+        st.subheader("Recherche Client")
         
-        # On peut ajouter une vue "Inbox" locale
-        st.subheader("Inbox (A traiter)")
-        
-        # Recuperer les emails depuis la DB locale ! Plus de fetch Gmail ici !
-        # Ici c'est simplifie, on affiche tout. Dans l'ideal on filtre par "traité/non traité"
-        # Pour l'instant on va simuler en prenant les derniers emails reçus
-        conn = st.session_state.db.get_client_history("") # Hack pour avoir un curseur
-        # TODO: Ajouter methode get_recent_stored_emails dans DatabaseManager
-        
-        # Temporaire: on affiche rien ici pour eviter la complexite, 
-        # on va juste demander de selectionner un client par son email
-        
-        client_search = st.text_input("🔍 Chercher un client (email)", placeholder="jean@example.com")
+        client_search = st.text_input("🔍 Email client", placeholder="jean@example.com")
         
         if client_search:
             st.session_state.emails = st.session_state.db.get_client_history(client_search)
@@ -235,6 +400,10 @@ def main():
                 st.warning("Aucun historique pour ce client")
             else:
                 st.success(f"{len(st.session_state.emails)} emails trouves")
+        
+        # Si pas de recherche, afficher les derniers mails recus (Inbox locale)
+        elif not st.session_state.emails:
+             st.session_state.emails = st.session_state.db.get_client_history("") # Retourne les 50 derniers
                 
         # Liste des emails trouves pour ce client
         for email_data in st.session_state.emails:
@@ -245,7 +414,14 @@ def main():
             
             if st.button(f"{icon} {date_str} - {email_data['subject'][:30]}", key=f"sel_{email_data['message_id']}", use_container_width=True):
                 st.session_state.selected_email = email_data
-                st.session_state.history = st.session_state.emails # Tout l'historique est deja la !
+                # Pour l'historique, si on a cherche un client, on a deja tout
+                # Sinon on recharge l'historique specifique de ce client
+                if client_search:
+                    st.session_state.history = st.session_state.emails
+                else:
+                    client_email = email_data.get('client_email')
+                    st.session_state.history = st.session_state.db.get_client_history(client_email)
+                    
                 st.session_state.analysis = None
                 st.session_state.draft = ""
                 st.rerun()
@@ -313,9 +489,6 @@ def main():
                             
                             st.session_state.draft = draft if draft else "Email a rediger manuellement."
                             
-                            # Sauvegarder l'analyse en DB pour ne pas la refaire !
-                            # TODO: Update DB with analysis
-                            
                             status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
                             st.rerun()
                         else:
@@ -351,9 +524,6 @@ def main():
                 st.subheader("📊 KPIs")
                 display_kpis(analysis.get("kpis", {}))
                 
-                # ... Reste de l'affichage analyse ...
-                # (Je simplifie pour l'exemple, tu peux remettre tout le code d'affichage detaille ici)
-                
             else:
                 st.info("👆 Clique sur 'Analyser' pour lancer l'analyse IA")
 
@@ -375,7 +545,7 @@ def main():
     else:
         st.info("👈 Synchronise Gmail puis cherche un client dans la sidebar")
         st.markdown("""
-        ### 🚀 Nouveau Mode CRM
+        ### 🚀 Nouveau Mode CRM v3.0
         
         1. **Synchroniser** : Telecharge les nouveaux emails et les stocke sur le Disque Persistant.
         2. **Chercher** : Tape l'email d'un client pour voir tout son dossier instantanement.
