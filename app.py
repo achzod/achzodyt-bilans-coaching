@@ -338,11 +338,25 @@ def main():
                         status.update(label="❌ Erreur", state="error")
                         st.error("Impossible de charger le contenu de l'email. Clique sur 'Recharger' puis re-essaie.")
                     else:
-                        st.write("🤖 Appel Claude API...")
+                        # Si l'historique est vide, on le charge rapidement (optimise batch)
+                        history_to_analyze = st.session_state.history
+                        if not history_to_analyze:
+                            st.write("📜 Chargement historique conversation...")
+                            history_to_analyze = st.session_state.reader.get_conversation_history(
+                                email_data['from_email'],
+                                days=60 # 2 mois suffisent pour l'analyse
+                            )
+                            st.session_state.history = history_to_analyze
+
+                        # Optimisation: on n'envoie que les 3 derniers emails a l'IA pour aller vite
+                        # L'historique est trie par date croissante (le dernier est le plus recent)
+                        limited_history = history_to_analyze[-3:] if history_to_analyze else []
+                        
+                        st.write(f"🧠 Analyse avec {len(limited_history)} emails de contexte...")
 
                         result = analyze_coaching_bilan(
                             email_data,
-                            st.session_state.history
+                            limited_history
                         )
 
                         if result["success"]:
