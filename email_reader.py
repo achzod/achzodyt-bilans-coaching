@@ -246,7 +246,7 @@ class EmailReader:
                 email_ids = email_ids[-200:]
 
             # Charger par lots (Batch Fetching)
-            batch_size = 50
+            batch_size = 20
             total_emails = len(email_ids)
             
             for i in range(0, total_emails, batch_size):
@@ -397,13 +397,16 @@ class EmailReader:
                 email_ids = email_ids[-max_emails:]
 
             # Charger par lots (Batch Fetching)
-            batch_size = 50
+            # On reduit a 20 pour etre sur que ca passe sur tous les serveurs IMAP
+            batch_size = 20
             total_emails = len(email_ids)
+            
+            print(f"[EMAILS] Debut chargement batch (Total: {total_emails}, Batch size: {batch_size})")
             
             for i in range(0, total_emails, batch_size):
                 batch_ids = email_ids[i:i + batch_size]
                 
-                # Nettoyage des IDs pour etre sur
+                # Nettoyage des IDs
                 clean_batch_ids = []
                 for bid in batch_ids:
                     if isinstance(bid, bytes):
@@ -411,9 +414,10 @@ class EmailReader:
                     else:
                         clean_batch_ids.append(str(bid))
                 
+                # Commande IMAP standard: IDs separes par virgule
                 batch_ids_str = ",".join(clean_batch_ids)
                 
-                print(f"[EMAILS] Chargement batch {i+1}-{min(i+batch_size, total_emails)}...")
+                print(f"[EMAILS] Batch {i+1}-{min(i+batch_size, total_emails)}...")
                 
                 try:
                     # FETCH multiple IDs en une seule fois
