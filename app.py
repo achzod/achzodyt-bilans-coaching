@@ -327,13 +327,13 @@ def display_attachments(attachments):
             # Support Base64 (nouveau) ou Path (DB)
             if "data" in att:
                 # Ancienne methode (memoire)
-            if att["content_type"].startswith("image/"):
-                try:
-                    img_data = base64.b64decode(att["data"])
-                    st.image(img_data, caption=att["filename"], use_container_width=True)
-                except:
-                    st.write(f"📷 {att['filename']}")
-            else:
+                if att["content_type"].startswith("image/"):
+                    try:
+                        img_data = base64.b64decode(att["data"])
+                        st.image(img_data, caption=att["filename"], use_container_width=True)
+                    except:
+                        st.write(f"📷 {att['filename']}")
+                else:
                     st.write(f"📎 {att['filename']}")
             elif "filepath" in att and att.get("filepath"):
                 # Nouvelle methode (DB/Fichier)
@@ -388,9 +388,9 @@ def main():
         days = st.selectbox("Jours a scanner", [1, 3, 7, 30], index=1)
         
         if st.button("📥 Synchroniser Gmail", use_container_width=True, type="primary"):
-                if st.session_state.reader is None:
-                    st.session_state.reader = EmailReader()
-                    
+            if st.session_state.reader is None:
+                st.session_state.reader = EmailReader()
+            
             with st.status("Synchronisation en cours...", expanded=True) as status:
                 st.write("🔌 Connexion Gmail...")
                 
@@ -500,9 +500,9 @@ def main():
             # Si c'est un mail recu, on peut analyser
             if email_data.get('direction', 'received') == 'received':
                 if st.button("🤖 Analyser", type="primary", use_container_width=True):
-                with st.status("Analyse IA en cours...", expanded=True) as status:
+                    with st.status("Analyse IA en cours...", expanded=True) as status:
                         st.write(f"🧠 Analyse avec {len(st.session_state.history)} emails de contexte...")
-
+                        
                         result = analyze_coaching_bilan(
                             email_data,
                             st.session_state.history # On envoie tout l'historique local !
@@ -544,16 +544,16 @@ def main():
                 display_attachments(email_data["attachments"])
 
         with tab2:
-                for hist_email in st.session_state.history:
-                    direction = hist_email.get("direction", "received")
-                    icon = "📥" if direction == "received" else "📤"
+            for hist_email in st.session_state.history:
+                direction = hist_email.get("direction", "received")
+                icon = "📥" if direction == "received" else "📤"
                 date_val = hist_email['date']
                 date_str = date_val.strftime('%d/%m/%Y') if isinstance(date_val, datetime) else str(date_val)[:10]
 
-                    with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
-                        st.write(hist_email.get("body", "")[:1000])
-                        if hist_email.get("attachments"):
-                            st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
+                with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
+                    st.write(hist_email.get("body", "")[:1000])
+                    if hist_email.get("attachments"):
+                        st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
                         display_attachments(hist_email["attachments"])
 
         with tab3:
