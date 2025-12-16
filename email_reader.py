@@ -406,123 +406,84 @@ class EmailReader:
 
     def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
         """
-        Recupere les emails sans reponse (version simplifiee)
-        Utilise le flag IMAP UNANSWERED + verification manuelle
+        Recupere les emails sans reponse - VERSION ULTRA RAPIDE
+        Utilise le flag IMAP UNANSWERED directement
         """
-        print(f"[UNANSWERED] Chargement emails sans reponse ({days} jours)...")
+        print(f"[UNANSWERED] Chargement rapide ({days} jours)...")
 
         if not self._fresh_connect():
             print("[UNANSWERED] Echec connexion")
             return []
 
         emails = []
-        sent_to = {}  # email -> dernier timestamp d'envoi
-
         try:
+            self.connection.select(folder)
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
 
-            # 1. Charger les emails ENVOYES pour savoir a qui on a repondu
-            print("[UNANSWERED] Chargement emails envoyes...")
-            for sent_folder in ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent"]:
-                try:
-                    status, _ = self.connection.select(f'"{sent_folder}"')
-                    if status == "OK":
-                        status, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
-                        if status == "OK" and msgs[0]:
-                            sent_ids = msgs[0].split()
-                            print(f"[UNANSWERED] {len(sent_ids)} emails envoyes")
-
-                            for eid in sent_ids:
-                                try:
-                                    status, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (TO DATE)])")
-                                    if status == "OK" and data and data[0]:
-                                        m = email.message_from_bytes(data[0][1])
-                                        to_email = self._extract_email_address(self._decode_header_value(m["To"] or ""))
-                                        if to_email:
-                                            try:
-                                                ts = parsedate_to_datetime(m["Date"]).timestamp()
-                                            except:
-                                                ts = time.time()
-                                            # Garder le plus recent
-                                            if to_email not in sent_to or ts > sent_to[to_email]:
-                                                sent_to[to_email] = ts
-                                except:
-                                    continue
-                        break
-                except:
-                    continue
-
-            print(f"[UNANSWERED] Reponses envoyees a {len(sent_to)} contacts")
-
-            # 2. Charger les emails RECUS
-            if not self.ensure_connected():
-                return []
-
-            self.connection.select(folder)
-            status, msgs = self.connection.search(None, f'(SINCE "{since_date}")')
+            # Utiliser le flag IMAP UNANSWERED - super rapide!
+            status, msgs = self.connection.search(None, f'(UNANSWERED SINCE "{since_date}")')
 
             if status != "OK" or not msgs[0]:
-                print("[UNANSWERED] Aucun email recu")
+                print("[UNANSWERED] Aucun email trouve")
                 return []
 
-            recv_ids = msgs[0].split()
-            print(f"[UNANSWERED] {len(recv_ids)} emails recus a verifier")
+            email_ids = msgs[0].split()
+            print(f"[UNANSWERED] {len(email_ids)} emails trouves")
 
-            for idx, eid in enumerate(recv_ids):
-                if idx > 0 and idx % 50 == 0:
-                    print(f"[UNANSWERED] Progress: {idx}/{len(recv_ids)}")
-                    try:
-                        self.connection.noop()
-                    except:
-                        if not self._fresh_connect():
-                            break
-                        self.connection.select(folder)
+            # Limiter et fetch en batch
+            if len(email_ids) > 200:
+                email_ids = email_ids[-200:]
 
+            if email_ids:
+                ids_str = b','.join(email_ids)
                 try:
-                    status, data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                    if status != "OK" or not data or not data[0]:
-                        continue
+                    status, all_data = self.connection.fetch(ids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    if status == "OK" and all_data:
+                        for i in range(0, len(all_data), 2):
+                            if i >= len(all_data):
+                                break
+                            item = all_data[i]
+                            if not item or not isinstance(item, tuple) or len(item) < 2:
+                                continue
+                            try:
+                                id_part = item[0].decode() if isinstance(item[0], bytes) else str(item[0])
+                                eid = id_part.split()[0]
+                                header_data = item[1]
+                                msg = email.message_from_bytes(header_data)
 
-                    m = email.message_from_bytes(data[0][1])
-                    from_header = self._decode_header_value(m["From"])
-                    from_email = self._extract_email_address(from_header)
-                    subject = self._decode_header_value(m["Subject"] or "")
+                                subject = self._decode_header_value(msg["Subject"])
+                                from_header = self._decode_header_value(msg["From"])
+                                from_email = self._extract_email_address(from_header)
 
-                    try:
-                        recv_date = parsedate_to_datetime(m["Date"])
-                        recv_ts = recv_date.timestamp()
-                    except:
-                        recv_date = datetime.now()
-                        recv_ts = time.time()
+                                try:
+                                    date = parsedate_to_datetime(msg["Date"])
+                                except:
+                                    date = datetime.now()
 
-                    # Verifier si on a repondu APRES reception
-                    if from_email in sent_to and sent_to[from_email] > recv_ts:
-                        continue  # On a repondu, skip
+                                is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
 
-                    is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
-
-                    emails.append({
-                        "id": eid.decode() if isinstance(eid, bytes) else str(eid),
-                        "from": from_header,
-                        "from_email": from_email,
-                        "subject": subject,
-                        "date": recv_date,
-                        "body": "",
-                        "attachments": [],
-                        "is_potential_bilan": is_bilan,
-                        "message_id": m.get("Message-ID", ""),
-                        "loaded": False
-                    })
+                                emails.append({
+                                    "id": eid,
+                                    "from": from_header,
+                                    "from_email": from_email,
+                                    "subject": subject,
+                                    "date": date,
+                                    "body": "",
+                                    "attachments": [],
+                                    "is_potential_bilan": is_bilan,
+                                    "message_id": msg.get("Message-ID", ""),
+                                    "loaded": False
+                                })
+                            except:
+                                continue
                 except Exception as e:
-                    continue
+                    print(f"[UNANSWERED] Erreur batch: {e}")
 
         except Exception as e:
             print(f"[UNANSWERED] Erreur: {e}")
-            import traceback
-            traceback.print_exc()
 
         emails.sort(key=lambda x: x["date"], reverse=True)
-        print(f"[UNANSWERED] {len(emails)} emails sans reponse")
+        print(f"[UNANSWERED] {len(emails)} emails charges")
         return emails
 
     def load_email_content(self, email_id: str, folder: str = "INBOX") -> Dict[str, Any]:
