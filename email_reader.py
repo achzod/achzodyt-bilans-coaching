@@ -129,36 +129,80 @@ class EmailReader:
         return from_header
 
     def _get_email_body(self, msg) -> str:
-        """Extrait le corps de l'email"""
-        body = ""
+        """Extrait le corps de l'email - version robuste"""
+        text_body = ""
+        html_body = ""
+
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
                 content_disposition = str(part.get("Content-Disposition", ""))
 
-                if "attachment" not in content_disposition:
-                    if content_type == "text/plain":
-                        try:
-                            charset = part.get_content_charset() or 'utf-8'
-                            body = part.get_payload(decode=True).decode(charset, errors='ignore')
-                            break
-                        except:
-                            pass
-                    elif content_type == "text/html" and not body:
-                        try:
-                            charset = part.get_content_charset() or 'utf-8'
-                            html = part.get_payload(decode=True).decode(charset, errors='ignore')
-                            body = re.sub(r'<[^>]+>', ' ', html)
-                            body = re.sub(r'\s+', ' ', body).strip()
-                        except:
-                            pass
+                # Skip attachments
+                if "attachment" in content_disposition:
+                    continue
+
+                try:
+                    payload = part.get_payload(decode=True)
+                    if not payload:
+                        continue
+
+                    charset = part.get_content_charset() or 'utf-8'
+                    text = payload.decode(charset, errors='ignore')
+
+                    if content_type == "text/plain" and not text_body:
+                        text_body = text
+                    elif content_type == "text/html" and not html_body:
+                        html_body = text
+                except Exception as e:
+                    print(f"[BODY] Erreur extraction part: {e}")
+                    continue
         else:
             try:
-                charset = msg.get_content_charset() or 'utf-8'
-                body = msg.get_payload(decode=True).decode(charset, errors='ignore')
-            except:
-                pass
-        return body.strip()
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    charset = msg.get_content_charset() or 'utf-8'
+                    content_type = msg.get_content_type()
+                    text = payload.decode(charset, errors='ignore')
+
+                    if content_type == "text/html":
+                        html_body = text
+                    else:
+                        text_body = text
+            except Exception as e:
+                print(f"[BODY] Erreur extraction: {e}")
+
+        # Priorite au texte plain, sinon convertir HTML
+        if text_body and len(text_body.strip()) > 10:
+            return text_body.strip()
+
+        if html_body:
+            # Conversion HTML -> texte amelioree
+            text = html_body
+            # Remplacer <br> et <p> par des newlines
+            text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'</p>', '\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'</div>', '\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'</tr>', '\n', text, flags=re.IGNORECASE)
+            text = re.sub(r'</li>', '\n', text, flags=re.IGNORECASE)
+            # Supprimer les balises style et script
+            text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.IGNORECASE | re.DOTALL)
+            text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+            # Supprimer toutes les autres balises
+            text = re.sub(r'<[^>]+>', ' ', text)
+            # Decoder les entites HTML
+            text = re.sub(r'&nbsp;', ' ', text)
+            text = re.sub(r'&amp;', '&', text)
+            text = re.sub(r'&lt;', '<', text)
+            text = re.sub(r'&gt;', '>', text)
+            text = re.sub(r'&quot;', '"', text)
+            text = re.sub(r'&#39;', "'", text)
+            # Nettoyer les espaces multiples
+            text = re.sub(r'[ \t]+', ' ', text)
+            text = re.sub(r'\n\s*\n', '\n\n', text)
+            return text.strip()
+
+        return text_body.strip() if text_body else ""
 
     def _get_attachments(self, msg) -> List[Dict[str, Any]]:
         """Extrait les pieces jointes"""
