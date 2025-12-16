@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achzod Coaching - Espace Client</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #9990EA;
+            --primary-dark: #7B71D9;
+            --secondary: #8DFFE0;
+            --bg-dark: #0f0f1e;
+            --bg-card: #1a1a2e;
+            --bg-input: #16213e;
+            --text: #e0e0e0;
+            --text-muted: #888;
+            --success: #4CAF50;
+            --warning: #FFD93D;
+            --danger: #FF6B6B;
+            --border: rgba(255,255,255,0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-card) 50%, var(--bg-dark) 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ============ AUTH PAGES ============ */
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-box {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-logo h1 {
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .auth-logo p {
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(153, 144, 234, 0.2);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(153, 144, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #45a049);
+            color: white;
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 20px;
+            color: var(--text-muted);
+        }
+
+        .auth-switch a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+
+        .error-msg {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .success-msg {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        /* ============ APP LAYOUT ============ */
+        .app-container {
+            display: none;
+            min-height: 100vh;
+        }
+
+        .app-container.active {
+            display: block;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar-brand {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-link {
+            padding: 10px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: var(--bg-input);
+            color: var(--text);
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-name {
+            color: var(--text-muted);
+        }
+
+        .notification-badge {
+            position: relative;
+        }
+
+        .notification-badge .badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--danger);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+
+        .stat-card.success .stat-value {
+            background: linear-gradient(135deg, var(--success), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-card.warning .stat-value {
+            background: linear-gradient(135deg, var(--warning), #FFB800);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* KPI Bars */
+        .kpi-item {
+            margin-bottom: 15px;
+        }
+
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .kpi-label {
+            font-weight: 500;
+        }
+
+        .kpi-value {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .kpi-bar {
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .kpi-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .kpi-fill.green { background: linear-gradient(90deg, var(--success), var(--secondary)); }
+        .kpi-fill.yellow { background: linear-gradient(90deg, var(--warning), #FFB800); }
+        .kpi-fill.red { background: linear-gradient(90deg, var(--danger), #FF4444); }
+        .kpi-fill.purple { background: linear-gradient(90deg, var(--primary), var(--primary-dark)); }
+
+        /* Bilan Form */
+        .bilan-section {
+            margin-bottom: 30px;
+        }
+
+        .bilan-section h3 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .slider-group {
+            margin-bottom: 20px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .slider-value {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: var(--bg-input);
+            border-radius: 4px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        /* Messages */
+        .messages-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .message-item {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .message-item:hover {
+            border-color: var(--primary);
+        }
+
+        .message-item.unread {
+            border-left: 3px solid var(--primary);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .message-from {
+            font-weight: 600;
+        }
+
+        .message-date {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .message-subject {
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .message-preview {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Chat */
+        .chat-container {
+            height: calc(100vh - 250px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg-input);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .chat-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+        }
+
+        .chat-bubble.sent {
+            background: var(--primary);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-bubble.received {
+            background: var(--bg-card);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input textarea {
+            flex: 1;
+            padding: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            resize: none;
+            height: 50px;
+        }
+
+        /* Progress Chart */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        /* Bilan History */
+        .bilan-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .bilan-item {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bilan-item:hover {
+            border-color: var(--primary);
+        }
+
+        .bilan-info h4 {
+            margin-bottom: 5px;
+        }
+
+        .bilan-info p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .bilan-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-badge.pending {
+            background: rgba(255, 217, 61, 0.2);
+            color: var(--warning);
+        }
+
+        .status-badge.completed {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .navbar-nav {
+                display: none;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .chat-bubble {
+                max-width: 85%;
+            }
+        }
+
+        /* Bottom Nav Mobile */
+        .bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            padding: 10px;
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            .bottom-nav {
+                display: flex;
+                justify-content: space-around;
+            }
+
+            .main-content {
+                padding-bottom: 80px;
+            }
+        }
+
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        .bottom-nav-item.active {
+            color: var(--primary);
+            background: rgba(153, 144, 234, 0.1);
+        }
+
+        .bottom-nav-item svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: var(--bg-input);
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .quick-action {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-action:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .quick-action-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .quick-action-label {
+            font-weight: 500;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* Hide elements */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- AUTH PAGE -->
+    <div id="auth-page" class="auth-container">
+        <div class="auth-box">
+            <div class="auth-logo">
+                <h1>Achzod Coaching</h1>
+                <p>Ton espace personnel</p>
+            </div>
+
+            <div id="auth-error" class="error-msg hidden"></div>
+
+            <!-- Login Form -->
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" placeholder="ton@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="login-password" placeholder="********" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Se connecter</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="hidden">
+                <div class="form-group">
+                    <label>Prenom</label>
+                    <input type="text" id="register-name" placeholder="Ton prenom" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="register-email" placeholder="ton@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="register-password" placeholder="Min. 6 caracteres" required>
+                </div>
+                <div class="form-group">
+                    <label>Objectif</label>
+                    <select id="register-objectif">
+                        <option value="perte_gras">Perte de gras</option>
+                        <option value="prise_muscle">Prise de muscle</option>
+                        <option value="recomposition">Recomposition</option>
+                        <option value="performance">Performance</option>
+                        <option value="sante">Sante generale</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Creer mon compte</button>
+            </form>
+
+            <div class="auth-switch">
+                <span id="switch-to-register">Pas encore de compte ? <a href="#">S'inscrire</a></span>
+                <span id="switch-to-login" class="hidden">Deja un compte ? <a href="#">Se connecter</a></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="app-container">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="navbar-inner">
+                <div class="navbar-brand">Achzod Coaching</div>
+                <div class="navbar-nav">
+                    <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
+                    <a href="#" class="nav-link" data-page="bilan">Nouveau Bilan</a>
+                    <a href="#" class="nav-link" data-page="messages">Messages</a>
+                    <a href="#" class="nav-link" data-page="history">Historique</a>
+                </div>
+                <div class="navbar-user">
+                    <div class="notification-badge">
+                        <a href="#" class="nav-link" data-page="messages">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                        </a>
+                        <span id="notif-badge" class="badge hidden">0</span>
+                    </div>
+                    <span class="user-name" id="user-name">Client</span>
+                    <button class="btn btn-secondary" id="logout-btn">Deconnexion</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- DASHBOARD PAGE -->
+            <section id="page-dashboard" class="page active">
+                <div class="page-header">
+                    <h1>Bienvenue, <span id="dashboard-name">Champion</span> !</h1>
+                    <p>Voici ton tableau de bord</p>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <div class="quick-action" data-action="new-bilan">
+                        <div class="quick-action-icon">📝</div>
+                        <div class="quick-action-label">Nouveau Bilan</div>
+                    </div>
+                    <div class="quick-action" data-action="message">
+                        <div class="quick-action-icon">💬</div>
+                        <div class="quick-action-label">Ecrire au Coach</div>
+                    </div>
+                    <div class="quick-action" data-action="daily">
+                        <div class="quick-action-icon">📊</div>
+                        <div class="quick-action-label">Log du jour</div>
+                    </div>
+                    <div class="quick-action" data-action="photos">
+                        <div class="quick-action-icon">📸</div>
+                        <div class="quick-action-label">Photos</div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-bilans">0</div>
+                        <div class="stat-label">Bilans soumis</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-value" id="stat-jours">0</div>
+                        <div class="stat-label">Jours restants</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-poids">--</div>
+                        <div class="stat-label">Poids actuel</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-value" id="stat-messages">0</div>
+                        <div class="stat-label">Messages non lus</div>
+                    </div>
+                </div>
+
+                <!-- KPIs -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📊 Tes KPIs (derniere semaine)</div>
+                    </div>
+                    <div id="kpis-container">
+                        <div class="kpi-item">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Energie</span>
+                                <span class="kpi-value" id="kpi-energie">-/10</span>
+                            </div>
+                            <div class="kpi-bar"><div class="kpi-fill purple" id="kpi-energie-bar" style="width: 0%"></div></div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Sommeil</span>
+                                <span class="kpi-value" id="kpi-sommeil">-/10</span>
+                            </div>
+                            <div class="kpi-bar"><div class="kpi-fill green" id="kpi-sommeil-bar" style="width: 0%"></div></div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Motivation</span>
+                                <span class="kpi-value" id="kpi-motivation">-/10</span>
+                            </div>
+                            <div class="kpi-bar"><div class="kpi-fill yellow" id="kpi-motivation-bar" style="width: 0%"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Response -->
+                <div class="card" id="last-response-card">
+                    <div class="card-header">
+                        <div class="card-title">💬 Dernier retour du coach</div>
+                    </div>
+                    <div id="last-response">
+                        <p class="empty-state">Aucun retour pour le moment. Soumets ton premier bilan !</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- NEW BILAN PAGE -->
+            <section id="page-bilan" class="page">
+                <div class="page-header">
+                    <h1>Nouveau Bilan Hebdo</h1>
+                    <p>Remplis ton check-in de la semaine</p>
+                </div>
+
+                <form id="bilan-form">
+                    <!-- Mesures -->
+                    <div class="card bilan-section">
+                        <h3>📏 Mesures</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Poids (kg)</label>
+                                <input type="number" step="0.1" name="poids" placeholder="75.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Tour de taille (cm)</label>
+                                <input type="number" step="0.1" name="tour_taille" placeholder="80">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ressenti -->
+                    <div class="card bilan-section">
+                        <h3>💪 Ressenti /10</h3>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span>Energie</span>
+                                <span class="slider-value" id="energie-val">5</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" name="energie" oninput="document.getElementById('energie-val').textContent = this.value">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span>Qualite du sommeil</span>
+                                <span class="slider-value" id="sommeil-val">5</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" name="sommeil_qualite" oninput="document.getElementById('sommeil-val').textContent = this.value">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span>Motivation</span>
+                                <span class="slider-value" id="motivation-val">5</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" name="motivation" oninput="document.getElementById('motivation-val').textContent = this.value">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span>Niveau de stress</span>
+                                <span class="slider-value" id="stress-val">5</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" name="stress" oninput="document.getElementById('stress-val').textContent = this.value">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span>Faim / Appetit</span>
+                                <span class="slider-value" id="faim-val">5</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" name="faim" oninput="document.getElementById('faim-val').textContent = this.value">
+                        </div>
+                    </div>
+
+                    <!-- Training -->
+                    <div class="card bilan-section">
+                        <h3>🏋️ Entrainement</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Seances prevues</label>
+                                <input type="number" name="seances_prevues" placeholder="4">
+                            </div>
+                            <div class="form-group">
+                                <label>Seances realisees</label>
+                                <input type="number" name="seances_faites" placeholder="4">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Difficultes rencontrees</label>
+                            <textarea name="difficultes_training" rows="2" placeholder="Exercices difficiles, douleurs, fatigue..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Nutrition -->
+                    <div class="card bilan-section">
+                        <h3>🍎 Nutrition</h3>
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span>Respect du plan /10</span>
+                                <span class="slider-value" id="calories-val">5</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" name="respect_calories" oninput="document.getElementById('calories-val').textContent = this.value">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nombre d'ecarts</label>
+                                <input type="number" name="nombre_ecarts" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Hydratation (litres/jour)</label>
+                                <input type="number" step="0.5" name="hydratation_litres" placeholder="2.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feedback -->
+                    <div class="card bilan-section">
+                        <h3>📝 Feedback</h3>
+                        <div class="form-group">
+                            <label>Tes victoires de la semaine</label>
+                            <textarea name="victoires" rows="3" placeholder="Ce dont tu es fier cette semaine..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Tes difficultes</label>
+                            <textarea name="difficultes" rows="3" placeholder="Ce qui a ete difficile..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Tes questions pour le coach</label>
+                            <textarea name="questions" rows="3" placeholder="Questions, demandes d'ajustements..."></textarea>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success" style="width: 100%; padding: 18px; font-size: 1.1rem;">
+                        Envoyer mon bilan
+                    </button>
+                </form>
+            </section>
+
+            <!-- MESSAGES PAGE -->
+            <section id="page-messages" class="page">
+                <div class="page-header">
+                    <h1>Messages</h1>
+                    <p>Discussion avec ton coach</p>
+                </div>
+
+                <div class="card">
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chat-messages">
+                            <!-- Messages loaded here -->
+                        </div>
+                        <div class="chat-input">
+                            <textarea id="message-input" placeholder="Ecris ton message..."></textarea>
+                            <button class="btn btn-primary" id="send-message-btn">Envoyer</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HISTORY PAGE -->
+            <section id="page-history" class="page">
+                <div class="page-header">
+                    <h1>Historique</h1>
+                    <p>Tes bilans precedents</p>
+                </div>
+
+                <div class="bilan-list" id="bilan-list">
+                    <!-- Bilans loaded here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Nav Mobile -->
+        <nav class="bottom-nav">
+            <a href="#" class="bottom-nav-item active" data-page="dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="bilan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <path d="M14 2v6h6M12 18v-6M9 15h6"></path>
+                </svg>
+                <span>Bilan</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="messages">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Messages</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="history">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>Historique</span>
+            </a>
+        </nav>
+    </div>
+
+    <script>
+        // ============ CONFIG ============
+        const API_URL = window.location.origin + '/api';
+        let currentUser = null;
+        let authToken = localStorage.getItem('token');
+
+        // ============ UTILS ============
+        async function api(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (authToken) {
+                options.headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(`${API_URL}${endpoint}`, options);
+
+            if (response.status === 401) {
+                logout();
+                throw new Error('Session expiree');
+            }
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.detail || 'Erreur');
+            }
+
+            return result;
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('auth-error');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 5000);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        // ============ AUTH ============
+        async function login(email, password) {
+            try {
+                const result = await api('/auth/login', 'POST', { email, password });
+                authToken = result.token;
+                localStorage.setItem('token', authToken);
+                currentUser = result.user;
+                showApp();
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        async function register(name, email, password, objectif) {
+            try {
+                const result = await api('/auth/register', 'POST', { name, email, password, objectif });
+                authToken = result.token;
+                localStorage.setItem('token', authToken);
+                currentUser = { id: result.user_id, name, email };
+                showApp();
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('token');
+            document.getElementById('auth-page').style.display = 'flex';
+            document.getElementById('app').classList.remove('active');
+        }
+
+        async function checkAuth() {
+            if (!authToken) return false;
+
+            try {
+                currentUser = await api('/auth/me');
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // ============ APP ============
+        async function showApp() {
+            document.getElementById('auth-page').style.display = 'none';
+            document.getElementById('app').classList.add('active');
+
+            if (currentUser) {
+                document.getElementById('user-name').textContent = currentUser.name;
+                document.getElementById('dashboard-name').textContent = currentUser.name;
+            }
+
+            loadDashboard();
+        }
+
+        async function loadDashboard() {
+            try {
+                const data = await api('/client/dashboard');
+
+                // Stats
+                document.getElementById('stat-bilans').textContent = data.total_bilans || 0;
+                document.getElementById('stat-jours').textContent = data.jours_restants >= 0 ? data.jours_restants : '--';
+                document.getElementById('stat-messages').textContent = data.unread_messages || 0;
+
+                // Poids
+                if (data.last_bilan && data.last_bilan.poids) {
+                    document.getElementById('stat-poids').textContent = data.last_bilan.poids + ' kg';
+                }
+
+                // KPIs
+                if (data.last_bilan) {
+                    const b = data.last_bilan;
+                    updateKPI('energie', b.energie);
+                    updateKPI('sommeil', b.sommeil_qualite);
+                    updateKPI('motivation', b.motivation);
+                }
+
+                // Last response
+                if (data.last_bilan && data.last_bilan.coach_response) {
+                    document.getElementById('last-response').innerHTML = `<p style="white-space: pre-wrap;">${data.last_bilan.coach_response}</p>`;
+                }
+
+                // Notifications badge
+                if (data.unread_messages > 0) {
+                    document.getElementById('notif-badge').textContent = data.unread_messages;
+                    document.getElementById('notif-badge').classList.remove('hidden');
+                }
+
+            } catch (e) {
+                console.error('Dashboard error:', e);
+            }
+        }
+
+        function updateKPI(name, value) {
+            if (!value) return;
+            document.getElementById(`kpi-${name}`).textContent = `${value}/10`;
+            document.getElementById(`kpi-${name}-bar`).style.width = `${value * 10}%`;
+        }
+
+        async function loadBilans() {
+            try {
+                const data = await api('/client/bilans');
+                const container = document.getElementById('bilan-list');
+
+                if (!data.bilans || data.bilans.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><p>Aucun bilan soumis</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.bilans.map(b => `
+                    <div class="bilan-item">
+                        <div class="bilan-info">
+                            <h4>Semaine ${b.week_number}</h4>
+                            <p>${formatDate(b.date_submitted)} - ${b.poids ? b.poids + ' kg' : 'Pas de poids'}</p>
+                        </div>
+                        <div class="bilan-status">
+                            <span class="status-badge ${b.coach_response ? 'completed' : 'pending'}">${b.coach_response ? 'Repondu' : 'En attente'}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error('Bilans error:', e);
+            }
+        }
+
+        async function loadMessages() {
+            try {
+                const data = await api('/messages');
+                const container = document.getElementById('chat-messages');
+
+                if (!data.messages || data.messages.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><p>Aucun message</p></div>';
+                    return;
+                }
+
+                // Group by conversation (simple - just show all)
+                container.innerHTML = data.messages.slice().reverse().map(m => `
+                    <div class="chat-bubble ${m.from_user_id === currentUser.id ? 'sent' : 'received'}">
+                        <div>${m.body}</div>
+                        <div class="chat-time">${formatDate(m.created_at)}</div>
+                    </div>
+                `).join('');
+
+                container.scrollTop = container.scrollHeight;
+
+            } catch (e) {
+                console.error('Messages error:', e);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const body = input.value.trim();
+
+            if (!body) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('body', body);
+
+                const response = await fetch(`${API_URL}/messages/to-coach`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    loadMessages();
+                }
+            } catch (e) {
+                console.error('Send error:', e);
+            }
+        }
+
+        async function submitBilan(formData) {
+            try {
+                const data = {};
+                formData.forEach((value, key) => {
+                    if (value) {
+                        data[key] = isNaN(value) ? value : Number(value);
+                    }
+                });
+
+                await api('/client/bilans', 'POST', data);
+                alert('Bilan envoye avec succes !');
+                navigateTo('dashboard');
+                loadDashboard();
+
+            } catch (e) {
+                alert('Erreur: ' + e.message);
+            }
+        }
+
+        // ============ NAVIGATION ============
+        function navigateTo(page) {
+            // Update nav
+            document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.page === page);
+            });
+
+            // Update pages
+            document.querySelectorAll('.page').forEach(el => {
+                el.classList.toggle('active', el.id === `page-${page}`);
+            });
+
+            // Load page data
+            if (page === 'dashboard') loadDashboard();
+            if (page === 'messages') loadMessages();
+            if (page === 'history') loadBilans();
+        }
+
+        // ============ EVENT LISTENERS ============
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check existing auth
+            if (await checkAuth()) {
+                showApp();
+            }
+
+            // Login form
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                login(email, password);
+            });
+
+            // Register form
+            document.getElementById('register-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('register-name').value;
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                const objectif = document.getElementById('register-objectif').value;
+                register(name, email, password, objectif);
+            });
+
+            // Auth switch
+            document.getElementById('switch-to-register').addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('register-form').classList.remove('hidden');
+                document.getElementById('switch-to-register').classList.add('hidden');
+                document.getElementById('switch-to-login').classList.remove('hidden');
+            });
+
+            document.getElementById('switch-to-login').addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('switch-to-register').classList.remove('hidden');
+                document.getElementById('switch-to-login').classList.add('hidden');
+            });
+
+            // Logout
+            document.getElementById('logout-btn').addEventListener('click', logout);
+
+            // Navigation
+            document.querySelectorAll('[data-page]').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navigateTo(el.dataset.page);
+                });
+            });
+
+            // Quick actions
+            document.querySelectorAll('[data-action]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const action = el.dataset.action;
+                    if (action === 'new-bilan') navigateTo('bilan');
+                    if (action === 'message') navigateTo('messages');
+                });
+            });
+
+            // Bilan form
+            document.getElementById('bilan-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                submitBilan(formData);
+            });
+
+            // Send message
+            document.getElementById('send-message-btn').addEventListener('click', sendMessage);
+            document.getElementById('message-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import os
 import base64
 import json
 import io
+import re
 from typing import List, Dict, Any, Optional
 from anthropic import Anthropic
 from dotenv import load_dotenv
