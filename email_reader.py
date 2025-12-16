@@ -219,11 +219,11 @@ class EmailReader:
     def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = False, max_emails: int = 500) -> List[Dict[str, Any]]:
         """
         Recupere TOUS les emails (sans filtre "sans reponse")
-        Mode simple et robuste
+        Mode simple et robuste - UNE SEULE connexion, fetch rapide
         """
         print(f"[GET_ALL] Chargement emails ({days} jours, unread_only={unread_only})...")
 
-        if not self._fresh_connect():  # Toujours nouvelle connexion
+        if not self._fresh_connect():
             print("[GET_ALL] Echec connexion")
             return []
 
@@ -232,7 +232,6 @@ class EmailReader:
             self.connection.select(folder)
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
 
-            # Construire la requete
             if unread_only:
                 search_query = f'(UNSEEN SINCE "{since_date}")'
             else:
@@ -249,59 +248,108 @@ class EmailReader:
             total = len(email_ids)
             print(f"[GET_ALL] {total} emails trouves")
 
-            # Prendre les plus recents (limiter si trop)
             if total > max_emails:
                 email_ids = email_ids[-max_emails:]
                 print(f"[GET_ALL] Limite a {max_emails} emails")
 
-            # Charger les headers de chaque email
-            for idx, eid in enumerate(email_ids):
-                if idx > 0 and idx % 50 == 0:
-                    print(f"[GET_ALL] Progress: {idx}/{len(email_ids)}")
-                    # Keepalive
-                    try:
-                        self.connection.noop()
-                    except:
-                        if not self._fresh_connect():
-                            break
-                        self.connection.select(folder)
-
+            # FETCH EN BATCH pour eviter les deconnexions
+            # Recuperer tous les headers d'un coup
+            if email_ids:
+                ids_str = b','.join(email_ids)
                 try:
-                    status, msg_data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                    if status != "OK" or not msg_data or not msg_data[0]:
-                        continue
+                    status, all_data = self.connection.fetch(ids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    if status == "OK" and all_data:
+                        # Parser les resultats du batch
+                        for i in range(0, len(all_data), 2):
+                            if i >= len(all_data):
+                                break
+                            item = all_data[i]
+                            if not item or not isinstance(item, tuple) or len(item) < 2:
+                                continue
 
-                    header_data = msg_data[0][1]
-                    msg = email.message_from_bytes(header_data)
+                            try:
+                                # Extraire l'ID de l'email
+                                id_part = item[0].decode() if isinstance(item[0], bytes) else str(item[0])
+                                eid = id_part.split()[0]
 
-                    subject = self._decode_header_value(msg["Subject"])
-                    from_header = self._decode_header_value(msg["From"])
-                    from_email = self._extract_email_address(from_header)
+                                header_data = item[1]
+                                msg = email.message_from_bytes(header_data)
 
-                    try:
-                        date = parsedate_to_datetime(msg["Date"])
-                    except:
-                        date = datetime.now()
+                                subject = self._decode_header_value(msg["Subject"])
+                                from_header = self._decode_header_value(msg["From"])
+                                from_email = self._extract_email_address(from_header)
 
-                    # Detection bilan
-                    text = subject.lower()
-                    is_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+                                try:
+                                    date = parsedate_to_datetime(msg["Date"])
+                                except:
+                                    date = datetime.now()
 
-                    emails.append({
-                        "id": eid.decode() if isinstance(eid, bytes) else str(eid),
-                        "from": from_header,
-                        "from_email": from_email,
-                        "subject": subject,
-                        "date": date,
-                        "body": "",
-                        "attachments": [],
-                        "is_potential_bilan": is_bilan,
-                        "message_id": msg.get("Message-ID", ""),
-                        "loaded": False
-                    })
+                                text = subject.lower()
+                                is_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+
+                                emails.append({
+                                    "id": eid,
+                                    "from": from_header,
+                                    "from_email": from_email,
+                                    "subject": subject,
+                                    "date": date,
+                                    "body": "",
+                                    "attachments": [],
+                                    "is_potential_bilan": is_bilan,
+                                    "message_id": msg.get("Message-ID", ""),
+                                    "loaded": False
+                                })
+                            except Exception as e:
+                                print(f"[GET_ALL] Erreur parse email: {e}")
+                                continue
                 except Exception as e:
-                    print(f"[GET_ALL] Erreur email {eid}: {e}")
-                    continue
+                    print(f"[GET_ALL] Erreur batch fetch, fallback un par un: {e}")
+                    # Fallback: un par un si batch echoue
+                    for idx, eid in enumerate(email_ids):
+                        if idx > 0 and idx % 30 == 0:
+                            print(f"[GET_ALL] Progress: {idx}/{len(email_ids)}")
+                            try:
+                                self.connection.noop()
+                            except:
+                                if not self._fresh_connect():
+                                    break
+                                self.connection.select(folder)
+
+                        try:
+                            status, msg_data = self.connection.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                            if status != "OK" or not msg_data or not msg_data[0]:
+                                continue
+
+                            header_data = msg_data[0][1]
+                            msg = email.message_from_bytes(header_data)
+
+                            subject = self._decode_header_value(msg["Subject"])
+                            from_header = self._decode_header_value(msg["From"])
+                            from_email = self._extract_email_address(from_header)
+
+                            try:
+                                date = parsedate_to_datetime(msg["Date"])
+                            except:
+                                date = datetime.now()
+
+                            text = subject.lower()
+                            is_bilan = any(kw in text for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+
+                            emails.append({
+                                "id": eid.decode() if isinstance(eid, bytes) else str(eid),
+                                "from": from_header,
+                                "from_email": from_email,
+                                "subject": subject,
+                                "date": date,
+                                "body": "",
+                                "attachments": [],
+                                "is_potential_bilan": is_bilan,
+                                "message_id": msg.get("Message-ID", ""),
+                                "loaded": False
+                            })
+                        except Exception as e:
+                            print(f"[GET_ALL] Erreur email {eid}: {e}")
+                            continue
 
         except Exception as e:
             print(f"[GET_ALL] Erreur: {e}")
@@ -436,29 +484,24 @@ class EmailReader:
     def load_email_content(self, email_id: str, folder: str = "INBOX") -> Dict[str, Any]:
         """
         Charge le contenu complet d'un email
-        TOUJOURS nouvelle connexion pour eviter les problemes
+        NOUVELLE CONNEXION a chaque appel - ultra robuste
         """
-        print(f"[LOAD] Chargement contenu email {email_id}...")
+        print(f"[LOAD] Chargement email {email_id}...")
 
         for attempt in range(3):
+            conn = None
             try:
-                # Nouvelle connexion a chaque tentative
-                if not self._fresh_connect():
-                    print(f"[LOAD] Echec connexion (tentative {attempt + 1})")
-                    time.sleep(1)
-                    continue
-
-                status, _ = self.connection.select(folder)
-                if status != "OK":
-                    print(f"[LOAD] Echec select folder")
-                    continue
+                # Creer une connexion DEDIEE pour ce fetch
+                print(f"[LOAD] Connexion... (tentative {attempt + 1})")
+                conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+                conn.login(MAIL_USER, MAIL_PASS)
+                conn.select(folder)
 
                 eid = email_id.encode() if isinstance(email_id, str) else email_id
-                status, msg_data = self.connection.fetch(eid, "(BODY.PEEK[])")
+                status, msg_data = conn.fetch(eid, "(BODY.PEEK[])")
 
                 if status != "OK" or not msg_data or not msg_data[0]:
-                    print(f"[LOAD] Echec fetch (tentative {attempt + 1})")
-                    time.sleep(1)
+                    print(f"[LOAD] Echec fetch")
                     continue
 
                 raw_email = msg_data[0][1]
@@ -470,7 +513,14 @@ class EmailReader:
                 body = self._get_email_body(msg)
                 attachments = self._get_attachments(msg)
 
-                print(f"[LOAD] OK: {len(body)} chars, {len(attachments)} pieces jointes")
+                print(f"[LOAD] OK: {len(body)} chars, {len(attachments)} PJ")
+
+                # Fermer proprement
+                try:
+                    conn.logout()
+                except:
+                    pass
+
                 return {
                     "body": body,
                     "attachments": attachments,
@@ -479,7 +529,13 @@ class EmailReader:
 
             except Exception as e:
                 print(f"[LOAD] Erreur (tentative {attempt + 1}): {e}")
-                time.sleep(1)
+                time.sleep(0.5)
+            finally:
+                if conn:
+                    try:
+                        conn.logout()
+                    except:
+                        pass
 
         return {"error": "Echec apres 3 tentatives", "loaded": False, "body": "", "attachments": []}
 
