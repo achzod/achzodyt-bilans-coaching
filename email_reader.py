@@ -94,10 +94,10 @@ class EmailReader:
         html_body = ""
 
         try:
-        if msg.is_multipart():
-            for part in msg.walk():
-                content_type = part.get_content_type()
-                content_disposition = str(part.get("Content-Disposition", ""))
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_type = part.get_content_type()
+                    content_disposition = str(part.get("Content-Disposition", ""))
 
                     if "attachment" in content_disposition:
                         continue
@@ -107,20 +107,20 @@ class EmailReader:
                         if not payload:
                             continue
 
-                            charset = part.get_content_charset() or 'utf-8'
+                        charset = part.get_content_charset() or 'utf-8'
                         text = payload.decode(charset, errors='ignore')
 
                         if content_type == "text/plain" and not text_body:
                             text_body = text
                         elif content_type == "text/html" and not html_body:
                             html_body = text
-                        except:
+                    except:
                         continue
-        else:
-            try:
+            else:
+                try:
                     payload = msg.get_payload(decode=True)
                     if payload:
-                charset = msg.get_content_charset() or 'utf-8'
+                        charset = msg.get_content_charset() or 'utf-8'
                         content_type = msg.get_content_type()
                         text = payload.decode(charset, errors='ignore')
 
@@ -128,8 +128,8 @@ class EmailReader:
                             html_body = text
                         else:
                             text_body = text
-            except:
-                pass
+                except:
+                    pass
 
             # Priorite au texte plain
             if text_body and len(text_body.strip()) > 10:
