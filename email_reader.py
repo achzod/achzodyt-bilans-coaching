@@ -166,7 +166,7 @@ class EmailReader:
         attachments = []
         try:
             if msg.is_multipart():
-            for part in msg.walk():
+                for part in msg.walk():
                 content_disposition = str(part.get("Content-Disposition", ""))
                 content_type = part.get_content_type()
 
