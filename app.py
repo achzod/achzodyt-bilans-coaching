@@ -102,6 +102,24 @@ class DatabaseManager:
 
     def save_email(self, email_data: Dict) -> bool:
         """Sauvegarde un email et ses pieces jointes"""
+        
+        # FILTRE: Ignorer les emails inutiles (spam coaching)
+        EXCLUDE_PATTERNS = [
+            'typeform', 'followup', 'newsletter', 'noreply', 'no-reply', 
+            'stripe', 'paypal', 'billing', 'invoice', 'facture', 'recu', 'receipt',
+            'confirmation', 'commande', 'order', 'shipping', 'livraison',
+            'publicite', 'promo', 'soldes', 'unsubscribe', 'desinscription',
+            'linkedin', 'instagram', 'facebook', 'twitter', 'youtube', 'pinterest',
+            'notification', 'alert', 'security', 'securite', 'connexion', 'login'
+        ]
+        
+        subject = email_data.get('subject', '').lower()
+        sender = email_data.get('from_email', '').lower()
+        
+        if any(p in subject for p in EXCLUDE_PATTERNS) or any(p in sender for p in EXCLUDE_PATTERNS):
+            # print(f"Email ignore (filtre): {subject}")
+            return False
+            
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
