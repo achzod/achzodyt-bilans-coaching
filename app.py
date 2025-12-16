@@ -147,18 +147,31 @@ class DatabaseManager:
                 safe_filename = "".join([c for c in att['filename'] if c.isalpha() or c.isdigit() or c in '._- ']).strip()
                 file_path = os.path.join(ATTACHMENTS_DIR, f"{email_data['message_id']}_{safe_filename}")
                 
-                if 'data' in att and not os.path.exists(file_path):
-                    try:
-                        with open(file_path, "wb") as f:
-                            f.write(base64.b64decode(att['data']))
-                    except:
-                        pass
+                if 'data' in att:
+                    if not os.path.exists(file_path):
+                        try:
+                            with open(file_path, "wb") as f:
+                                f.write(base64.b64decode(att['data']))
+                        except:
+                            pass
+                    
+                    # CRITIQUE: Liberer la memoire tout de suite !
+                    # On supprime la donnee binaire lourde de l'objet en memoire
+                    att['data'] = None 
+                    del att['data']
                 
                 c.execute("""INSERT OR IGNORE INTO attachments (message_id, filename, filepath, content_type)
                              VALUES (?, ?, ?, ?)""",
                           (email_data['message_id'], att['filename'], file_path, att['content_type']))
             
             conn.commit()
+            
+            # Encore plus de nettoyage
+            if 'attachments' in email_data:
+                for att in email_data['attachments']:
+                    if 'data' in att:
+                        del att['data']
+                        
             return True
         except Exception as e:
             print(f"Erreur save DB: {e}")
@@ -327,13 +340,13 @@ def display_attachments(attachments):
             # Support Base64 (nouveau) ou Path (DB)
             if "data" in att:
                 # Ancienne methode (memoire)
-                if att["content_type"].startswith("image/"):
-                    try:
-                        img_data = base64.b64decode(att["data"])
-                        st.image(img_data, caption=att["filename"], use_container_width=True)
-                    except:
-                        st.write(f"📷 {att['filename']}")
-                else:
+            if att["content_type"].startswith("image/"):
+                try:
+                    img_data = base64.b64decode(att["data"])
+                    st.image(img_data, caption=att["filename"], use_container_width=True)
+                except:
+                    st.write(f"📷 {att['filename']}")
+            else:
                     st.write(f"📎 {att['filename']}")
             elif "filepath" in att and att.get("filepath"):
                 # Nouvelle methode (DB/Fichier)
@@ -372,7 +385,8 @@ def display_kpis(kpis):
 
 
 def main():
-    st.markdown('<div class="main-header">💪 Bilans Coaching - CRM v3.0 (Monolith)</div>', unsafe_allow_html=True)
+    import gc
+    st.markdown('<div class="main-header">💪 Bilans Coaching - CRM v3.1 (Low Ram)</div>', unsafe_allow_html=True)
 
     # Sidebar - Synchro
     with st.sidebar:
@@ -388,9 +402,9 @@ def main():
         days = st.selectbox("Jours a scanner", [1, 3, 7, 30], index=1)
         
         if st.button("📥 Synchroniser Gmail", use_container_width=True, type="primary"):
-            if st.session_state.reader is None:
-                st.session_state.reader = EmailReader()
-            
+                if st.session_state.reader is None:
+                    st.session_state.reader = EmailReader()
+                    
             with st.status("Synchronisation en cours...", expanded=True) as status:
                 st.write("🔌 Connexion Gmail...")
                 
@@ -421,6 +435,11 @@ def main():
                             email['attachments'] = content.get('attachments', [])
                             if st.session_state.db.save_email(email):
                                 saved_count += 1
+                        
+                        # Nettoyage agressif memoire apres chaque mail
+                        del content
+                        email.clear() # Vide le dict
+                        gc.collect()
                 
                 status.update(label=f"✅ {saved_count} nouveaux emails sauvegardes ({ignored_count} ignores)", state="complete", expanded=False)
                 st.success(f"Base de donnees a jour (+{saved_count} emails)")
@@ -500,9 +519,9 @@ def main():
             # Si c'est un mail recu, on peut analyser
             if email_data.get('direction', 'received') == 'received':
                 if st.button("🤖 Analyser", type="primary", use_container_width=True):
-                    with st.status("Analyse IA en cours...", expanded=True) as status:
+                with st.status("Analyse IA en cours...", expanded=True) as status:
                         st.write(f"🧠 Analyse avec {len(st.session_state.history)} emails de contexte...")
-                        
+
                         result = analyze_coaching_bilan(
                             email_data,
                             st.session_state.history # On envoie tout l'historique local !
@@ -544,16 +563,16 @@ def main():
                 display_attachments(email_data["attachments"])
 
         with tab2:
-            for hist_email in st.session_state.history:
-                direction = hist_email.get("direction", "received")
-                icon = "📥" if direction == "received" else "📤"
+                for hist_email in st.session_state.history:
+                    direction = hist_email.get("direction", "received")
+                    icon = "📥" if direction == "received" else "📤"
                 date_val = hist_email['date']
                 date_str = date_val.strftime('%d/%m/%Y') if isinstance(date_val, datetime) else str(date_val)[:10]
 
-                with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
-                    st.write(hist_email.get("body", "")[:1000])
-                    if hist_email.get("attachments"):
-                        st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
+                    with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
+                        st.write(hist_email.get("body", "")[:1000])
+                        if hist_email.get("attachments"):
+                            st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
                         display_attachments(hist_email["attachments"])
 
         with tab3:
