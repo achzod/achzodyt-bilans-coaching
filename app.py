@@ -162,30 +162,53 @@ def main():
         # Bouton connexion
         col1, col2 = st.columns(2)
         with col1:
-            connect_btn = st.button("🔄 Connecter", use_container_width=True)
+            connect_btn = st.button("🔄 Charger", use_container_width=True)
         with col2:
             days = st.selectbox("Jours", [3, 7, 14, 30], index=1, label_visibility="collapsed")
+
+        # Mode de chargement
+        load_mode = st.radio(
+            "Mode",
+            ["Sans reponse", "Non lus", "Tous"],
+            horizontal=True,
+            help="Sans reponse = emails auxquels tu n'as pas repondu"
+        )
 
         if connect_btn:
             with st.status("Chargement emails...", expanded=True) as status:
                 if st.session_state.reader is None:
                     st.session_state.reader = EmailReader()
-                    
+
                 st.write("🔌 Connexion Gmail...")
-                if st.session_state.reader.connect():
+
+                if load_mode == "Sans reponse":
                     st.write("📬 Recherche emails sans reponse...")
-                    st.write("⏳ Cela peut prendre 1-2 minutes pour charger tous les emails")
+                    st.write("⏳ Comparaison avec emails envoyes...")
                     st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                elif load_mode == "Non lus":
+                    st.write("📬 Recherche emails non lus...")
+                    st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=True)
+                else:
+                    st.write("📬 Recherche tous les emails...")
+                    st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=False)
+
+                if st.session_state.emails:
                     st.session_state.connected = True
                     status.update(label=f"✅ {len(st.session_state.emails)} emails charges!", state="complete", expanded=False)
                 else:
-                    status.update(label="❌ Erreur connexion", state="error")
+                    status.update(label="⚠️ Aucun email trouve", state="complete", expanded=False)
 
         # Bouton rafraichir
         if st.session_state.connected:
             if st.button("🔃 Rafraichir", use_container_width=True):
-                with st.spinner("Chargement..."):
-                    st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                with st.spinner("Rechargement..."):
+                    if load_mode == "Sans reponse":
+                        st.session_state.emails = st.session_state.reader.get_unanswered_emails(days=days)
+                    elif load_mode == "Non lus":
+                        st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=True)
+                    else:
+                        st.session_state.emails = st.session_state.reader.get_all_emails(days=days, unread_only=False)
+                    st.rerun()
 
         st.divider()
 
