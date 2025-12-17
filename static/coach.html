@@ -693,12 +693,25 @@ function closeDashboard() {
 async function sync() {
     const status = document.getElementById('sync-status');
     status.textContent = 'Sync en cours...';
+    status.style.color = '#6b7280';
     try {
+        console.log('[SYNC] Starting...');
         const res = await api('/coach/gmail/sync', 'POST');
-        status.textContent = `${res.synced} nouveaux emails`;
-        loadClients();
-        setTimeout(() => status.textContent = '', 5000);
-    } catch(e) { status.textContent = 'Erreur sync'; }
+        console.log('[SYNC] Result:', res);
+        if (res.error) {
+            status.textContent = `Erreur: ${res.error}`;
+            status.style.color = '#dc2626';
+        } else {
+            status.textContent = `✓ ${res.synced || 0} emails synced`;
+            status.style.color = '#16a34a';
+            loadClients();
+        }
+        setTimeout(() => { status.textContent = ''; status.style.color = '#6b7280'; }, 8000);
+    } catch(e) {
+        console.error('[SYNC] Error:', e);
+        status.textContent = `Erreur: ${e.message}`;
+        status.style.color = '#dc2626';
+    }
 }
 
 // COPY
