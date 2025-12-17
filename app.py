@@ -251,7 +251,7 @@ class DatabaseManager:
                 except:
                     pass
 
-    def get_client_history(self, client_email: str) -> List[Dict]:
+    def get_client_history(self, client_email: str, limit: int = 50) -> List[Dict]:
         """Recupere tout l'historique d'un client depuis la DB"""
         conn = None
         try:
@@ -261,12 +261,12 @@ class DatabaseManager:
             
             # Recherche flexible (contient)
             if client_email and client_email.strip():
-                c.execute("""SELECT * FROM emails 
+                c.execute(f"""SELECT * FROM emails 
                             WHERE client_email LIKE ? OR client_email LIKE ?
-                            ORDER BY date ASC""", (f"%{client_email}%", client_email))
+                            ORDER BY date DESC LIMIT ?""", (f"%{client_email}%", client_email, limit))
             else:
-                # Si vide, on ne renvoie rien ou les recents (limit 50)
-                c.execute("SELECT * FROM emails ORDER BY date DESC LIMIT 50")
+                # Si vide, on ne renvoie rien ou les recents (limit parametrable)
+                c.execute(f"SELECT * FROM emails ORDER BY date DESC LIMIT ?", (limit,))
 
             rows = c.fetchall()
             
@@ -284,19 +284,11 @@ class DatabaseManager:
                     except:
                         email_dict['date'] = datetime.now()
                     
-                    # Recuperer attachments (seulement si body_loaded = 1)
+                    # OPTIMISATION: Ne pas charger les attachments pour la liste (trop lent)
+                    # On les chargera seulement quand on clique sur l'email
                     email_dict['body_loaded'] = email_dict.get('body_loaded', 0)
                     email_dict['email_id'] = email_dict.get('email_id', '')
-                    
-                    if email_dict['body_loaded']:
-                        try:
-                            c.execute("SELECT * FROM attachments WHERE message_id = ?", (email_dict.get('message_id', ''),))
-                            att_rows = c.fetchall()
-                            email_dict['attachments'] = [dict(att) for att in att_rows]
-                        except:
-                            email_dict['attachments'] = []
-                    else:
-                        email_dict['attachments'] = []
+                    email_dict['attachments'] = []  # Pas besoin pour la liste
                     
                     history.append(email_dict)
                 except Exception as e:
@@ -638,15 +630,21 @@ def main():
         # Si pas de recherche, afficher les derniers mails recus (Inbox locale)
         elif not st.session_state.emails:
             try:
-                st.session_state.emails = st.session_state.db.get_client_history("") # Retourne les 50 derniers
+                # OPTIMISATION: Limiter a 20 emails pour la sidebar (beaucoup plus rapide)
+                st.session_state.emails = st.session_state.db.get_client_history("", limit=20)
             except:
                 st.session_state.emails = []
                 
         # Liste des emails trouves pour ce client
         if not isinstance(st.session_state.emails, list):
             st.session_state.emails = []
+        
+        # OPTIMISATION: Limiter l'affichage a 20 emails max dans la sidebar
+        emails_to_display = st.session_state.emails[:20]
+        if len(st.session_state.emails) > 20:
+            st.caption(f"📧 Affichage de 20 emails sur {len(st.session_state.emails)}")
             
-        for email_data in st.session_state.emails:
+        for email_data in emails_to_display:
             try:
                 if not isinstance(email_data, dict):
                     continue

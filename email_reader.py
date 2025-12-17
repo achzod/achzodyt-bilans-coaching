@@ -572,11 +572,11 @@ class EmailReader:
         """Deprecated: utiliser _batch_fetch_full_emails"""
         return None
 
-    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True) -> List[Dict[str, Any]]:
+    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, max_emails: int = 200) -> List[Dict[str, Any]]:
         """
         Recupere tous les emails (lus ou non)
         """
-        print(f"[EMAILS] Chargement emails (unread_only={unread_only}, {days} jours)...")
+        print(f"[EMAILS] Chargement emails (unread_only={unread_only}, {days} jours, max={max_emails})...")
 
         conn = create_connection()
         if not conn:
@@ -602,9 +602,9 @@ class EmailReader:
             email_ids = data[0].split()
             print(f"[EMAILS] {len(email_ids)} emails trouves, chargement...")
 
-            # Limiter a 200 max
-            if len(email_ids) > 200:
-                email_ids = email_ids[-200:]
+            # Limiter selon max_emails
+            if len(email_ids) > max_emails:
+                email_ids = email_ids[-max_emails:]
 
             # Charger par lots (Batch Fetching)
             # On reduit a 10 pour economiser la RAM sur Render (512MB limit)
@@ -687,10 +687,10 @@ class EmailReader:
         return emails
 
     # Alias pour compatibilite
-    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False) -> List[Dict[str, Any]]:
+    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False, max_emails: int = 200) -> List[Dict[str, Any]]:
         if unanswered_only:
             return self.get_unanswered_emails(days=days, folder=folder)
-        return self.get_all_emails(days=days, folder=folder, unread_only=unread_only)
+        return self.get_all_emails(days=days, folder=folder, unread_only=unread_only, max_emails=max_emails)
 
     def ensure_connected(self) -> bool:
         return True  # Chaque operation cree sa propre connexion
