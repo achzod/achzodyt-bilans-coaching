@@ -744,14 +744,24 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
         "attachments": attachments
     }
 
-    result = analyze_coaching_bilan(email_for_analysis, history, email_data['sender_email'])
-
-    return {
-        "success": result.get('success', False),
-        "analysis": result.get('analysis', {}),
-        "draft": result.get('analysis', {}).get('draft_email', ''),
-        "error": result.get('error', '')
-    }
+    try:
+        result = analyze_coaching_bilan(email_for_analysis, history, email_data['sender_email'])
+        return {
+            "success": result.get('success', False),
+            "analysis": result.get('analysis', {}),
+            "draft": result.get('analysis', {}).get('draft_email', ''),
+            "error": result.get('error', '')
+        }
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"[ANALYZE ERROR] {error_detail}")
+        return {
+            "success": False,
+            "analysis": {},
+            "draft": "",
+            "error": f"Erreur analyse: {str(e)}"
+        }
 
 @app.post("/api/coach/email/{email_id}/mark-replied")
 async def mark_email_replied(email_id: int, user: Dict = Depends(get_current_coach)):

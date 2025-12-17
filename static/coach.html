@@ -341,6 +341,10 @@
             if (data) opts.body = JSON.stringify(data);
             const res = await fetch(API + endpoint, opts);
             if (res.status === 401) { showLogin(); throw new Error('Auth required'); }
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || `Erreur ${res.status}`);
+            }
             return res.json();
         }
 
@@ -679,13 +683,21 @@
             if (!currentEmail) return;
             const btn = document.getElementById('analyze-btn');
             btn.disabled = true;
-            btn.textContent = 'Analyse...';
+            btn.textContent = 'Analyse en cours...';
             try {
                 const res = await api(`/coach/email/${currentEmail.id}/analyze`, 'POST');
                 document.getElementById('ai-result').classList.remove('hidden');
-                document.getElementById('ai-analysis').textContent = res.analysis?.resume || JSON.stringify(res.analysis, null, 2);
-                if (res.draft) document.getElementById('response-text').value = res.draft;
-            } catch (e) { alert('Erreur: ' + e.message); }
+
+                if (res.success && res.analysis) {
+                    document.getElementById('ai-analysis').textContent = res.analysis.resume || JSON.stringify(res.analysis, null, 2);
+                    if (res.draft) document.getElementById('response-text').value = res.draft;
+                } else {
+                    document.getElementById('ai-analysis').textContent = 'Erreur: ' + (res.error || 'Analyse echouee');
+                }
+            } catch (e) {
+                document.getElementById('ai-result').classList.remove('hidden');
+                document.getElementById('ai-analysis').textContent = 'Erreur: ' + e.message;
+            }
             btn.disabled = false;
             btn.textContent = 'Analyser avec IA';
         }
