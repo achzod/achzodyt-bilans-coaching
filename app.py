@@ -635,15 +635,10 @@ def main():
     # CHARGEMENT AUTOMATIQUE DES EMAILS NON LUS AU DÉMARRAGE
     if 'emails' not in st.session_state or not st.session_state.emails:
         try:
-             # Charger depuis DB (très rapide)
+            # Charger depuis DB (très rapide)
             conn = sqlite3.connect(DB_PATH)
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
-            # SEULEMENT LES NON LUS DU COUP
-            c.execute("SELECT * FROM emails WHERE is_bilan = 0 ORDER BY date DESC LIMIT 50") 
-            # Note: is_bilan=0 est une heuristique, on pourrait affiner. 
-            # Mais ici on veut surtout afficher TOUT ce qui est récent.
-            # Mieux : afficher tout ce qui est récent.
             c.execute("SELECT * FROM emails ORDER BY date DESC LIMIT 50")
             rows = c.fetchall()
             conn.close()
@@ -662,8 +657,38 @@ def main():
                     except:
                         continue
                 st.session_state.emails = emails_from_db
-        except:
-            pass
+            else:
+                # DB VIDE -> Synchro automatique !
+                st.session_state.emails = []
+                st.warning("⚠️ Base de données vide. Synchronisation automatique en cours...")
+                
+                # Lancer synchro légère (3 jours, 20 emails max)
+                try:
+                    if st.session_state.reader is None:
+                        st.session_state.reader = EmailReader()
+                    
+                    with st.spinner("🔄 Chargement initial des emails depuis Gmail..."):
+                        new_emails = st.session_state.reader.get_recent_emails(days=3, unread_only=True, max_emails=20)
+                        
+                        if new_emails and isinstance(new_emails, list):
+                            saved = 0
+                            for email in new_emails:
+                                if isinstance(email, dict):
+                                    message_id = email.get('message_id') or email.get('id')
+                                    if message_id and not st.session_state.db.email_exists(str(message_id)):
+                                        email['body'] = ''
+                                        email['attachments'] = []
+                                        if st.session_state.db.save_email(email):
+                                            saved += 1
+                            
+                            st.success(f"✅ {saved} emails chargés ! Rafraîchis la page.")
+                            st.rerun()
+                        else:
+                            st.error("❌ Impossible de charger les emails. Vérifie les variables d'environnement.")
+                except Exception as e:
+                    st.error(f"❌ Erreur synchro: {e}")
+        except Exception as e:
+            st.error(f"Erreur DB: {e}")
 
 
     # Sidebar - Synchro
