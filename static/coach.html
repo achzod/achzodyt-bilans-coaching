@@ -340,8 +340,8 @@ async function analyzeAll() {
 
     const btn = document.querySelector('.main-actions .btn-primary');
     btn.disabled = true;
-    btn.textContent = 'Analyse GPT-5.2 + Gemini 3...';
-    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT-5.2 + Gemini 3 Pro en parallele (30-60s)...</div></div>';
+    btn.textContent = 'Analyse GPT-5.2 Pro + Gemini 3...';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT-5.2 Pro + Gemini 3 Pro Preview en parallele (30-60s)...</div></div>';
 
     try {
         const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, 'POST');
@@ -365,7 +365,7 @@ async function analyzeAll() {
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
             <div style="border:2px solid #10b981;border-radius:12px;padding:16px;background:#10b98110;">
                 <div style="font-weight:bold;font-size:1.1rem;color:#10b981;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-                    <span>🤖 GPT-5.2</span>
+                    <span>🤖 GPT-5.2 Pro</span>
                     <button class="btn btn-sm btn-success" onclick="selectAI('gpt4')">Utiliser</button>
                 </div>
                 <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
@@ -416,7 +416,7 @@ function selectAI(aiName) {
     if (aiName === 'gpt4' && gpt4Analysis?.draft) {
         document.getElementById('draft-text').value = gpt4Analysis.draft;
         currentAnalysis = gpt4Analysis.analysis;
-        showNotification('GPT-5.2 selectionne!', 'success');
+        showNotification('GPT-5.2 Pro selectionne!', 'success');
     } else if (aiName === 'gemini' && geminiAnalysis?.draft) {
         document.getElementById('draft-text').value = geminiAnalysis.draft;
         currentAnalysis = geminiAnalysis.analysis;

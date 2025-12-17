@@ -190,19 +190,19 @@ def call_gpt4(prompt: str, images: list) -> Dict:
             })
 
         response = openai_client.chat.completions.create(
-            model="gpt-5.2",  # GPT-5.2 - Top tier OpenAI (Dec 2025)
-            max_tokens=8000,
+            model="gpt-5.2-pro",  # GPT-5.2 Pro - Top tier OpenAI (Dec 2025)
+            max_completion_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
-        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-5.2"}
+        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-5.2-Pro"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "GPT-5.2"}
+        return {"success": False, "error": str(e), "model": "GPT-5.2-Pro"}
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
-    """Appel Gemini 3 Pro (dernier modele Google - Dec 2025)"""
+    """Appel Gemini 3 Pro Preview (dernier modele Google - Dec 2025)"""
     try:
-        model = genai.GenerativeModel('gemini-3-pro')  # Gemini 3 Pro - Top tier Google (Dec 2025)
+        model = genai.GenerativeModel('gemini-3-pro-preview')  # Gemini 3 Pro Preview - Top tier Google (Dec 2025)
 
         # Construire le contenu
         parts = [prompt]
@@ -342,8 +342,8 @@ Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoie
 
     try:
         r = openai_client.chat.completions.create(
-            model="gpt-5.2",  # GPT-5.2 pour regeneration
-            max_tokens=2000,
+            model="gpt-5.2-pro",  # GPT-5.2 Pro pour regeneration
+            max_completion_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
         return r.choices[0].message.content
