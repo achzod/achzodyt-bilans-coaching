@@ -156,6 +156,11 @@ FEMME: 18-20%=fit+abdos visibles | 24-28%=normale, PAS d'abdos, gras hanches/cui
 HOMME: 10-12%=abdos decoupes | 15-18%=fit, abdos peu visibles | 20-25%=gras ventre, pas abdos | 28%+=surpoids
 REGLE ABSOLUE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme. JAMAIS en dessous!
 
+CONSEILS ADAPTES AU PROFIL (TRES IMPORTANT):
+- Client en SURPOIDS (>30% femme, >25% homme, ou >85kg femme, >100kg homme): JAMAIS suggerer de snacks, barres, collations! Le probleme c'est qu'ils mangent TROP, pas pas assez. Malaise = mieux gerer les repas principaux, pas ajouter des calories.
+- Client SEC en seche agressive: la oui, collation de secours peut etre utile.
+- ADAPTE tes conseils au CONTEXTE: quelqu'un qui doit perdre 20kg n'a pas besoin de "garder une barre proteinee", il a besoin de structure et discipline sur ses repas.
+
 === HISTORIQUE COMPLET DEPUIS JOUR 1 ===
 {history_text[:5000] if history_text else "Premier contact - pas d'historique"}
 
