@@ -433,14 +433,14 @@ def display_attachments(attachments):
             # Support Base64 (nouveau) ou Path (DB)
             if "data" in att:
                 # Ancienne methode (memoire)
-            if att["content_type"].startswith("image/"):
-                try:
-                    img_data = base64.b64decode(att["data"])
-                    st.image(img_data, caption=att["filename"], use_container_width=True)
-                except:
-                    st.write(f"📷 {att['filename']}")
-            else:
-                    st.write(f"📎 {att['filename']}")
+                if att.get("content_type", "").startswith("image/"):
+                    try:
+                        img_data = base64.b64decode(att["data"])
+                        st.image(img_data, caption=att.get("filename", ""), use_container_width=True)
+                    except:
+                        st.write(f"📷 {att.get('filename', 'Image')}")
+                else:
+                    st.write(f"📎 {att.get('filename', 'Fichier')}")
             elif "filepath" in att and att.get("filepath"):
                 # Nouvelle methode (DB/Fichier)
                 try:
@@ -495,8 +495,8 @@ def main():
         days = st.selectbox("Jours a scanner", [1, 3, 7, 30], index=1)
         
         if st.button("📥 Synchroniser Gmail", use_container_width=True, type="primary"):
-                if st.session_state.reader is None:
-                    st.session_state.reader = EmailReader()
+            if st.session_state.reader is None:
+                st.session_state.reader = EmailReader()
                     
             with st.status("Synchronisation en cours...", expanded=True) as status:
                 st.write("🔌 Connexion Gmail...")
@@ -656,7 +656,7 @@ def main():
                 subject = email_data.get('subject', 'Sans sujet')[:30]
                 
                 if st.button(f"{icon} {date_str} - {subject}", key=f"sel_{message_id}", use_container_width=True):
-                st.session_state.selected_email = email_data
+                    st.session_state.selected_email = email_data
                     # Pour l'historique, si on a cherche un client, on a deja tout
                     # Sinon on recharge l'historique specifique de ce client
                     if client_search:
@@ -681,14 +681,14 @@ def main():
     # Contenu principal
     if st.session_state.selected_email:
         try:
-        email_data = st.session_state.selected_email
+            email_data = st.session_state.selected_email
             if not isinstance(email_data, dict):
                 st.error("Erreur: email_data invalide")
                 st.session_state.selected_email = None
             else:
-        # Header
+                # Header
                 col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
+                with col1:
                     subject = email_data.get('subject', 'Sans sujet')
                     st.subheader(f"📧 {subject}")
                     client_email = email_data.get('client_email', email_data.get('from_email', ''))
@@ -697,27 +697,27 @@ def main():
             # Infos client
                     try:
                         client_info = get_client(client_email)
-            if client_info:
-                jours = get_jours_restants(client_info)
-                color = "green" if jours > 14 else "orange" if jours > 0 else "red"
-                st.markdown(f"**Commande:** {client_info.get('commande', 'N/A')} | **Jours restants:** :{color}[{jours}j]")
-            
-            with st.expander("Modifier infos client"):
-                c_commande = st.text_input("Commande", value=client_info.get('commande', '') if client_info else '', key="c_cmd")
-                c_date = st.date_input("Date debut", key="c_date")
-                c_duree = st.number_input("Duree (semaines)", min_value=1, max_value=52, value=client_info.get('duree_semaines', 12) if client_info else 12, key="c_dur")
-                if st.button("Sauvegarder client"):
-                                    save_client(client_email, c_commande, c_date.strftime('%Y-%m-%d'), c_duree)
-                    st.success("Client sauvegarde!")
-                    st.rerun()
+                        if client_info:
+                            jours = get_jours_restants(client_info)
+                            color = "green" if jours > 14 else "orange" if jours > 0 else "red"
+                            st.markdown(f"**Commande:** {client_info.get('commande', 'N/A')} | **Jours restants:** :{color}[{jours}j]")
+                        
+                        with st.expander("Modifier infos client"):
+                            c_commande = st.text_input("Commande", value=client_info.get('commande', '') if client_info else '', key="c_cmd")
+                            c_date = st.date_input("Date debut", key="c_date")
+                            c_duree = st.number_input("Duree (semaines)", min_value=1, max_value=52, value=client_info.get('duree_semaines', 12) if client_info else 12, key="c_dur")
+                            if st.button("Sauvegarder client"):
+                                save_client(client_email, c_commande, c_date.strftime('%Y-%m-%d'), c_duree)
+                                st.success("Client sauvegarde!")
+                                st.rerun()
                     except Exception as e:
                         print(f"[UI] Erreur infos client: {e}")
 
-        with col2:
+                with col2:
                     history_len = len(st.session_state.history) if isinstance(st.session_state.history, list) else 0
                     st.metric("Historique", f"{history_len} emails")
 
-        with col3:
+                with col3:
                     # Si c'est un mail recu, on peut analyser
                     if email_data.get('direction', 'received') == 'received':
                         if st.button("🤖 Analyser", type="primary", use_container_width=True):
@@ -726,37 +726,42 @@ def main():
                                     history_len = len(st.session_state.history) if isinstance(st.session_state.history, list) else 0
                                     st.write(f"🧠 Analyse avec {history_len} emails de contexte...")
 
-                        result = analyze_coaching_bilan(
-                            email_data,
+                                    result = analyze_coaching_bilan(
+                                        email_data,
                                         st.session_state.history # On envoie tout l'historique local !
-                        )
+                                    )
 
                                     if result and result.get("success"):
                                         analysis = result.get("analysis")
-                            if isinstance(analysis, str):
-                                try:
-                                    analysis = json.loads(analysis)
-                                except:
-                                    pass
-                            st.session_state.analysis = analysis
+                                        if isinstance(analysis, str):
+                                            try:
+                                                analysis = json.loads(analysis)
+                                            except:
+                                                pass
+                                        st.session_state.analysis = analysis
                                         
                                         # Extraire draft
-                            draft = ""
-                            if isinstance(analysis, dict):
-                                draft = analysis.get("draft_email", "")
+                                        draft = ""
+                                        if isinstance(analysis, dict):
+                                            draft = analysis.get("draft_email", "")
                                         elif isinstance(analysis, str):
-                                import re
-                                match = re.search(r'"draft_email"\s*:\s*"(.*?)"(?=\s*[,}])', analysis, re.DOTALL)
-                                if match:
-                                    draft = match.group(1).replace('\\n', '\n').replace('\\"', '"')
+                                            import re
+                                            match = re.search(r'"draft_email"\s*:\s*"(.*?)"(?=\s*[,}])', analysis, re.DOTALL)
+                                            if match:
+                                                draft = match.group(1).replace('\\n', '\n').replace('\\"', '"')
                                         
-                            st.session_state.draft = draft if draft else "Email a rediger manuellement."
+                                        st.session_state.draft = draft if draft else "Email a rediger manuellement."
                                         
-                            status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
-                            st.rerun()
-                        else:
+                                        status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
+                                        st.rerun()
+                                    else:
                                         error_msg = result.get('error', 'Erreur inconnue') if result else 'Erreur: resultat vide'
                                         st.error(f"Erreur: {error_msg}")
+                                        st.error(f"Erreur: {error_msg}")
+                                    st.error(f"Erreur analyse IA: {e}")
+                                    import traceback
+                                    traceback.print_exc()
+                                    status.update(label="❌ Erreur", state="error", expanded=False)
                                 except Exception as e:
                                     st.error(f"Erreur analyse IA: {e}")
                                     import traceback
@@ -767,7 +772,7 @@ def main():
             import traceback
             traceback.print_exc()
             st.session_state.selected_email = None
-                        else:
+        else:
             # Tabs (seulement si pas d'erreur)
             tab1, tab2, tab3, tab4, tab5 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse", "📈 Dashboard"])
 
@@ -775,9 +780,9 @@ def main():
                 try:
                     body = email_data.get("body", "")
                     st.markdown(f'<div class="bilan-card">{html.escape(body)}</div>', unsafe_allow_html=True)
-            if email_data.get("attachments"):
-                st.subheader("📎 Pieces jointes")
-                display_attachments(email_data["attachments"])
+                    if email_data.get("attachments"):
+                        st.subheader("📎 Pieces jointes")
+                        display_attachments(email_data["attachments"])
                 except Exception as e:
                     st.error(f"Erreur affichage email: {e}")
 
@@ -789,47 +794,46 @@ def main():
                             continue
                     direction = hist_email.get("direction", "received")
                     icon = "📥" if direction == "received" else "📤"
-                        date_val = hist_email.get('date')
-                        if isinstance(date_val, datetime):
-                            date_str = date_val.strftime('%d/%m/%Y')
-                        else:
-                            date_str = str(date_val)[:10] if date_val else "Date inconnue"
+                    date_val = hist_email.get('date')
+                    if isinstance(date_val, datetime):
+                        date_str = date_val.strftime('%d/%m/%Y')
+                        date_str = str(date_val)[:10] if date_val else "Date inconnue"
 
-                        subject = hist_email.get('subject', 'Sans sujet')[:50]
-                        with st.expander(f"{icon} {date_str} - {subject}"):
+                    subject = hist_email.get('subject', 'Sans sujet')[:50]
+                    subject = hist_email.get('subject', 'Sans sujet')[:50]
+                    with st.expander(f"{icon} {date_str} - {subject}"):
                         st.write(hist_email.get("body", "")[:1000])
                         if hist_email.get("attachments"):
                             st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
-                                display_attachments(hist_email["attachments"])
+                            display_attachments(hist_email["attachments"])
                 except Exception as e:
                     st.error(f"Erreur affichage historique: {e}")
 
         with tab3:
-                try:
-            if st.session_state.analysis:
-                analysis = st.session_state.analysis
-                        if isinstance(analysis, dict):
-                st.subheader("📝 Resume")
-                st.info(analysis.get("resume", ""))
-                st.subheader("📊 KPIs")
-                display_kpis(analysis.get("kpis", {}))
-                        else:
-                            st.info("Analyse en format inattendu")
-            else:
-                st.info("👆 Clique sur 'Analyser' pour lancer l'analyse IA")
-                except Exception as e:
-                    st.error(f"Erreur affichage analyse: {e}")
+            try:
+                if st.session_state.analysis:
+                    analysis = st.session_state.analysis
+                    if isinstance(analysis, dict):
+                        st.info(analysis.get("resume", ""))
+                        st.subheader("📊 KPIs")
+                        display_kpis(analysis.get("kpis", {}))
+                    else:
+                        st.info("Analyse en format inattendu")
+                else:
+                    st.info("👆 Clique sur 'Analyser' pour lancer l'analyse IA")
+            except Exception as e:
+                st.error(f"Erreur affichage analyse: {e}")
 
         with tab4:
+            with tab4:
                 try:
-            if st.session_state.analysis:
-                st.subheader("✉️ Email de reponse")
+                    if st.session_state.analysis:
+                        st.subheader("✉️ Email de reponse")
                         draft = st.session_state.draft if st.session_state.draft else ""
-                        st.text_area("Draft", value=draft, height=400)
                         # ... Boutons d'envoi ...
                         if st.button("📤 Envoyer", type="primary"):
                             st.warning("Fonction envoi a reconnecter avec la nouvelle architecture")
-                            else:
+                    else:
                         st.info("Lance l'analyse d'abord")
                 except Exception as e:
                     st.error(f"Erreur affichage reponse: {e}")
