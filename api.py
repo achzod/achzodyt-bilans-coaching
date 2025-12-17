@@ -114,6 +114,55 @@ def init_tables():
 init_tables()
 
 # ============ HELPER FUNCTIONS ============
+
+# Spam/useless email filter
+SPAM_DOMAINS = [
+    'typeform.com', 'typeform.io', 'shopify.com', 'stripe.com', 'paypal.com',
+    'noreply', 'no-reply', 'mailer-daemon', 'postmaster', 'notification',
+    'newsletter', 'marketing', 'promo', 'pub@', 'info@', 'contact@',
+    'support@', 'help@', 'billing@', 'invoice', 'receipt', 'confirmation',
+    'donotreply', 'automated', 'mailer@', 'bounce', 'unsubscribe',
+    'mailchimp', 'sendgrid', 'sendinblue', 'brevo', 'klaviyo', 'hubspot',
+    'calendly', 'zoom.us', 'google.com', 'facebook.com', 'instagram.com',
+    'twitter.com', 'linkedin.com', 'youtube.com', 'tiktok.com',
+    'render.com', 'github.com', 'gitlab.com', 'vercel.com', 'netlify.com',
+    'amazon.', 'aws.amazon', 'apple.com', 'microsoft.com', 'outlook.com',
+    'googlemail', 'facebookmail', 'account-security', 'security@',
+    'alerts@', 'updates@', 'team@', 'hello@', 'bonjour@'
+]
+
+SPAM_SUBJECTS = [
+    'confirmation de commande', 'order confirmation', 'votre commande',
+    'your order', 'receipt', 'reçu', 'facture', 'invoice', 'payment',
+    'paiement', 'subscription', 'abonnement', 'newsletter', 'unsubscribe',
+    'verify your email', 'vérifiez votre', 'confirm your', 'confirmez votre',
+    'password reset', 'réinitialisation', 'security alert', 'alerte sécurité',
+    'welcome to', 'bienvenue', 'thank you for signing', 'merci de vous être',
+    'your account', 'votre compte', 'notification', 'reminder', 'rappel',
+    'automatic reply', 'réponse automatique', 'out of office', 'absence'
+]
+
+def is_spam_email(email_data: Dict) -> bool:
+    """Check if email should be filtered out"""
+    sender = (email_data.get('from_email') or email_data.get('from', '')).lower()
+    subject = (email_data.get('subject') or '').lower()
+
+    # Check sender domain/address
+    for spam in SPAM_DOMAINS:
+        if spam in sender:
+            return True
+
+    # Check subject
+    for spam in SPAM_SUBJECTS:
+        if spam in subject:
+            return True
+
+    # Filter emails from self (achzodyt or coaching)
+    if 'achzodyt@gmail.com' in sender or 'coaching@achzodcoaching.com' in sender:
+        return True
+
+    return False
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -359,23 +408,51 @@ async def get_me(user: Dict = Depends(get_current_coach)):
     return {"id": user['id'], "email": user['email'], "name": user['name'], "role": user['role']}
 
 # ============ GMAIL SYNC ============
+
+# Gmail credentials - achzodyt@gmail.com
+GMAIL_USER = os.getenv("MAIL_USER", "achzodyt@gmail.com")
+GMAIL_PASS = os.getenv("MAIL_PASS", "")
+
 @app.post("/api/coach/gmail/sync")
-async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 90):
-    """Sync ALL emails from Gmail inbox"""
+async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 180):
+    """
+    Sync ALL emails from Gmail inbox (achzodyt@gmail.com)
+    - Fetches full email content with body and attachments
+    - Filters spam/useless emails (typeform, confirmations, etc.)
+    - Auto-creates clients from senders
+    """
     reader = EmailReader()
 
     try:
-        # Get all emails from inbox (not filtered by client)
+        # Get all emails with FULL content (body + attachments)
+        print(f"[SYNC] Starting sync for last {days} days...")
         emails = reader.get_all_emails(days=days, unread_only=False)
+        print(f"[SYNC] Found {len(emails)} emails total")
 
         synced = 0
+        filtered = 0
+
         for email_data in emails:
+            # Filter spam
+            if is_spam_email(email_data):
+                filtered += 1
+                continue
+
+            # Load full email content if not already loaded
+            if not email_data.get('body') or len(email_data.get('body', '')) < 10:
+                try:
+                    full_content = reader.load_full_email(email_data.get('message_id'))
+                    if full_content and full_content.get('loaded'):
+                        email_data['body'] = full_content.get('body', '')
+                        email_data['attachments'] = full_content.get('attachments', [])
+                except Exception as e:
+                    print(f"[SYNC] Error loading full email: {e}")
+
             email_data['direction'] = 'received'
+
             if save_email(email_data):
                 synced += 1
-
-        # Also get sent emails
-        # (would need to implement get_sent_emails in email_reader)
+                print(f"[SYNC] Saved: {email_data.get('from_email', 'unknown')} - {email_data.get('subject', 'no subject')[:50]}")
 
         reader.disconnect()
 
@@ -385,17 +462,27 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 90
         c.execute('SELECT COUNT(*) as total FROM gmail_emails')
         total = c.fetchone()['total']
         c.execute('SELECT COUNT(DISTINCT sender_email) as clients FROM gmail_emails WHERE direction = "received"')
-        clients = c.fetchone()['clients']
+        clients_count = c.fetchone()['clients']
+        c.execute('SELECT COUNT(*) as unread FROM gmail_emails WHERE status = "new"')
+        unread = c.fetchone()['unread']
         conn.close()
+
+        print(f"[SYNC] Done: {synced} synced, {filtered} filtered, {total} total")
 
         return {
             "success": True,
             "synced": synced,
+            "filtered": filtered,
             "total_emails": total,
-            "total_clients": clients
+            "total_clients": clients_count,
+            "unread": unread
         }
     except Exception as e:
-        reader.disconnect()
+        print(f"[SYNC] Error: {e}")
+        try:
+            reader.disconnect()
+        except:
+            pass
         raise HTTPException(status_code=500, detail=f"Erreur sync: {str(e)}")
 
 @app.get("/api/coach/dashboard")
