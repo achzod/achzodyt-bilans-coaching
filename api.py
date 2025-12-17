@@ -17,6 +17,7 @@ import json
 import hashlib
 import secrets
 import sqlite3
+import base64
 
 from models import (
     init_platform_db, create_user, authenticate_user, get_user_by_id, get_user_by_email,
@@ -106,6 +107,45 @@ def init_tables():
         )
     ''')
 
+    # KPIs / Metrics tracking
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS client_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_email TEXT NOT NULL,
+            date_recorded TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            poids REAL,
+            tour_taille REAL,
+            tour_hanches REAL,
+            tour_poitrine REAL,
+            tour_bras REAL,
+            tour_cuisses REAL,
+            body_fat REAL,
+            energie INTEGER,
+            sommeil INTEGER,
+            stress INTEGER,
+            adherence INTEGER,
+            notes TEXT,
+            source TEXT DEFAULT 'manual',
+            email_id INTEGER
+        )
+    ''')
+
+    # Attachments storage (images as base64)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS email_attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email_id INTEGER NOT NULL,
+            filename TEXT,
+            content_type TEXT,
+            data TEXT,
+            is_image INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    c.execute('CREATE INDEX IF NOT EXISTS idx_metrics_client ON client_metrics(client_email)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_metrics_date ON client_metrics(date_recorded DESC)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_attachments_email ON email_attachments(email_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_emails_sender ON gmail_emails(sender_email)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_emails_date ON gmail_emails(date_sent DESC)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_emails_status ON gmail_emails(status)')
@@ -509,7 +549,7 @@ async def get_client_detail(client_email: str, user: Dict = Depends(get_current_
 
 @app.post("/api/coach/email/{email_id}/load-body")
 async def load_email_body(email_id: int, user: Dict = Depends(get_current_coach)):
-    """Load email body on demand from Gmail"""
+    """Load email body on demand from Gmail with attachments"""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT * FROM gmail_emails WHERE id = ?', (email_id,))
@@ -521,10 +561,12 @@ async def load_email_body(email_id: int, user: Dict = Depends(get_current_coach)
 
     email_data = dict(row)
 
-    # If body already loaded, return it
+    # If body already loaded, get cached attachments too
     if email_data.get('body_loaded') and email_data.get('body'):
+        c.execute('SELECT * FROM email_attachments WHERE email_id = ?', (email_id,))
+        attachments = [dict(a) for a in c.fetchall()]
         conn.close()
-        return {"success": True, "body": email_data['body'], "cached": True}
+        return {"success": True, "body": email_data['body'], "attachments": attachments, "cached": True}
 
     # Load from Gmail using IMAP ID
     imap_id = email_data.get('imap_id')
@@ -539,17 +581,47 @@ async def load_email_body(email_id: int, user: Dict = Depends(get_current_coach)
 
         if full_content and full_content.get('loaded'):
             body = full_content.get('body', '')
-            attachments = full_content.get('attachments', [])
+            raw_attachments = full_content.get('attachments', [])
 
-            # Save body to database for future use
+            # Save attachments to database with base64 data
+            saved_attachments = []
+            for att in raw_attachments:
+                filename = att.get('filename', 'file')
+                content_type = att.get('content_type', 'application/octet-stream')
+                data = att.get('data', b'')
+
+                # Convert to base64 if bytes
+                if isinstance(data, bytes):
+                    data_b64 = base64.b64encode(data).decode('utf-8')
+                else:
+                    data_b64 = data
+
+                is_image = 1 if content_type.startswith('image/') else 0
+
+                c.execute('''
+                    INSERT INTO email_attachments (email_id, filename, content_type, data, is_image)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (email_id, filename, content_type, data_b64, is_image))
+
+                saved_attachments.append({
+                    'id': c.lastrowid,
+                    'filename': filename,
+                    'content_type': content_type,
+                    'is_image': is_image,
+                    'data': data_b64 if is_image else None  # Only include data for images
+                })
+
+            # Save body to database
             c.execute('''
-                UPDATE gmail_emails SET body = ?, body_loaded = 1, attachments_json = ?
+                UPDATE gmail_emails SET body = ?, body_loaded = 1, has_attachments = ?, attachments_json = ?
                 WHERE id = ?
-            ''', (body, json.dumps([{'filename': a.get('filename', 'file')} for a in attachments]), email_id))
+            ''', (body, 1 if saved_attachments else 0,
+                  json.dumps([{'filename': a['filename'], 'id': a['id']} for a in saved_attachments]),
+                  email_id))
             conn.commit()
             conn.close()
 
-            return {"success": True, "body": body, "attachments": attachments, "cached": False}
+            return {"success": True, "body": body, "attachments": saved_attachments, "cached": False}
         else:
             conn.close()
             return {"success": False, "body": "(Erreur chargement)", "error": "load_failed"}
@@ -619,6 +691,104 @@ async def mark_email_replied(email_id: int, user: Dict = Depends(get_current_coa
     conn.commit()
     conn.close()
     return {"success": True}
+
+# ============ KPI / METRICS ENDPOINTS ============
+class MetricData(BaseModel):
+    poids: Optional[float] = None
+    tour_taille: Optional[float] = None
+    tour_hanches: Optional[float] = None
+    tour_poitrine: Optional[float] = None
+    tour_bras: Optional[float] = None
+    tour_cuisses: Optional[float] = None
+    body_fat: Optional[float] = None
+    energie: Optional[int] = None
+    sommeil: Optional[int] = None
+    stress: Optional[int] = None
+    adherence: Optional[int] = None
+    notes: Optional[str] = None
+    date_recorded: Optional[str] = None
+
+@app.get("/api/coach/client/{client_email:path}/metrics")
+async def get_client_metrics(client_email: str, user: Dict = Depends(get_current_coach)):
+    """Get all metrics for a client"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT * FROM client_metrics
+        WHERE client_email = ?
+        ORDER BY date_recorded ASC
+    ''', (client_email.lower(),))
+    metrics = [dict(row) for row in c.fetchall()]
+    conn.close()
+
+    # Calculate evolution if we have data
+    evolution = {}
+    if len(metrics) >= 2:
+        first = metrics[0]
+        last = metrics[-1]
+        for key in ['poids', 'tour_taille', 'tour_hanches', 'tour_poitrine', 'tour_bras', 'tour_cuisses', 'body_fat']:
+            if first.get(key) and last.get(key):
+                diff = last[key] - first[key]
+                pct = (diff / first[key]) * 100 if first[key] != 0 else 0
+                evolution[key] = {'diff': round(diff, 2), 'pct': round(pct, 1)}
+
+    return {"metrics": metrics, "evolution": evolution, "count": len(metrics)}
+
+@app.post("/api/coach/client/{client_email:path}/metrics")
+async def add_client_metric(client_email: str, data: MetricData, user: Dict = Depends(get_current_coach)):
+    """Add a new metric entry for a client"""
+    conn = get_db()
+    c = conn.cursor()
+
+    date_recorded = data.date_recorded or datetime.now().isoformat()
+
+    c.execute('''
+        INSERT INTO client_metrics
+        (client_email, date_recorded, poids, tour_taille, tour_hanches, tour_poitrine,
+         tour_bras, tour_cuisses, body_fat, energie, sommeil, stress, adherence, notes, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+    ''', (
+        client_email.lower(), date_recorded,
+        data.poids, data.tour_taille, data.tour_hanches, data.tour_poitrine,
+        data.tour_bras, data.tour_cuisses, data.body_fat,
+        data.energie, data.sommeil, data.stress, data.adherence, data.notes
+    ))
+    conn.commit()
+    metric_id = c.lastrowid
+    conn.close()
+
+    return {"success": True, "id": metric_id}
+
+@app.delete("/api/coach/client/{client_email:path}/metrics/{metric_id}")
+async def delete_client_metric(client_email: str, metric_id: int, user: Dict = Depends(get_current_coach)):
+    """Delete a metric entry"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM client_metrics WHERE id = ? AND client_email = ?', (metric_id, client_email.lower()))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/api/attachment/{attachment_id}")
+async def get_attachment(attachment_id: int, user: Dict = Depends(get_current_coach)):
+    """Get attachment data"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT * FROM email_attachments WHERE id = ?', (attachment_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Attachment non trouve")
+
+    att = dict(row)
+    return {
+        "id": att['id'],
+        "filename": att['filename'],
+        "content_type": att['content_type'],
+        "is_image": att['is_image'],
+        "data": att['data']
+    }
 
 # ============ CLIENT AUTH (Magic Link) ============
 @app.get("/api/client/auth/magic/{token}")
