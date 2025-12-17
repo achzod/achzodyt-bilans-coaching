@@ -178,6 +178,7 @@
                     <div style="display:flex;gap:8px;">
                         <button class="btn btn-primary btn-sm" id="btn-analyze" onclick="analyze()" disabled>Analyser IA</button>
                         <button class="btn btn-success btn-sm" id="btn-copy" onclick="copyDraft()" disabled>Copier</button>
+                        <button class="btn btn-sm" style="background:#10b981;color:white;" id="btn-replied" onclick="markReplied()" disabled>✓ Répondu</button>
                     </div>
                 </div>
             </div>
@@ -243,17 +244,20 @@ async function checkAuth() {
 async function loadClients() {
     try {
         const data = await api('/coach/dashboard');
-        const html = data.clients.map(c => `
-            <div class="client ${c.unread_count > 0 ? 'unread' : ''}" onclick="selectClient('${c.email}')">
+        // Filtrer: seulement clients avec emails non repondus
+        const clientsWithUnreplied = data.clients.filter(c => c.unread_count > 0 || c.unreplied_count > 0);
+
+        const html = clientsWithUnreplied.map(c => `
+            <div class="client unread" onclick="selectClient('${c.email}')">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div class="client-name">${c.name || c.email.split('@')[0]}</div>
-                    ${c.unread_count > 0 ? `<span class="badge">${c.unread_count}</span>` : ''}
+                    <span class="badge">${c.unread_count || c.unreplied_count || '?'}</span>
                 </div>
                 <div class="client-email">${c.email}</div>
-                <div class="client-meta">${c.total_emails} emails</div>
+                <div class="client-meta">A repondre</div>
             </div>
         `).join('');
-        document.getElementById('clients-panel').innerHTML = html || '<div class="empty">Aucun client</div>';
+        document.getElementById('clients-panel').innerHTML = html || '<div class="empty">Tous les clients ont ete repondus! 🎉</div>';
     } catch(e) { console.error(e); }
 }
 
@@ -264,16 +268,19 @@ async function selectClient(email) {
 
     const data = await api(`/coach/client/${encodeURIComponent(email)}`);
     document.getElementById('emails-title').textContent = data.client.name || email.split('@')[0];
-    document.getElementById('emails-count').textContent = `${data.emails.length} emails`;
 
-    const html = data.emails.map(e => `
+    // Filtrer: seulement les emails RECUS non repondus
+    const unreplied = data.emails.filter(e => e.direction === 'received' && e.status !== 'replied');
+    document.getElementById('emails-count').textContent = `${unreplied.length} non repondus`;
+
+    const html = unreplied.map(e => `
         <div class="email ${e.status === 'new' ? 'unread' : ''}" onclick="selectEmail(${e.id})">
             <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
             <div class="email-preview">${(e.body || '').substring(0, 100)}</div>
             <div class="email-date">${formatDate(e.date_sent)}</div>
         </div>
     `).join('');
-    document.getElementById('emails-panel').innerHTML = html || '<div class="empty">Aucun email</div>';
+    document.getElementById('emails-panel').innerHTML = html || '<div class="empty">Tous les emails ont ete repondus!</div>';
 
     // Reset analysis
     document.getElementById('analysis-panel').innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><div>Selectionne un email</div></div>';
@@ -326,7 +333,26 @@ async function selectEmail(emailId) {
 
     document.getElementById('analysis-panel').innerHTML = html;
     document.getElementById('btn-analyze').disabled = false;
+    document.getElementById('btn-replied').disabled = false;
     document.getElementById('analysis-title').textContent = 'Email #' + emailId;
+}
+
+async function markReplied() {
+    if (!currentEmailId) return;
+    try {
+        await api(`/coach/email/${currentEmailId}/mark-replied`, 'POST');
+        // Retirer l'email de la liste
+        document.querySelector('.email.active')?.remove();
+        // Reset
+        document.getElementById('analysis-panel').innerHTML = '<div class="empty"><div class="empty-icon">✓</div><div>Email marque comme repondu!</div></div>';
+        document.getElementById('btn-analyze').disabled = true;
+        document.getElementById('btn-copy').disabled = true;
+        document.getElementById('btn-replied').disabled = true;
+        // Recharger la liste des clients
+        loadClients();
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+    }
 }
 
 async function analyze() {

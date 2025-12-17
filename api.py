@@ -311,19 +311,20 @@ def get_all_emails_grouped() -> Dict:
     conn = get_db()
     c = conn.cursor()
 
-    # Get clients with their email counts
+    # Get clients with their email counts - inclure unreplied_count
     c.execute('''
         SELECT c.*,
-               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new') as unread_count
+               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new') as unread_count,
+               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND direction = 'received' AND status != 'replied') as unreplied_count
         FROM clients c
         ORDER BY c.last_email_date DESC
     ''')
     clients = [dict(row) for row in c.fetchall()]
 
-    # Get recent emails
+    # Get recent emails - seulement non repondus
     c.execute('''
         SELECT * FROM gmail_emails
-        WHERE direction = 'received'
+        WHERE direction = 'received' AND status != 'replied'
         ORDER BY date_sent DESC
         LIMIT 100
     ''')
@@ -350,10 +351,7 @@ def get_client_emails(client_email: str) -> Dict:
     ''', (client_email.lower(), f'%{client_email}%'))
     emails = [dict(row) for row in c.fetchall()]
 
-    # Mark as read
-    c.execute("UPDATE gmail_emails SET status = 'read' WHERE sender_email = ? AND status = 'new'",
-              (client_email.lower(),))
-    conn.commit()
+    # NE PAS marquer comme lu automatiquement - seulement quand on repond
     conn.close()
 
     return {"client": client, "emails": emails}
