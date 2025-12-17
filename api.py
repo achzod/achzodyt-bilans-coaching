@@ -937,7 +937,8 @@ async def mark_all_replied(client_email: str, user: Dict = Depends(get_current_c
 
 @app.get("/api/coach/client/{client_email:path}/dashboard-html")
 async def generate_client_dashboard_html(client_email: str, user: Dict = Depends(get_current_coach)):
-    """Generate beautiful HTML dashboard for client to send as attachment"""
+    """Generate beautiful HTML dashboard showing REAL evolution metrics"""
+    import re
     conn = get_db()
     c = conn.cursor()
 
@@ -946,67 +947,102 @@ async def generate_client_dashboard_html(client_email: str, user: Dict = Depends
     client_row = c.fetchone()
     client = dict(client_row) if client_row else {"email": client_email, "name": client_email.split('@')[0]}
 
-    # Get all KPI history
+    # Get ALL emails to extract real metrics
     c.execute('''
-        SELECT * FROM client_metrics WHERE client_email = ? ORDER BY date_recorded ASC
+        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent ASC
     ''', (client_email.lower(),))
-    metrics = [dict(r) for r in c.fetchall()]
+    all_emails = [dict(r) for r in c.fetchall()]
     conn.close()
 
     client_name = client.get('name') or client_email.split('@')[0]
-    start_date = client.get('date_debut', datetime.now().isoformat())[:10] if client.get('date_debut') else "N/A"
 
-    # Parse KPIs from metrics
-    kpi_data = []
-    for m in metrics:
-        try:
-            kpis = json.loads(m.get('notes', '{}')) if m.get('notes') else {}
-            kpi_data.append({
-                "date": m['date_recorded'][:10] if m.get('date_recorded') else "?",
-                **kpis
-            })
-        except:
-            pass
+    # Extract metrics from email bodies
+    def extract_metrics(text):
+        if not text:
+            return {}
+        metrics = {}
+        # Poids: 85kg, 85,5kg, 85.5 kg
+        poids_match = re.search(r'(?:poids|pese|weight)[:\s]*(\d+[,.]?\d*)\s*kg', text.lower())
+        if poids_match:
+            metrics['poids'] = float(poids_match.group(1).replace(',', '.'))
+        # Pas: 10000 pas, 8500 pas/jour
+        pas_match = re.search(r'(\d{4,6})\s*(?:pas|steps)', text.lower())
+        if pas_match:
+            metrics['pas'] = int(pas_match.group(1))
+        return metrics
 
-    # Calculate evolution
-    evolution_html = ""
-    if len(kpi_data) >= 2:
-        first = kpi_data[0]
-        last = kpi_data[-1]
-        kpi_names = ['adherence_training', 'adherence_nutrition', 'energie', 'sommeil', 'mindset', 'progression']
-        kpi_labels = {'adherence_training': 'Training', 'adherence_nutrition': 'Nutrition', 'energie': 'Energie', 'sommeil': 'Sommeil', 'mindset': 'Mindset', 'progression': 'Progression'}
+    # Build timeline of metrics
+    timeline = []
+    for email in all_emails:
+        if email.get('direction') != 'received':
+            continue
+        body = email.get('body', '') or ''
+        metrics = extract_metrics(body)
+        if metrics:
+            date_str = email.get('date_sent', '')[:10] if email.get('date_sent') else '?'
+            timeline.append({'date': date_str, **metrics})
 
-        cards = []
-        for kpi in kpi_names:
-            first_val = first.get(kpi, 0) or 0
-            last_val = last.get(kpi, 0) or 0
-            diff = last_val - first_val
-            color = "#22c55e" if diff >= 0 else "#ef4444"
-            arrow = "↑" if diff >= 0 else "↓"
-            cards.append(f'''
-                <div style="background:linear-gradient(135deg,{color}22,{color}11);border:2px solid {color};border-radius:16px;padding:20px;text-align:center;">
-                    <div style="font-size:0.9rem;color:#666;margin-bottom:8px;">{kpi_labels.get(kpi, kpi)}</div>
-                    <div style="font-size:2.5rem;font-weight:800;color:{color};">{last_val}/10</div>
-                    <div style="font-size:1rem;color:{color};margin-top:8px;">{arrow} {'+' if diff >= 0 else ''}{diff} pts</div>
-                </div>
-            ''')
-        evolution_html = f'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0;">{"".join(cards)}</div>'
+    # Get first and last values
+    first_poids = None
+    last_poids = None
+    first_pas = None
+    last_pas = None
+    start_date = all_emails[0].get('date_sent', '')[:10] if all_emails else 'N/A'
 
-    # Build chart data
+    for t in timeline:
+        if 'poids' in t:
+            if first_poids is None:
+                first_poids = t['poids']
+            last_poids = t['poids']
+        if 'pas' in t:
+            if first_pas is None:
+                first_pas = t['pas']
+            last_pas = t['pas']
+
+    # Build evolution cards
+    evolution_cards = ""
+    if first_poids and last_poids:
+        diff = last_poids - first_poids
+        color = "#22c55e" if diff <= 0 else "#ef4444"
+        evolution_cards += f'''
+            <div style="background:rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;">
+                <div style="font-size:1rem;color:#94a3b8;margin-bottom:12px;">Poids</div>
+                <div style="font-size:1.5rem;font-weight:600;margin-bottom:8px;">{first_poids}kg → {last_poids}kg</div>
+                <div style="font-size:2rem;font-weight:800;color:{color};">{'+' if diff > 0 else ''}{diff:.1f}kg</div>
+            </div>
+        '''
+    if first_pas and last_pas:
+        diff_pct = ((last_pas - first_pas) / first_pas * 100) if first_pas else 0
+        color = "#22c55e" if diff_pct >= 0 else "#ef4444"
+        evolution_cards += f'''
+            <div style="background:rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;">
+                <div style="font-size:1rem;color:#94a3b8;margin-bottom:12px;">Pas/jour</div>
+                <div style="font-size:1.5rem;font-weight:600;margin-bottom:8px;">{first_pas} → {last_pas}</div>
+                <div style="font-size:2rem;font-weight:800;color:{color};">{'+' if diff_pct >= 0 else ''}{diff_pct:.0f}%</div>
+            </div>
+        '''
+
+    # Build chart (poids over time)
     chart_bars = ""
-    if kpi_data:
-        for entry in kpi_data[-12:]:  # Last 12 entries
-            avg = sum([entry.get(k, 7) or 7 for k in ['adherence_training', 'energie', 'sommeil', 'progression']]) / 4
-            height = int((avg / 10) * 150)
+    poids_timeline = [t for t in timeline if 'poids' in t][-10:]  # Last 10
+    if poids_timeline:
+        min_p = min(t['poids'] for t in poids_timeline) - 2
+        max_p = max(t['poids'] for t in poids_timeline) + 2
+        for t in poids_timeline:
+            height = int(((t['poids'] - min_p) / (max_p - min_p)) * 120) + 30
             chart_bars += f'''
                 <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
-                    <div style="font-size:0.8rem;font-weight:600;margin-bottom:4px;">{avg:.1f}</div>
+                    <div style="font-size:0.8rem;font-weight:600;margin-bottom:4px;">{t['poids']}</div>
                     <div style="width:30px;height:{height}px;background:linear-gradient(to top,#7c3aed,#a78bfa);border-radius:6px 6px 0 0;"></div>
-                    <div style="font-size:0.7rem;color:#888;margin-top:6px;">{entry['date'][5:10]}</div>
+                    <div style="font-size:0.7rem;color:#888;margin-top:6px;">{t['date'][5:10]}</div>
                 </div>
             '''
 
     # Generate HTML
+    nb_bilans = len([e for e in all_emails if e.get('direction') == 'received'])
+    poids_actuel = f"{last_poids}kg" if last_poids else "-"
+    poids_diff = f"{last_poids - first_poids:+.1f}kg" if first_poids and last_poids else "-"
+
     html = f'''<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1027,6 +1063,7 @@ async def generate_client_dashboard_html(client_email: str, user: Dict = Depends
         .stat {{ background: rgba(124,58,237,0.2); border-radius: 12px; padding: 16px; text-align: center; }}
         .stat-value {{ font-size: 1.8rem; font-weight: 800; color: #a78bfa; }}
         .stat-label {{ font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }}
+        .evolution-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }}
         .chart {{ display: flex; align-items: flex-end; justify-content: space-around; height: 180px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px; }}
         .footer {{ text-align: center; margin-top: 40px; color: #64748b; font-size: 0.9rem; }}
         .badge {{ display: inline-block; background: linear-gradient(135deg, #7c3aed, #ec4899); padding: 8px 20px; border-radius: 50px; font-weight: 600; font-size: 0.9rem; }}
@@ -1043,33 +1080,35 @@ async def generate_client_dashboard_html(client_email: str, user: Dict = Depends
             <div class="card-title"><span>👤</span> {client_name}</div>
             <div class="stats-grid">
                 <div class="stat">
-                    <div class="stat-value">{len(kpi_data)}</div>
-                    <div class="stat-label">Bilans analyses</div>
+                    <div class="stat-value">{nb_bilans}</div>
+                    <div class="stat-label">Bilans recus</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value">{start_date}</div>
                     <div class="stat-label">Debut coaching</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">{kpi_data[-1].get('progression', 7) if kpi_data else '-'}/10</div>
-                    <div class="stat-label">Progression actuelle</div>
+                    <div class="stat-value">{poids_actuel}</div>
+                    <div class="stat-label">Poids actuel</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">{kpi_data[-1].get('adherence_training', 7) if kpi_data else '-'}/10</div>
-                    <div class="stat-label">Adherence</div>
+                    <div class="stat-value">{poids_diff}</div>
+                    <div class="stat-label">Evolution poids</div>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <div class="card-title"><span>📈</span> Evolution des KPIs</div>
-            {evolution_html if evolution_html else '<p style="color:#94a3b8;">Pas assez de donnees pour afficher l\'evolution</p>'}
+            <div class="card-title"><span>📈</span> Evolution depuis Jour 1</div>
+            <div class="evolution-grid">
+                {evolution_cards if evolution_cards else '<p style="color:#94a3b8;grid-column:1/-1;text-align:center;">Pas assez de donnees - les bilans doivent contenir le poids</p>'}
+            </div>
         </div>
 
         <div class="card">
-            <div class="card-title"><span>📊</span> Progression dans le temps</div>
+            <div class="card-title"><span>📊</span> Courbe de poids</div>
             <div class="chart">
-                {chart_bars if chart_bars else '<p style="color:#94a3b8;text-align:center;width:100%;">Analyse des bilans pour voir la progression</p>'}
+                {chart_bars if chart_bars else '<p style="color:#94a3b8;text-align:center;width:100%;">Indique ton poids dans tes bilans pour voir la courbe</p>'}
             </div>
         </div>
 
