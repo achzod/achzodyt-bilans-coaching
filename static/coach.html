@@ -312,8 +312,17 @@ async function selectClient(email) {
             <div id="ai-result">Clique sur "Analyser TOUS" pour generer l'analyse de tous les emails</div>
         </div>
         <div class="section response-section">
-            <div class="section-title" style="color:var(--success);">✉️ REPONSE A ENVOYER</div>
-            <textarea id="draft-text" placeholder="L'IA va generer ta reponse complete ici..."></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div class="section-title" style="color:var(--success);margin:0;">✉️ REPONSE A ENVOYER</div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="insertKPIs()">+ KPIs Design</button>
+                    <button class="btn btn-sm" id="btn-preview" onclick="togglePreview()">Preview HTML</button>
+                </div>
+            </div>
+            <div id="draft-container">
+                <textarea id="draft-text" placeholder="L'IA va generer ta reponse HTML ici..."></textarea>
+            </div>
+            <div id="draft-preview" style="display:none;background:#fff;border:2px solid var(--border);border-radius:10px;padding:20px;min-height:350px;"></div>
         </div>
     `;
 
@@ -408,6 +417,79 @@ async function markAllReplied() {
     } catch(e) {
         alert('Erreur: ' + e.message);
     }
+}
+
+// TOGGLE HTML PREVIEW
+let previewMode = false;
+function togglePreview() {
+    const textarea = document.getElementById('draft-container');
+    const preview = document.getElementById('draft-preview');
+    const btn = document.getElementById('btn-preview');
+
+    if (!previewMode) {
+        // Show preview
+        const html = document.getElementById('draft-text').value;
+        preview.innerHTML = html;
+        textarea.style.display = 'none';
+        preview.style.display = 'block';
+        btn.textContent = 'Editer';
+        btn.style.background = '#ef4444';
+        previewMode = true;
+    } else {
+        // Back to edit
+        textarea.style.display = 'block';
+        preview.style.display = 'none';
+        btn.textContent = 'Preview HTML';
+        btn.style.background = '';
+        previewMode = false;
+    }
+}
+
+// INSERT KPIs DESIGN
+function insertKPIs() {
+    if (!currentAnalysis || !currentAnalysis.kpis) {
+        alert('Analyse d\'abord les emails pour avoir les KPIs!');
+        return;
+    }
+
+    const kpis = currentAnalysis.kpis;
+    const kpiHtml = `
+<div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:24px;margin:24px 0;color:white;font-family:Arial,sans-serif;">
+    <h3 style="margin:0 0 20px 0;font-size:20px;text-align:center;">📊 Tes KPIs de la semaine</h3>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
+            <div style="font-size:32px;font-weight:bold;">${kpis.adherence_training || 7}/10</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Training</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
+            <div style="font-size:32px;font-weight:bold;">${kpis.adherence_nutrition || 7}/10</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Nutrition</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
+            <div style="font-size:32px;font-weight:bold;">${kpis.energie || 7}/10</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Energie</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
+            <div style="font-size:32px;font-weight:bold;">${kpis.sommeil || 7}/10</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Sommeil</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
+            <div style="font-size:32px;font-weight:bold;">${kpis.mindset || 7}/10</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Mindset</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
+            <div style="font-size:32px;font-weight:bold;">${kpis.progression || 7}/10</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Progression</div>
+        </div>
+    </div>
+</div>`;
+
+    const textarea = document.getElementById('draft-text');
+    const cursorPos = textarea.selectionStart;
+    const textBefore = textarea.value.substring(0, cursorPos);
+    const textAfter = textarea.value.substring(cursorPos);
+    textarea.value = textBefore + kpiHtml + textAfter;
+    textarea.focus();
 }
 
 // SEND EMAIL via Gmail

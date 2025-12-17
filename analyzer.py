@@ -151,34 +151,63 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
 
 STYLE: Direct, tutoiement, JAMAIS d'asterisques (*), HONNETE sur le physique, pas de flatterie.
 
-GUIDE MASSE GRASSE:
+GUIDE MASSE GRASSE (STRICT):
 FEMME: 18-20%=fit+abdos visibles | 24-28%=normale, PAS d'abdos, gras hanches/cuisses | 30-35%=surpoids, cellulite | 35%+=obesite
 HOMME: 10-12%=abdos decoupes | 15-18%=fit, abdos peu visibles | 20-25%=gras ventre, pas abdos | 28%+=surpoids
-REGLE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme.
+REGLE ABSOLUE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme. JAMAIS en dessous!
 
-HISTORIQUE COMPLET (pour comparaison avec JOUR 1):
-{history_text[:4000] if history_text else "Premier contact - pas d'historique"}
+=== HISTORIQUE COMPLET DEPUIS JOUR 1 ===
+{history_text[:5000] if history_text else "Premier contact - pas d'historique"}
 
-BILAN ACTUEL ({date_str}):
+=== BILAN ACTUEL ({date_str}) ===
 {body_text[:4000]}
 
-DONNEES: {len(photos)} photos, {len(excels)} Excel
+DONNEES: {len(photos)} photos actuelles, {len(excels)} Excel
 {excel_content[:2000] if excel_content else ""}
 
-ANALYSE AVEC EVOLUTION DEPUIS JOUR 1:
-1. PHOTOS ACTUELLES: masse grasse %, description honnete
-2. COMPARAISON JOUR 1: qu'est-ce qui a change? Progres visibles? Perte de gras? Gain musculaire?
-3. Ce qui reste a faire pour atteindre l'objectif
+ANALYSE OBLIGATOIRE:
+1. PHYSIQUE ACTUEL: masse grasse % HONNETE (voir guide), description zones
+2. EVOLUTION DEPUIS JOUR 1: Compare avec le DEBUT du coaching! Quels progres? Perte gras? Gain muscle?
+3. Ce qui reste pour l'objectif
 
-EMAIL (400 mots):
-- Compare avec le debut du coaching (pas juste aujourd'hui!)
-- Montre les progres realises depuis jour 1
-- Encourage sur le chemin parcouru
-- Plan pour la suite
-Signe "Achzod"
+EMAIL HTML (format OBLIGATOIRE):
+- Tu DOIS generer un email en HTML avec du style inline
+- Inclure une section "Tes KPIs de la semaine" avec les scores sur 10 dans des boxes colorees
+- Compare TOUJOURS avec le debut du coaching (pas juste cette semaine!)
+- Montre les progres depuis jour 1
+- Plan d'action pour la suite
+- Signe "Achzod"
 
-JSON:
-{{"resume":"analyse avec evolution depuis jour 1","analyse_photos":{{"masse_grasse_actuelle":"X%","masse_grasse_jour1":"X% si connu","evolution":"description des changements depuis le debut","zones_ameliorees":["zone"],"zones_restantes":["zone"],"progres_visible":"oui/non et details"}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["progres depuis jour 1"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"ajustements_proposes":{{"diete":"x","training":"x","cardio":"x"}},"draft_email":"EMAIL 400 mots AVEC COMPARAISON JOUR 1"}}"""
+TEMPLATE HTML A SUIVRE pour draft_email:
+<div style='font-family:Arial,sans-serif;max-width:600px;'>
+  <p>Salut [prenom],</p>
+  <p>[Intro personnalisee]</p>
+
+  <div style='background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;padding:20px;margin:20px 0;color:white;'>
+    <h3 style='margin:0 0 15px 0;font-size:18px;'>📊 Tes KPIs cette semaine</h3>
+    <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;'>
+      <div style='background:rgba(255,255,255,0.2);border-radius:8px;padding:12px;text-align:center;'>
+        <div style='font-size:24px;font-weight:bold;'>X/10</div>
+        <div style='font-size:12px;opacity:0.9;'>Training</div>
+      </div>
+      [... autres KPIs ...]
+    </div>
+  </div>
+
+  <h3 style='color:#667eea;'>📈 Evolution depuis le debut</h3>
+  <p>[Comparaison avec jour 1 - progres realises]</p>
+
+  <h3 style='color:#22c55e;'>✅ Points positifs</h3>
+  <p>[Ce qui va bien]</p>
+
+  <h3 style='color:#f59e0b;'>🎯 Plan d'action</h3>
+  <p>[Actions concretes pour la semaine]</p>
+
+  <p style='margin-top:30px;'>Achzod</p>
+</div>
+
+JSON OBLIGATOIRE:
+{{"resume":"analyse evolution depuis jour 1","analyse_photos":{{"masse_grasse_actuelle":"X%","masse_grasse_jour1":"X% si connu dans historique","evolution":"description changements depuis debut","zones_ameliorees":["zone"],"zones_restantes":["zone"],"progres_visible":"oui/non details"}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["progres depuis jour 1"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"ajustements_proposes":{{"diete":"x","training":"x","cardio":"x"}},"draft_email":"EMAIL HTML COMPLET AVEC KPIS INTEGRES"}}"""
 
     content.append({"type": "text", "text": prompt})
 

@@ -700,7 +700,7 @@ async def send_magic_link(client_email: str, user: Dict = Depends(get_current_co
 
 @app.post("/api/coach/client/{client_email:path}/analyze-all")
 async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_current_coach)):
-    """Analyze ALL unreplied emails from a client at once"""
+    """Analyze ALL unreplied emails from a client at once - with FULL history including photos from DAY 1"""
     conn = get_db()
     c = conn.cursor()
 
@@ -716,25 +716,51 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
         conn.close()
         return {"success": False, "error": "Aucun email non repondu", "analysis": {}, "draft": ""}
 
-    # Get full history for context
+    # Get FULL history - ALL emails since day 1 (not just 30!)
     c.execute('''
-        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent DESC LIMIT 30
+        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent ASC
     ''', (client_email.lower(),))
+    all_emails = [dict(r) for r in c.fetchall()]
+
+    # Build history with ALL emails
     history = [{"date": datetime.fromisoformat(r['date_sent']) if r['date_sent'] else datetime.now(),
                 "direction": r['direction'], "body": r['body']}
-               for r in c.fetchall()]
+               for r in all_emails]
+
+    # Get FIRST email date (JOUR 1)
+    first_email = all_emails[0] if all_emails else None
+    first_date = datetime.fromisoformat(first_email['date_sent']).strftime("%d/%m/%Y") if first_email and first_email.get('date_sent') else "?"
 
     # Combine all unreplied emails into one analysis
-    combined_body = ""
+    combined_body = f"=== DEBUT COACHING: {first_date} ===\n"
+    combined_body += f"=== NOMBRE TOTAL D'EMAILS DEPUIS JOUR 1: {len(all_emails)} ===\n"
+
     all_attachments = []
     email_ids = []
+
+    # IMPORTANT: Get photos from FIRST emails (day 1) for comparison
+    first_photos = []
+    if all_emails:
+        # Get first 3 emails to find day 1 photos
+        for early_email in all_emails[:3]:
+            c.execute('SELECT * FROM email_attachments WHERE email_id = ? AND is_image = 1', (early_email['id'],))
+            for att in c.fetchall():
+                att_dict = dict(att)
+                first_photos.append({
+                    "filename": f"JOUR1_{att_dict.get('filename', 'photo')}",
+                    "content_type": att_dict.get('content_type', 'image/jpeg'),
+                    "data": att_dict.get('data', ''),
+                    "is_image": 1
+                })
+        if first_photos:
+            combined_body += f"\n=== {len(first_photos)} PHOTOS DU JOUR 1 INCLUSES POUR COMPARAISON ===\n"
 
     for email in unreplied_emails:
         email_ids.append(email['id'])
         date_str = datetime.fromisoformat(email['date_sent']).strftime("%d/%m/%Y %H:%M") if email.get('date_sent') else "?"
         combined_body += f"\n\n=== EMAIL DU {date_str} ===\nSujet: {email.get('subject', '(sans sujet)')}\n\n{email.get('body', '')}"
 
-        # Get attachments for each email
+        # Get attachments for each unreplied email
         c.execute('SELECT * FROM email_attachments WHERE email_id = ?', (email['id'],))
         for att in c.fetchall():
             att_dict = dict(att)
@@ -744,6 +770,10 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
                 "data": att_dict.get('data', ''),
                 "is_image": att_dict.get('is_image', 0)
             })
+
+    # Add day 1 photos to attachments (limited to 2 to not overwhelm)
+    for photo in first_photos[:2]:
+        all_attachments.append(photo)
 
     conn.close()
 
