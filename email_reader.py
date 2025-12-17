@@ -27,7 +27,7 @@ def create_connection():
     """Cree une nouvelle connexion IMAP"""
     try:
         import socket
-        socket.setdefaulttimeout(30)  # Timeout 30 secondes
+        socket.setdefaulttimeout(10)  # Timeout 10 secondes (plus rapide)
         conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
         conn.login(MAIL_USER, MAIL_PASS)
         return conn
