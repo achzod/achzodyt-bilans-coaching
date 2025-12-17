@@ -3,355 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Achzod - Dashboard Coach</title>
+    <title>Achzod Coach - Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --primary: #9990EA;
-            --primary-dark: #7B71D9;
-            --secondary: #8DFFE0;
-            --bg-dark: #0f0f1e;
-            --bg-card: #1a1a2e;
-            --bg-input: #16213e;
-            --text: #e0e0e0;
-            --text-muted: #888;
-            --success: #4CAF50;
-            --warning: #FFD93D;
-            --danger: #FF6B6B;
+            --primary: #9990EA; --primary-dark: #7B71D9; --secondary: #8DFFE0;
+            --bg-dark: #0f0f1e; --bg-card: #1a1a2e; --bg-input: #16213e;
+            --text: #e0e0e0; --text-muted: #888;
+            --success: #4CAF50; --warning: #FFD93D; --danger: #FF6B6B;
             --border: rgba(255,255,255,0.1);
         }
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark), var(--bg-card), var(--bg-dark));
-            color: var(--text);
-            min-height: 100vh;
-        }
-        .navbar {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            padding: 15px 30px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .navbar-brand {
-            font-size: 1.4rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text); min-height: 100vh; }
+        .navbar { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 1.4rem; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .navbar-right { display: flex; gap: 15px; align-items: center; }
-        .main-container {
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            min-height: calc(100vh - 60px);
-        }
-        .sidebar {
-            background: var(--bg-card);
-            border-right: 1px solid var(--border);
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .sidebar-section { margin-bottom: 25px; }
-        .sidebar-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-            letter-spacing: 1px;
-        }
+        .container { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 60px); }
+        .sidebar { background: var(--bg-card); border-right: 1px solid var(--border); padding: 20px; overflow-y: auto; }
+        .sidebar-title { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 15px; letter-spacing: 1px; }
         .client-list { display: flex; flex-direction: column; gap: 8px; }
-        .client-item {
-            padding: 12px 15px;
-            background: var(--bg-input);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
+        .client-item { padding: 15px; background: var(--bg-input); border-radius: 12px; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
         .client-item:hover { border-color: var(--primary); }
-        .client-item.active { background: var(--primary); color: white; }
-        .client-name { font-weight: 600; margin-bottom: 4px; }
-        .client-meta { font-size: 0.8rem; color: var(--text-muted); }
-        .client-item.active .client-meta { color: rgba(255,255,255,0.8); }
-        .badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 5px; }
-        .badge-warning { background: var(--warning); color: #000; }
-        .badge-success { background: var(--success); color: white; }
-        .badge-info { background: var(--primary); color: white; }
+        .client-item.active { border-color: var(--primary); background: rgba(153,144,234,0.15); }
+        .client-item.has-new { border-left: 4px solid var(--warning); }
+        .client-item.replied { opacity: 0.6; }
+        .client-name { font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .client-email { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; }
+        .client-meta { font-size: 0.75rem; color: var(--text-muted); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+        .badge-new { background: var(--warning); color: #000; }
+        .badge-count { background: var(--primary); color: white; }
         .content { padding: 30px; overflow-y: auto; }
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .stat-card.warning .stat-value {
-            background: linear-gradient(135deg, var(--warning), #FFB800);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-align: center; }
+        .stat-value { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .stat-label { color: var(--text-muted); margin-top: 5px; }
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 20px;
-        }
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .card-title { font-size: 1.2rem; font-weight: 600; }
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
-        .btn-success { background: linear-gradient(135deg, var(--success), #45a049); color: white; }
+        .btn-success { background: var(--success); color: white; }
         .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
-        .btn-danger { background: linear-gradient(135deg, var(--danger), #e55353); color: white; }
+        .btn-warning { background: var(--warning); color: #000; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .email-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 15px;
-            background: var(--bg-input);
-            border-radius: 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            border: 1px solid transparent;
-            transition: all 0.2s;
-        }
-        .email-item:hover { border-color: var(--primary); }
-        .email-item.sent { border-left: 3px solid var(--success); }
-        .email-item.received { border-left: 3px solid var(--primary); }
-        .email-info { flex: 1; }
+        .email-item { padding: 15px; background: var(--bg-input); border-radius: 10px; margin-bottom: 10px; cursor: pointer; border-left: 3px solid var(--primary); }
+        .email-item.sent { border-left-color: var(--success); }
+        .email-item.new { border-left-color: var(--warning); background: rgba(255,217,61,0.1); }
         .email-subject { font-weight: 600; margin-bottom: 5px; }
-        .email-preview { color: var(--text-muted); font-size: 0.9rem; max-height: 40px; overflow: hidden; }
-        .email-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; }
-        .email-direction { font-size: 0.7rem; padding: 3px 8px; border-radius: 5px; }
-        .email-direction.sent { background: var(--success); color: white; }
-        .email-direction.received { background: var(--primary); color: white; }
-        textarea {
-            width: 100%;
-            padding: 15px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text);
-            font-size: 1rem;
-            resize: vertical;
-            min-height: 200px;
-        }
-        textarea:focus { outline: none; border-color: var(--primary); }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
-        .ai-section {
-            background: linear-gradient(135deg, rgba(153, 144, 234, 0.1), rgba(141, 255, 224, 0.05));
-            border: 1px solid var(--primary);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .ai-section h3 { color: var(--primary); margin-bottom: 15px; }
-        .hidden { display: none !important; }
-        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .section { margin-bottom: 20px; }
-        .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 10px; color: var(--primary); }
-        .section-content { background: var(--bg-input); padding: 15px; border-radius: 10px; white-space: pre-wrap; }
-        .sync-status { font-size: 0.85rem; color: var(--text-muted); margin-left: 10px; }
-        .sync-status.syncing { color: var(--warning); }
-        .sync-status.success { color: var(--success); }
+        .email-preview { color: var(--text-muted); font-size: 0.9rem; max-height: 60px; overflow: hidden; }
+        .email-date { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; }
         .email-full { background: var(--bg-input); padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-        .email-full-header { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
-        .email-full-body { line-height: 1.6; white-space: pre-wrap; }
-        .attachments { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); }
-        .attachment { display: inline-block; background: var(--bg-card); padding: 8px 15px; border-radius: 8px; margin: 5px; font-size: 0.9rem; }
-        @media (max-width: 1024px) {
-            .main-container { grid-template-columns: 1fr; }
-            .sidebar { display: none; }
-            .stats-row { grid-template-columns: repeat(2, 1fr); }
-        }
+        .email-full-body { white-space: pre-wrap; line-height: 1.6; max-height: 400px; overflow-y: auto; }
+        textarea { width: 100%; padding: 15px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; resize: vertical; min-height: 150px; }
+        textarea:focus { outline: none; border-color: var(--primary); }
+        .ai-section { background: linear-gradient(135deg, rgba(153,144,234,0.1), rgba(141,255,224,0.05)); border: 1px solid var(--primary); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .hidden { display: none !important; }
+        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .magic-link-box { background: var(--bg-input); padding: 15px; border-radius: 10px; margin-top: 15px; }
+        .magic-link-box input { width: 100%; padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 0.85rem; }
+        .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 10px; color: var(--primary); }
+        .section-content { background: var(--bg-input); padding: 15px; border-radius: 10px; }
+        @media (max-width: 1024px) { .container { grid-template-columns: 1fr; } .sidebar { display: none; } }
     </style>
 </head>
 <body>
-    <div id="login-required" class="hidden" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
-        <div style="text-align: center;">
-            <h2>Connexion Coach Requise</h2>
-            <p style="color: var(--text-muted); margin: 20px 0;">Cette page est reservee au coach.</p>
-            <a href="/" class="btn btn-primary">Retour au portail client</a>
+    <div id="login-page" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;">
+        <div class="card" style="width:400px;text-align:center;">
+            <h2 style="margin-bottom:20px;">Coach Login</h2>
+            <input type="email" id="login-email" placeholder="Email" style="width:100%;padding:12px;margin-bottom:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            <input type="password" id="login-password" placeholder="Mot de passe" style="width:100%;padding:12px;margin-bottom:20px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            <button class="btn btn-primary" onclick="login()" style="width:100%;">Se connecter</button>
         </div>
     </div>
 
-    <div id="coach-app">
+    <div id="app" class="hidden">
         <nav class="navbar">
-            <div class="navbar-brand">Achzod Coach Dashboard</div>
+            <div class="navbar-brand">Achzod Coach</div>
             <div class="navbar-right">
-                <button class="btn btn-primary" id="sync-gmail-btn" onclick="syncGmail()">
-                    Sync Gmail
-                </button>
-                <span id="sync-status" class="sync-status"></span>
-                <span id="coach-name">Coach</span>
+                <button class="btn btn-primary" onclick="syncGmail()">Sync Gmail</button>
+                <span id="sync-status" style="font-size:0.85rem;color:var(--text-muted);"></span>
                 <button class="btn btn-secondary" onclick="logout()">Deconnexion</button>
             </div>
         </nav>
 
-        <div class="main-container">
+        <div class="container">
             <aside class="sidebar">
-                <div class="sidebar-section">
-                    <div class="sidebar-title">Clients</div>
-                    <div id="clients-list" class="client-list">
-                        <div class="loading"><div class="spinner"></div></div>
-                    </div>
+                <div class="sidebar-title">Clients <span id="client-count"></span></div>
+                <div id="clients-list" class="client-list">
+                    <div class="loading"><div class="spinner"></div></div>
                 </div>
             </aside>
 
             <main class="content">
-                <!-- Dashboard View -->
                 <div id="dashboard-view">
-                    <h1 style="margin-bottom: 30px;">Dashboard</h1>
-
+                    <h1 style="margin-bottom:30px;">Dashboard</h1>
                     <div class="stats-row">
                         <div class="stat-card">
                             <div class="stat-value" id="stat-clients">0</div>
                             <div class="stat-label">Clients</div>
                         </div>
-                        <div class="stat-card warning">
+                        <div class="stat-card">
                             <div class="stat-value" id="stat-emails">0</div>
-                            <div class="stat-label">Emails synces</div>
+                            <div class="stat-label">Emails</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="stat-pending">0</div>
-                            <div class="stat-label">Bilans en attente</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-received">0</div>
-                            <div class="stat-label">Emails recus</div>
+                            <div class="stat-value" id="stat-unread">0</div>
+                            <div class="stat-label">Non lus</div>
                         </div>
                     </div>
-
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">Derniers emails</div>
-                            <button class="btn btn-secondary" onclick="syncGmail()">Actualiser</button>
+                            <div class="card-title">Derniers emails recus</div>
                         </div>
-                        <div id="recent-emails">
-                            <p style="color: var(--text-muted); text-align: center; padding: 20px;">
-                                Clique sur "Sync Gmail" pour charger les emails de tes clients
-                            </p>
-                        </div>
+                        <div id="recent-emails"></div>
                     </div>
                 </div>
 
-                <!-- Client Detail View -->
                 <div id="client-view" class="hidden">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h1 id="client-title">Client</h1>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                         <div>
-                            <button class="btn btn-secondary" onclick="syncClientGmail()">Sync ce client</button>
+                            <h1 id="client-name">Client</h1>
+                            <p id="client-email-display" style="color:var(--text-muted);"></p>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button class="btn btn-warning" onclick="generateMagicLink()">Generer lien client</button>
                             <button class="btn btn-secondary" onclick="showDashboard()">Retour</button>
                         </div>
                     </div>
 
-                    <div class="card">
-                        <h3 style="margin-bottom: 15px;">Informations</h3>
-                        <div id="client-info"></div>
+                    <div id="magic-link-result" class="magic-link-box hidden">
+                        <p style="margin-bottom:10px;font-weight:600;">Lien d'acces client:</p>
+                        <input type="text" id="magic-link-input" readonly onclick="this.select()">
+                        <button class="btn btn-secondary" style="margin-top:10px;" onclick="copyMagicLink()">Copier</button>
                     </div>
 
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">Historique des emails</div>
-                            <div>
-                                <span id="email-count" style="color: var(--text-muted); margin-right: 15px;"></span>
-                            </div>
+                            <div class="card-title">Historique des echanges</div>
+                            <span id="emails-count" style="color:var(--text-muted);"></span>
                         </div>
-                        <div id="client-emails">
-                            <div class="loading"><div class="spinner"></div></div>
-                        </div>
+                        <div id="client-emails"></div>
                     </div>
                 </div>
 
-                <!-- Email Detail View -->
                 <div id="email-view" class="hidden">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h1>Email</h1>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <h1 id="email-subject-title">Email</h1>
                         <button class="btn btn-secondary" onclick="backToClient()">Retour</button>
                     </div>
 
                     <div class="email-full">
-                        <div class="email-full-header">
-                            <h2 id="email-subject"></h2>
-                            <div style="margin-top: 10px; color: var(--text-muted);">
-                                <span id="email-direction-badge"></span>
-                                <span id="email-date" style="margin-left: 15px;"></span>
-                            </div>
+                        <div style="margin-bottom:15px;color:var(--text-muted);font-size:0.9rem;">
+                            <span id="email-from"></span> - <span id="email-date"></span>
                         </div>
                         <div class="email-full-body" id="email-body"></div>
-                        <div class="attachments" id="email-attachments"></div>
                     </div>
 
                     <div class="ai-section">
-                        <h3>Analyse IA & Reponse</h3>
-                        <p style="color: var(--text-muted); margin-bottom: 15px;">
-                            L'IA analyse cet email et genere un draft de reponse personnalise.
-                        </p>
-                        <button class="btn btn-primary" id="analyze-email-btn" onclick="analyzeEmail()">
-                            Analyser avec IA
-                        </button>
-
-                        <div id="email-analysis" class="hidden" style="margin-top: 20px;">
-                            <div class="section-title">Resume</div>
-                            <div class="section-content" id="analysis-resume"></div>
+                        <h3 style="color:var(--primary);margin-bottom:15px;">Analyse IA & Reponse</h3>
+                        <button class="btn btn-primary" id="analyze-btn" onclick="analyzeEmail()">Analyser avec IA</button>
+                        <div id="ai-result" class="hidden" style="margin-top:20px;">
+                            <div class="section-title">Analyse</div>
+                            <div class="section-content" id="ai-analysis"></div>
                         </div>
                     </div>
 
                     <div class="card">
-                        <h3 style="margin-bottom: 15px;">Reponse</h3>
-                        <div class="form-group">
-                            <textarea id="email-response" rows="10" placeholder="Ecris ta reponse ici ou utilise l'IA pour generer un draft..."></textarea>
+                        <h3 style="margin-bottom:15px;">Reponse</h3>
+                        <textarea id="response-text" placeholder="Ecris ta reponse ou utilise l'IA..."></textarea>
+                        <div style="margin-top:15px;display:flex;gap:10px;">
+                            <button class="btn btn-success" onclick="markReplied()">Marquer comme repondu</button>
+                            <button class="btn btn-secondary" onclick="copyResponse()">Copier</button>
                         </div>
-                        <button class="btn btn-success" onclick="copyResponse()">Copier la reponse</button>
                     </div>
                 </div>
             </main>
@@ -359,266 +186,198 @@
     </div>
 
     <script>
-        const API_URL = window.location.origin + '/api';
-        let authToken = localStorage.getItem('token');
-        let currentUser = null;
+        const API = '/api';
+        let token = localStorage.getItem('coach_token');
         let currentClient = null;
         let currentEmail = null;
 
         async function api(endpoint, method = 'GET', data = null) {
-            const options = {
-                method,
-                headers: { 'Content-Type': 'application/json' }
-            };
-            if (authToken) options.headers['Authorization'] = `Bearer ${authToken}`;
-            if (data) options.body = JSON.stringify(data);
-
-            const response = await fetch(`${API_URL}${endpoint}`, options);
-            if (response.status === 401 || response.status === 403) {
-                showLoginRequired();
-                throw new Error('Non autorise');
-            }
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.detail || 'Erreur');
-            return result;
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+            if (data) opts.body = JSON.stringify(data);
+            const res = await fetch(API + endpoint, opts);
+            if (res.status === 401) { showLogin(); throw new Error('Auth required'); }
+            return res.json();
         }
 
-        function showLoginRequired() {
-            document.getElementById('coach-app').classList.add('hidden');
-            document.getElementById('login-required').classList.remove('hidden');
-            document.getElementById('login-required').style.display = 'flex';
+        function showLogin() {
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('login-page').style.display = 'flex';
+            document.getElementById('app').classList.add('hidden');
         }
 
-        async function checkAuth() {
-            if (!authToken) { showLoginRequired(); return false; }
+        function showApp() {
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
             try {
-                currentUser = await api('/auth/me');
-                if (currentUser.role !== 'coach') { showLoginRequired(); return false; }
-                document.getElementById('coach-name').textContent = currentUser.name;
-                return true;
-            } catch (e) { showLoginRequired(); return false; }
+                const res = await api('/auth/login', 'POST', { email, password });
+                if (res.token) {
+                    token = res.token;
+                    localStorage.setItem('coach_token', token);
+                    showApp();
+                    loadDashboard();
+                }
+            } catch (e) { alert('Erreur connexion'); }
         }
 
         function logout() {
-            localStorage.removeItem('token');
-            window.location.href = '/';
+            localStorage.removeItem('coach_token');
+            token = null;
+            showLogin();
+        }
+
+        async function checkAuth() {
+            if (!token) { showLogin(); return; }
+            try {
+                await api('/auth/me');
+                showApp();
+                loadDashboard();
+            } catch (e) { showLogin(); }
         }
 
         async function loadDashboard() {
             try {
-                const [dashboard, emails] = await Promise.all([
-                    api('/coach/dashboard'),
-                    api('/coach/gmail/emails').catch(() => ({ emails: [], total: 0 }))
-                ]);
+                const data = await api('/coach/dashboard');
 
-                document.getElementById('stat-clients').textContent = dashboard.total_clients || 0;
-                document.getElementById('stat-pending').textContent = dashboard.pending_bilans?.length || 0;
-                document.getElementById('stat-emails').textContent = emails.total || 0;
+                document.getElementById('stat-clients').textContent = data.stats.total_clients;
+                document.getElementById('stat-emails').textContent = data.stats.total_emails;
+                document.getElementById('stat-unread').textContent = data.stats.unread_emails;
+                document.getElementById('client-count').textContent = `(${data.stats.total_clients})`;
 
-                const received = emails.emails?.filter(e => e.direction === 'received') || [];
-                document.getElementById('stat-received').textContent = received.length;
-
-                // Clients sidebar
-                const clientsContainer = document.getElementById('clients-list');
-                if (dashboard.clients && dashboard.clients.length > 0) {
-                    clientsContainer.innerHTML = dashboard.clients.map(c => {
-                        const clientEmails = emails.by_client?.[c.email.toLowerCase()] || [];
-                        return `
-                            <div class="client-item" onclick="loadClient(${c.id}, '${c.email}')">
-                                <div class="client-name">${c.name || c.email}</div>
-                                <div class="client-meta">
-                                    ${clientEmails.length} emails
-                                    ${c.pending_bilans > 0 ? `<span class="badge badge-warning">${c.pending_bilans} bilan</span>` : ''}
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    clientsContainer.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Aucun client inscrit</p>';
-                }
+                // Clients list
+                const clientsHtml = data.clients.map(c => `
+                    <div class="client-item ${c.unread_count > 0 ? 'has-new' : ''}" onclick="loadClient('${c.email}')">
+                        <div class="client-name">
+                            ${c.name || c.email.split('@')[0]}
+                            ${c.unread_count > 0 ? `<span class="badge badge-new">${c.unread_count} new</span>` : ''}
+                        </div>
+                        <div class="client-email">${c.email}</div>
+                        <div class="client-meta">${c.total_emails} emails - ${formatDate(c.last_email_date)}</div>
+                    </div>
+                `).join('') || '<p style="color:var(--text-muted);padding:20px;text-align:center;">Aucun client. Clique sur "Sync Gmail"</p>';
+                document.getElementById('clients-list').innerHTML = clientsHtml;
 
                 // Recent emails
-                const recentContainer = document.getElementById('recent-emails');
-                if (emails.emails && emails.emails.length > 0) {
-                    const recent = emails.emails.slice(0, 10);
-                    recentContainer.innerHTML = recent.map(e => `
-                        <div class="email-item ${e.direction}" onclick="loadEmailById(${e.id})">
-                            <div class="email-info">
-                                <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
-                                <div class="email-preview">${(e.body || '').substring(0, 100)}...</div>
-                                <div class="email-meta">
-                                    <span class="email-direction ${e.direction}">${e.direction === 'sent' ? 'Envoye' : 'Recu'}</span>
-                                    ${e.client_email} - ${formatDate(e.date_sent)}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    recentContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Aucun email synce. Clique sur "Sync Gmail" pour commencer.</p>';
-                }
+                const emailsHtml = data.recent_emails.slice(0, 10).map(e => `
+                    <div class="email-item ${e.status === 'new' ? 'new' : ''}" onclick="loadEmailDirect(${e.id}, '${e.sender_email}')">
+                        <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
+                        <div class="email-preview">${(e.body || '').substring(0, 150)}...</div>
+                        <div class="email-date">${e.sender_email} - ${formatDate(e.date_sent)}</div>
+                    </div>
+                `).join('') || '<p style="color:var(--text-muted);text-align:center;">Aucun email</p>';
+                document.getElementById('recent-emails').innerHTML = emailsHtml;
 
-            } catch (e) {
-                console.error('Dashboard error:', e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function syncGmail() {
-            const btn = document.getElementById('sync-gmail-btn');
             const status = document.getElementById('sync-status');
-
-            btn.disabled = true;
-            btn.textContent = 'Synchronisation...';
-            status.textContent = 'En cours...';
-            status.className = 'sync-status syncing';
-
+            status.textContent = 'Synchronisation...';
             try {
-                const result = await api('/coach/gmail/sync', 'POST');
-                status.textContent = `${result.total_synced} nouveaux emails`;
-                status.className = 'sync-status success';
+                const res = await api('/coach/gmail/sync', 'POST');
+                status.textContent = `${res.synced} nouveaux emails`;
                 loadDashboard();
+                setTimeout(() => status.textContent = '', 5000);
             } catch (e) {
-                status.textContent = 'Erreur: ' + e.message;
-                status.className = 'sync-status';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Sync Gmail';
+                status.textContent = 'Erreur sync';
             }
         }
 
-        async function loadClient(clientId, clientEmail) {
-            currentClient = { id: clientId, email: clientEmail };
-
+        async function loadClient(email) {
+            currentClient = email;
             try {
-                const [clientData, emailsData] = await Promise.all([
-                    api(`/coach/clients/${clientId}`),
-                    api(`/coach/gmail/client/${clientId}`)
-                ]);
+                const data = await api(`/coach/client/${encodeURIComponent(email)}`);
 
-                document.getElementById('client-title').textContent = clientData.client.name || clientData.client.email;
+                document.getElementById('client-name').textContent = data.client.name || email.split('@')[0];
+                document.getElementById('client-email-display').textContent = email;
+                document.getElementById('emails-count').textContent = `${data.emails.length} emails`;
+                document.getElementById('magic-link-result').classList.add('hidden');
 
-                document.getElementById('client-info').innerHTML = `
-                    <p><strong>Email:</strong> ${clientData.client.email}</p>
-                    <p><strong>Objectif:</strong> ${clientData.client.objectif || '-'}</p>
-                    <p><strong>Debut:</strong> ${clientData.client.date_debut || '-'}</p>
-                `;
-
-                const emailsContainer = document.getElementById('client-emails');
-                document.getElementById('email-count').textContent = `${emailsData.total} emails (${emailsData.received?.length || 0} recus, ${emailsData.sent?.length || 0} envoyes)`;
-
-                if (emailsData.emails && emailsData.emails.length > 0) {
-                    emailsContainer.innerHTML = emailsData.emails.map(e => `
-                        <div class="email-item ${e.direction}" onclick="loadEmail(${JSON.stringify(e).replace(/"/g, '&quot;')})">
-                            <div class="email-info">
-                                <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
-                                <div class="email-preview">${(e.body || '').substring(0, 150)}...</div>
-                                <div class="email-meta">
-                                    <span class="email-direction ${e.direction}">${e.direction === 'sent' ? 'Envoye' : 'Recu'}</span>
-                                    ${formatDate(e.date_sent)}
-                                    ${e.has_attachments ? '<span class="badge badge-info">PJ</span>' : ''}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    emailsContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Aucun email trouve pour ce client. Clique sur "Sync ce client" pour charger ses emails.</p>';
-                }
+                const emailsHtml = data.emails.map(e => `
+                    <div class="email-item ${e.direction === 'sent' ? 'sent' : ''} ${e.status === 'new' ? 'new' : ''}" onclick="loadEmail(${JSON.stringify(e).replace(/"/g, '&quot;')})">
+                        <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
+                        <div class="email-preview">${(e.body || '').substring(0, 150)}...</div>
+                        <div class="email-date">${e.direction === 'sent' ? 'Envoye' : 'Recu'} - ${formatDate(e.date_sent)}</div>
+                    </div>
+                `).join('') || '<p style="color:var(--text-muted);text-align:center;">Aucun email</p>';
+                document.getElementById('client-emails').innerHTML = emailsHtml;
 
                 showClientView();
-
-            } catch (e) {
-                alert('Erreur: ' + e.message);
-            }
-        }
-
-        async function syncClientGmail() {
-            if (!currentClient) return;
-
-            try {
-                const result = await api(`/coach/gmail/sync/${currentClient.id}`, 'POST');
-                alert(`${result.synced} nouveaux emails synchronises`);
-                loadClient(currentClient.id, currentClient.email);
-            } catch (e) {
-                alert('Erreur sync: ' + e.message);
-            }
+            } catch (e) { alert('Erreur: ' + e.message); }
         }
 
         function loadEmail(emailData) {
             currentEmail = emailData;
-
-            document.getElementById('email-subject').textContent = emailData.subject || '(Sans sujet)';
-            document.getElementById('email-direction-badge').innerHTML = `<span class="email-direction ${emailData.direction}">${emailData.direction === 'sent' ? 'Envoye' : 'Recu'}</span>`;
+            document.getElementById('email-subject-title').textContent = emailData.subject || '(Sans sujet)';
+            document.getElementById('email-from').textContent = emailData.sender_email || emailData.sender_name;
             document.getElementById('email-date').textContent = formatDate(emailData.date_sent);
             document.getElementById('email-body').textContent = emailData.body || '';
-
-            // Attachments
-            const attachments = JSON.parse(emailData.attachments_json || '[]');
-            if (attachments.length > 0) {
-                document.getElementById('email-attachments').innerHTML = `
-                    <strong>Pieces jointes:</strong>
-                    ${attachments.map(a => `<span class="attachment">${a.filename || a.name || 'Fichier'}</span>`).join('')}
-                `;
-                document.getElementById('email-attachments').classList.remove('hidden');
-            } else {
-                document.getElementById('email-attachments').classList.add('hidden');
-            }
-
-            document.getElementById('email-response').value = '';
-            document.getElementById('email-analysis').classList.add('hidden');
-
+            document.getElementById('response-text').value = '';
+            document.getElementById('ai-result').classList.add('hidden');
             showEmailView();
         }
 
-        async function loadEmailById(emailId) {
-            try {
-                // Get email from the list
-                const emails = await api('/coach/gmail/emails');
-                const email = emails.emails.find(e => e.id === emailId);
-                if (email) {
-                    currentClient = { email: email.client_email };
-                    loadEmail(email);
-                }
-            } catch (e) {
-                alert('Erreur: ' + e.message);
-            }
+        async function loadEmailDirect(emailId, senderEmail) {
+            currentClient = senderEmail;
+            const data = await api(`/coach/client/${encodeURIComponent(senderEmail)}`);
+            const email = data.emails.find(e => e.id === emailId);
+            if (email) loadEmail(email);
         }
 
         async function analyzeEmail() {
             if (!currentEmail) return;
-
-            const btn = document.getElementById('analyze-email-btn');
+            const btn = document.getElementById('analyze-btn');
             btn.disabled = true;
-            btn.textContent = 'Analyse en cours...';
-
+            btn.textContent = 'Analyse...';
             try {
-                const result = await api(`/coach/gmail/email/${currentEmail.id}/analyze`, 'POST');
+                const res = await api(`/coach/email/${currentEmail.id}/analyze`, 'POST');
+                document.getElementById('ai-result').classList.remove('hidden');
+                document.getElementById('ai-analysis').textContent = res.analysis?.resume || JSON.stringify(res.analysis, null, 2);
+                if (res.draft) document.getElementById('response-text').value = res.draft;
+            } catch (e) { alert('Erreur: ' + e.message); }
+            btn.disabled = false;
+            btn.textContent = 'Analyser avec IA';
+        }
 
-                if (result.success) {
-                    document.getElementById('email-analysis').classList.remove('hidden');
-                    document.getElementById('analysis-resume').textContent = result.analysis?.resume || result.draft || 'Analyse terminee';
+        async function markReplied() {
+            if (!currentEmail) return;
+            try {
+                await api(`/coach/email/${currentEmail.id}/mark-replied`, 'POST');
+                alert('Marque comme repondu!');
+                backToClient();
+            } catch (e) { alert('Erreur'); }
+        }
 
-                    if (result.draft) {
-                        document.getElementById('email-response').value = result.draft;
-                    }
-                }
-            } catch (e) {
-                alert('Erreur analyse: ' + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Analyser avec IA';
-            }
+        async function generateMagicLink() {
+            if (!currentClient) return;
+            try {
+                const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/magic-link`, 'POST');
+                document.getElementById('magic-link-input').value = res.magic_link;
+                document.getElementById('magic-link-result').classList.remove('hidden');
+            } catch (e) { alert('Erreur'); }
+        }
+
+        function copyMagicLink() {
+            document.getElementById('magic-link-input').select();
+            document.execCommand('copy');
+            alert('Lien copie!');
         }
 
         function copyResponse() {
-            const response = document.getElementById('email-response').value;
-            navigator.clipboard.writeText(response).then(() => {
-                alert('Reponse copiee dans le presse-papier !');
-            });
+            navigator.clipboard.writeText(document.getElementById('response-text').value);
+            alert('Reponse copiee!');
         }
 
         function showDashboard() {
             document.getElementById('dashboard-view').classList.remove('hidden');
             document.getElementById('client-view').classList.add('hidden');
             document.getElementById('email-view').classList.add('hidden');
+            loadDashboard();
         }
 
         function showClientView() {
@@ -634,24 +393,16 @@
         }
 
         function backToClient() {
-            if (currentClient) {
-                showClientView();
-            } else {
-                showDashboard();
-            }
+            if (currentClient) loadClient(currentClient);
+            else showDashboard();
         }
 
-        function formatDate(dateStr) {
-            if (!dateStr) return '';
-            const d = new Date(dateStr);
-            return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        function formatDate(d) {
+            if (!d) return '';
+            return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            if (await checkAuth()) {
-                loadDashboard();
-            }
-        });
+        document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </body>
 </html>
