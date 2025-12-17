@@ -774,6 +774,22 @@ async def mark_email_replied(email_id: int, user: Dict = Depends(get_current_coa
     conn.close()
     return {"success": True}
 
+class RegenerateRequest(BaseModel):
+    analysis: Dict = {}
+    instructions: str = ""
+    current_draft: str = ""
+
+@app.post("/api/coach/email/{email_id}/regenerate")
+async def regenerate_email_draft(email_id: int, data: RegenerateRequest, user: Dict = Depends(get_current_coach)):
+    """Regenerate email draft with new instructions"""
+    from analyzer import regenerate_email_draft
+
+    try:
+        new_draft = regenerate_email_draft(data.analysis, data.instructions, data.current_draft)
+        return {"success": True, "draft": new_draft}
+    except Exception as e:
+        return {"success": False, "error": str(e), "draft": ""}
+
 # ============ KPI / METRICS ENDPOINTS ============
 class MetricData(BaseModel):
     poids: Optional[float] = None

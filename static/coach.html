@@ -302,19 +302,44 @@
 
                     <div class="ai-section">
                         <h3 style="color:var(--primary);margin-bottom:15px;">Analyse IA & Reponse</h3>
-                        <button class="btn btn-primary" id="analyze-btn" onclick="analyzeEmail()">Analyser avec IA</button>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+                            <button class="btn btn-primary" id="analyze-btn" onclick="analyzeEmail()">Analyser avec IA</button>
+                            <button class="btn btn-secondary" id="extract-kpi-btn" onclick="extractKPIs()" disabled>Extraire KPIs</button>
+                        </div>
                         <div id="ai-result" class="hidden" style="margin-top:20px;">
-                            <div class="section-title">Analyse</div>
+                            <div class="section-title">Resume</div>
                             <div class="section-content" id="ai-analysis"></div>
+
+                            <!-- KPIs from analysis -->
+                            <div id="ai-kpis" class="hidden" style="margin-top:15px;">
+                                <div class="section-title">KPIs detectes</div>
+                                <div id="ai-kpis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:10px;"></div>
+                            </div>
+
+                            <!-- Points positifs -->
+                            <div id="ai-positifs" class="hidden" style="margin-top:15px;">
+                                <div class="section-title" style="color:#4ade80;">Points positifs</div>
+                                <ul id="ai-positifs-list" style="margin-top:10px;padding-left:20px;color:var(--text-muted);"></ul>
+                            </div>
+
+                            <!-- Points a ameliorer -->
+                            <div id="ai-ameliorer" class="hidden" style="margin-top:15px;">
+                                <div class="section-title" style="color:#f97316;">A ameliorer</div>
+                                <ul id="ai-ameliorer-list" style="margin-top:10px;padding-left:20px;color:var(--text-muted);"></ul>
+                            </div>
                         </div>
                     </div>
 
                     <div class="card">
                         <h3 style="margin-bottom:15px;">Reponse</h3>
                         <textarea id="response-text" placeholder="Ecris ta reponse ou utilise l'IA..."></textarea>
-                        <div style="margin-top:15px;display:flex;gap:10px;">
+                        <div style="margin-top:10px;">
+                            <input type="text" id="regen-instructions" placeholder="Instructions pour regenerer (ex: plus court, plus motivant...)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:var(--text);margin-bottom:10px;">
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
                             <button class="btn btn-success" onclick="markReplied()">Marquer comme repondu</button>
                             <button class="btn btn-secondary" onclick="copyResponse()">Copier</button>
+                            <button class="btn btn-secondary" id="regen-btn" onclick="regenerateResponse()" disabled>Regenerer</button>
                         </div>
                     </div>
                 </div>
@@ -679,6 +704,8 @@
             if (email) loadEmail(email);
         }
 
+        let lastAnalysis = null;
+
         async function analyzeEmail() {
             if (!currentEmail) return;
             const btn = document.getElementById('analyze-btn');
@@ -689,10 +716,63 @@
                 document.getElementById('ai-result').classList.remove('hidden');
 
                 if (res.success && res.analysis) {
-                    document.getElementById('ai-analysis').textContent = res.analysis.resume || JSON.stringify(res.analysis, null, 2);
+                    lastAnalysis = res.analysis;
+
+                    // Resume
+                    document.getElementById('ai-analysis').textContent = res.analysis.resume || 'Pas de resume';
+
+                    // KPIs
+                    const kpis = res.analysis.kpis;
+                    if (kpis && Object.keys(kpis).length > 0) {
+                        document.getElementById('ai-kpis').classList.remove('hidden');
+                        const grid = document.getElementById('ai-kpis-grid');
+                        grid.innerHTML = '';
+                        const kpiLabels = {
+                            adherence_training: 'Training',
+                            adherence_nutrition: 'Nutrition',
+                            sommeil: 'Sommeil',
+                            energie: 'Energie',
+                            sante: 'Sante',
+                            mindset: 'Mindset',
+                            progression: 'Progression'
+                        };
+                        for (const [key, value] of Object.entries(kpis)) {
+                            const label = kpiLabels[key] || key;
+                            const color = value >= 8 ? '#4ade80' : value >= 6 ? '#fbbf24' : '#f87171';
+                            grid.innerHTML += `<div style="background:var(--bg-dark);padding:10px;border-radius:8px;text-align:center;">
+                                <div style="font-size:1.5rem;font-weight:bold;color:${color}">${value}/10</div>
+                                <div style="font-size:0.75rem;color:var(--text-muted)">${label}</div>
+                            </div>`;
+                        }
+                    }
+
+                    // Points positifs
+                    const positifs = res.analysis.points_positifs;
+                    if (positifs && positifs.length > 0) {
+                        document.getElementById('ai-positifs').classList.remove('hidden');
+                        document.getElementById('ai-positifs-list').innerHTML = positifs.map(p => `<li>${p}</li>`).join('');
+                    }
+
+                    // Points a ameliorer
+                    const ameliorer = res.analysis.points_ameliorer;
+                    if (ameliorer && ameliorer.length > 0) {
+                        document.getElementById('ai-ameliorer').classList.remove('hidden');
+                        document.getElementById('ai-ameliorer-list').innerHTML = ameliorer.map(p =>
+                            `<li><strong>${p.probleme || p}</strong>${p.solution ? ': ' + p.solution : ''}</li>`
+                        ).join('');
+                    }
+
+                    // Draft email
                     if (res.draft) document.getElementById('response-text').value = res.draft;
+
+                    // Enable buttons
+                    document.getElementById('extract-kpi-btn').disabled = false;
+                    document.getElementById('regen-btn').disabled = false;
                 } else {
                     document.getElementById('ai-analysis').textContent = 'Erreur: ' + (res.error || 'Analyse echouee');
+                    document.getElementById('ai-kpis').classList.add('hidden');
+                    document.getElementById('ai-positifs').classList.add('hidden');
+                    document.getElementById('ai-ameliorer').classList.add('hidden');
                 }
             } catch (e) {
                 document.getElementById('ai-result').classList.remove('hidden');
@@ -700,6 +780,54 @@
             }
             btn.disabled = false;
             btn.textContent = 'Analyser avec IA';
+        }
+
+        async function extractKPIs() {
+            if (!lastAnalysis || !lastAnalysis.kpis || !currentClient) return;
+
+            const kpis = lastAnalysis.kpis;
+            const metricData = {
+                energie: kpis.energie || null,
+                sommeil: kpis.sommeil || null,
+                stress: kpis.sante ? (10 - kpis.sante) : null,
+                adherence: Math.round(((kpis.adherence_training || 7) + (kpis.adherence_nutrition || 7)) / 2),
+                notes: `KPIs extraits de l'analyse IA - Email ID: ${currentEmail?.id}`
+            };
+
+            try {
+                await api(`/coach/client/${encodeURIComponent(currentClient)}/metrics`, 'POST', metricData);
+                alert('KPIs sauvegardes! Va dans l\'onglet KPI pour voir l\'evolution.');
+            } catch (e) {
+                alert('Erreur sauvegarde KPIs: ' + e.message);
+            }
+        }
+
+        async function regenerateResponse() {
+            if (!lastAnalysis || !currentEmail) return;
+
+            const instructions = document.getElementById('regen-instructions').value || 'Regenere avec un ton plus motivant';
+            const currentDraft = document.getElementById('response-text').value;
+
+            const btn = document.getElementById('regen-btn');
+            btn.disabled = true;
+            btn.textContent = 'Generation...';
+
+            try {
+                const res = await api(`/coach/email/${currentEmail.id}/regenerate`, 'POST', {
+                    analysis: lastAnalysis,
+                    instructions: instructions,
+                    current_draft: currentDraft
+                });
+
+                if (res.draft) {
+                    document.getElementById('response-text').value = res.draft;
+                }
+            } catch (e) {
+                alert('Erreur regeneration: ' + e.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Regenerer';
         }
 
         async function markReplied() {
