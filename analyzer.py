@@ -31,6 +31,142 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 MAX_IMAGE_SIZE = 4 * 1024 * 1024
 
 
+def extract_google_doc_links(text: str) -> List[str]:
+    """Extrait tous les liens Google Docs d'un texte"""
+    if not text:
+        return []
+    # Pattern pour Google Docs: docs.google.com/document/d/ID
+    pattern = r'https?://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)'
+    matches = re.findall(pattern, text)
+    return list(set(matches))  # Unique IDs
+
+
+def extract_google_sheet_links(text: str) -> List[str]:
+    """Extrait tous les liens Google Sheets d'un texte"""
+    if not text:
+        return []
+    # Pattern pour Google Sheets: docs.google.com/spreadsheets/d/ID
+    pattern = r'https?://docs\.google\.com/spreadsheets/d/([a-zA-Z0-9_-]+)'
+    matches = re.findall(pattern, text)
+    return list(set(matches))
+
+
+def fetch_google_doc_content(doc_id: str) -> str:
+    """
+    Recupere le contenu d'un Google Doc via export public ou API
+    """
+    print(f"[GDOC] Fetching doc {doc_id[:20]}...")
+
+    # Methode 1: Export public en txt (si le doc est partage "anyone with link")
+    export_url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
+    try:
+        response = requests.get(export_url, timeout=15)
+        if response.status_code == 200 and len(response.text) > 50:
+            print(f"[GDOC] OK via export public ({len(response.text)} chars)")
+            return response.text[:10000]  # Limiter a 10k chars
+    except Exception as e:
+        print(f"[GDOC] Export public failed: {e}")
+
+    # Methode 2: API Google Drive avec API key
+    if GOOGLE_API_KEY:
+        try:
+            api_url = f"https://www.googleapis.com/drive/v3/files/{doc_id}/export?mimeType=text/plain&key={GOOGLE_API_KEY}"
+            response = requests.get(api_url, timeout=15)
+            if response.status_code == 200:
+                print(f"[GDOC] OK via Drive API ({len(response.text)} chars)")
+                return response.text[:10000]
+        except Exception as e:
+            print(f"[GDOC] Drive API failed: {e}")
+
+    # Methode 3: Essayer de scraper la page HTML publique
+    try:
+        html_url = f"https://docs.google.com/document/d/{doc_id}/pub"
+        response = requests.get(html_url, timeout=15)
+        if response.status_code == 200:
+            # Extraire le texte du HTML
+            html = response.text
+            # Nettoyer le HTML
+            text = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+            text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+            text = re.sub(r'<[^>]+>', ' ', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            if len(text) > 100:
+                print(f"[GDOC] OK via HTML pub ({len(text)} chars)")
+                return text[:10000]
+    except Exception as e:
+        print(f"[GDOC] HTML pub failed: {e}")
+
+    return f"[Google Doc {doc_id[:10]}... - contenu non accessible]"
+
+
+def fetch_google_sheet_content(sheet_id: str) -> str:
+    """
+    Recupere le contenu d'un Google Sheet via export CSV public
+    """
+    print(f"[GSHEET] Fetching sheet {sheet_id[:20]}...")
+
+    # Export en CSV (si partage public)
+    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    try:
+        response = requests.get(export_url, timeout=15)
+        if response.status_code == 200 and len(response.text) > 20:
+            # Convertir CSV en texte lisible
+            lines = response.text.strip().split('\n')
+            formatted = []
+            for line in lines[:50]:  # Max 50 lignes
+                cells = line.split(',')
+                formatted.append(" | ".join(cells))
+            content = "\n".join(formatted)
+            print(f"[GSHEET] OK via export CSV ({len(content)} chars)")
+            return content[:8000]
+    except Exception as e:
+        print(f"[GSHEET] Export CSV failed: {e}")
+
+    # Methode 2: API Google Sheets
+    if GOOGLE_API_KEY:
+        try:
+            api_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z100?key={GOOGLE_API_KEY}"
+            response = requests.get(api_url, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                values = data.get("values", [])
+                formatted = []
+                for row in values[:50]:
+                    formatted.append(" | ".join(str(cell) for cell in row))
+                content = "\n".join(formatted)
+                print(f"[GSHEET] OK via Sheets API ({len(content)} chars)")
+                return content[:8000]
+        except Exception as e:
+            print(f"[GSHEET] Sheets API failed: {e}")
+
+    return f"[Google Sheet {sheet_id[:10]}... - contenu non accessible]"
+
+
+def parse_all_google_docs(text: str) -> str:
+    """Detecte et parse tous les Google Docs ET Sheets dans un texte"""
+    contents = []
+
+    # Google Docs
+    doc_ids = extract_google_doc_links(text)
+    if doc_ids:
+        print(f"[GDOC] Found {len(doc_ids)} Google Doc(s) to parse")
+        for doc_id in doc_ids[:3]:  # Max 3 docs
+            content = fetch_google_doc_content(doc_id)
+            if content and not content.startswith("[Google Doc"):
+                contents.append(f"\n=== GOOGLE DOC (ID: {doc_id[:10]}...) ===\n{content}")
+
+    # Google Sheets
+    sheet_ids = extract_google_sheet_links(text)
+    if sheet_ids:
+        print(f"[GSHEET] Found {len(sheet_ids)} Google Sheet(s) to parse")
+        for sheet_id in sheet_ids[:2]:  # Max 2 sheets
+            content = fetch_google_sheet_content(sheet_id)
+            if content and not content.startswith("[Google Sheet"):
+                contents.append(f"\n=== GOOGLE SHEET (ID: {sheet_id[:10]}...) ===\n{content}")
+
+    return "\n".join(contents)
+
+
 def compress_image_if_needed(b64_data: str, media_type: str) -> tuple:
     raw_size = len(base64.b64decode(b64_data))
     if raw_size <= MAX_IMAGE_SIZE:
@@ -299,8 +435,13 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
     body_text = current_email.get("body", "") or ""
 
-    # Build prompt
-    prompt = build_prompt(history_text, date_str, body_text, len(photos), excel_content)
+    # Parse Google Docs links in body
+    gdoc_content = parse_all_google_docs(body_text)
+    if gdoc_content:
+        print(f"[ANALYZE] Google Docs content added ({len(gdoc_content)} chars)")
+
+    # Build prompt with Google Docs content
+    prompt = build_prompt(history_text, date_str, body_text, len(photos), excel_content + gdoc_content)
 
     # Prepare images
     images = []
