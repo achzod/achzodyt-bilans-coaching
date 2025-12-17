@@ -214,7 +214,7 @@ class EmailReader:
                 pass
             return False
 
-    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
+    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", max_emails: int = 200, progress_callback=None) -> List[Dict[str, Any]]:
         """
         Recupere les emails sans reponse - utilise le flag IMAP UNANSWERED
         """
@@ -428,7 +428,7 @@ class EmailReader:
 
         return {"error": "Echec apres 3 tentatives", "loaded": False, "body": "", "attachments": []}
 
-    def _batch_fetch_full_emails(self, conn, email_ids: List[str], max_fetch: int = 500) -> List[Dict[str, Any]]:
+    def _batch_fetch_full_emails(self, conn, email_ids: List[str], max_fetch: int = 10000) -> List[Dict[str, Any]]:
         """
         Helper pour fetcher une liste d'emails COMPLETS en batch
         Optimise pour l'historique
@@ -509,7 +509,7 @@ class EmailReader:
                     
         return fetched_emails
 
-    def get_conversation_history(self, email_address: str, days: int = 90) -> List[Dict[str, Any]]:
+    def get_conversation_history(self, email_address: str, days: int = 3650) -> List[Dict[str, Any]]:
         """
         Recupere l'historique de conversation avec un client
         Optimise avec batch fetching
@@ -593,14 +593,20 @@ class EmailReader:
                 criteria = f'(UNSEEN SINCE "{since_date}")'
 
             status, data = conn.search(None, criteria)
+            print(f"[EMAILS] Recherche IMAP: status={status}, criteria={criteria}")
 
-            if status != "OK" or not data[0]:
+            if status != "OK":
+                print(f"[EMAILS] Erreur recherche IMAP: {status}")
+                conn.logout()
+                return []
+            
+            if not data or not data[0]:
                 print("[EMAILS] Aucun email trouve")
                 conn.logout()
                 return []
 
             email_ids = data[0].split()
-            print(f"[EMAILS] {len(email_ids)} emails trouves, chargement...")
+            print(f"[EMAILS] {len(email_ids)} emails trouves (IDs), chargement headers...")
 
             # Limiter selon max_emails
             if len(email_ids) > max_emails:
