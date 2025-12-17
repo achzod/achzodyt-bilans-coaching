@@ -241,7 +241,7 @@ async function loadClients() {
     } catch(e) { console.error(e); }
 }
 
-// SELECT CLIENT - Load ALL unreplied emails
+// SELECT CLIENT - Load only NEW emails (non lus)
 async function selectClient(email) {
     currentClient = email;
     currentEmailIds = [];
@@ -252,7 +252,8 @@ async function selectClient(email) {
 
     const data = await api(`/coach/client/${encodeURIComponent(email)}`);
     const clientName = data.client.name || email.split('@')[0];
-    const unreplied = data.emails.filter(e => e.direction === 'received' && e.status !== 'replied');
+    // SEULEMENT status='new' - pas les 'read' ou autres
+    const unreplied = data.emails.filter(e => e.direction === 'received' && e.status === 'new');
 
     currentEmailIds = unreplied.map(e => e.id);
 

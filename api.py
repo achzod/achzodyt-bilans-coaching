@@ -249,7 +249,8 @@ def save_email(email_data: Dict) -> bool:
             conn.close()
             return False
 
-        sender_email = email_data.get('from_email', '').lower()
+        # sender_email: pour received c'est from_email, pour sent c'est sender_email (le destinataire)
+        sender_email = email_data.get('sender_email', email_data.get('from_email', '')).lower()
         sender_name = email_data.get('from', '').split('<')[0].strip()
 
         # Insert email (body may be empty - loaded on demand)
@@ -722,10 +723,10 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
     conn = get_db()
     c = conn.cursor()
 
-    # Get ALL unreplied emails for this client
+    # Get only NEW emails for this client (not read, not replied)
     c.execute('''
         SELECT * FROM gmail_emails
-        WHERE sender_email = ? AND direction = 'received' AND status != 'replied'
+        WHERE sender_email = ? AND direction = 'received' AND status = 'new'
         ORDER BY date_sent ASC
     ''', (client_email.lower(),))
     unreplied_emails = [dict(r) for r in c.fetchall()]
