@@ -311,15 +311,34 @@
             } catch (e) { alert('Erreur: ' + e.message); }
         }
 
-        function loadEmail(emailData) {
+        async function loadEmail(emailData) {
             currentEmail = emailData;
             document.getElementById('email-subject-title').textContent = emailData.subject || '(Sans sujet)';
             document.getElementById('email-from').textContent = emailData.sender_email || emailData.sender_name;
             document.getElementById('email-date').textContent = formatDate(emailData.date_sent);
-            document.getElementById('email-body').textContent = emailData.body || '';
             document.getElementById('response-text').value = '';
             document.getElementById('ai-result').classList.add('hidden');
             showEmailView();
+
+            // Load body on demand if not already loaded
+            const bodyEl = document.getElementById('email-body');
+            if (!emailData.body || emailData.body.length < 10 || !emailData.body_loaded) {
+                bodyEl.innerHTML = '<div style="color:var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 10px;"></div>Chargement du contenu...</div>';
+                try {
+                    const res = await api(`/coach/email/${emailData.id}/load-body`, 'POST');
+                    if (res.success) {
+                        bodyEl.textContent = res.body || '(Contenu vide)';
+                        currentEmail.body = res.body;
+                        currentEmail.body_loaded = true;
+                    } else {
+                        bodyEl.textContent = res.body || '(Erreur de chargement)';
+                    }
+                } catch (e) {
+                    bodyEl.textContent = '(Erreur: ' + e.message + ')';
+                }
+            } else {
+                bodyEl.textContent = emailData.body || '(Contenu vide)';
+            }
         }
 
         async function loadEmailDirect(emailId, senderEmail) {

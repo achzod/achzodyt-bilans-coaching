@@ -53,9 +53,11 @@ def init_tables():
             sender_email TEXT NOT NULL,
             sender_name TEXT,
             message_id TEXT UNIQUE,
+            imap_id TEXT,
             direction TEXT DEFAULT 'received',
             subject TEXT,
             body TEXT,
+            body_loaded INTEGER DEFAULT 0,
             date_sent TIMESTAMP,
             has_attachments INTEGER DEFAULT 0,
             attachments_json TEXT DEFAULT '[]',
@@ -169,7 +171,7 @@ def get_db():
     return conn
 
 def save_email(email_data: Dict) -> bool:
-    """Save email and auto-create/update client"""
+    """Save email and auto-create/update client (headers only for fast sync)"""
     conn = get_db()
     c = conn.cursor()
 
@@ -184,20 +186,25 @@ def save_email(email_data: Dict) -> bool:
         sender_email = email_data.get('from_email', '').lower()
         sender_name = email_data.get('from', '').split('<')[0].strip()
 
-        # Insert email
+        # Insert email (body may be empty - loaded on demand)
         attachments = email_data.get('attachments', [])
+        body = email_data.get('body', '')
+        body_loaded = 1 if body and len(body) > 10 else 0
+
         c.execute('''
             INSERT INTO gmail_emails
-            (sender_email, sender_name, message_id, direction, subject, body,
+            (sender_email, sender_name, message_id, imap_id, direction, subject, body, body_loaded,
              date_sent, has_attachments, attachments_json, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             sender_email,
             sender_name,
             msg_id,
+            email_data.get('id', ''),  # IMAP ID for on-demand loading
             email_data.get('direction', 'received'),
             email_data.get('subject', ''),
-            email_data.get('body', ''),
+            body,
+            body_loaded,
             email_data.get('date').isoformat() if email_data.get('date') else datetime.now().isoformat(),
             1 if attachments else 0,
             json.dumps([{'filename': a.get('filename', 'file')} for a in attachments]) if attachments else '[]',
@@ -416,16 +423,12 @@ GMAIL_PASS = os.getenv("MAIL_PASS", "")
 @app.post("/api/coach/gmail/sync")
 async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 180):
     """
-    Sync ALL emails from Gmail inbox (achzodyt@gmail.com)
-    - Fetches full email content with body and attachments
-    - Filters spam/useless emails (typeform, confirmations, etc.)
-    - Auto-creates clients from senders
+    FAST Sync - Headers only, body loaded on demand when viewing
     """
     reader = EmailReader()
 
     try:
-        # Get all emails with FULL content (body + attachments)
-        print(f"[SYNC] Starting sync for last {days} days...")
+        print(f"[SYNC] Starting FAST sync for last {days} days (headers only)...")
         emails = reader.get_all_emails(days=days, unread_only=False)
         print(f"[SYNC] Found {len(emails)} emails total")
 
@@ -438,25 +441,11 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 18
                 filtered += 1
                 continue
 
-            # Load full email content if not already loaded
-            if not email_data.get('body') or len(email_data.get('body', '')) < 10:
-                try:
-                    # Use the IMAP email ID (not message_id header) with load_email_content
-                    email_imap_id = email_data.get('id')
-                    if email_imap_id:
-                        full_content = reader.load_email_content(email_imap_id)
-                        if full_content and full_content.get('loaded'):
-                            email_data['body'] = full_content.get('body', '')
-                            email_data['attachments'] = full_content.get('attachments', [])
-                            print(f"[SYNC] Loaded body: {len(email_data['body'])} chars")
-                except Exception as e:
-                    print(f"[SYNC] Error loading full email: {e}")
-
+            # NO body loading during sync - just save headers + IMAP ID
             email_data['direction'] = 'received'
 
             if save_email(email_data):
                 synced += 1
-                print(f"[SYNC] Saved: {email_data.get('from_email', 'unknown')} - {email_data.get('subject', 'no subject')[:50]}")
 
         reader.disconnect()
 
@@ -517,6 +506,58 @@ async def coach_dashboard(user: Dict = Depends(get_current_coach)):
 async def get_client_detail(client_email: str, user: Dict = Depends(get_current_coach)):
     """Get client details and all emails"""
     return get_client_emails(client_email)
+
+@app.post("/api/coach/email/{email_id}/load-body")
+async def load_email_body(email_id: int, user: Dict = Depends(get_current_coach)):
+    """Load email body on demand from Gmail"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT * FROM gmail_emails WHERE id = ?', (email_id,))
+    row = c.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Email non trouve")
+
+    email_data = dict(row)
+
+    # If body already loaded, return it
+    if email_data.get('body_loaded') and email_data.get('body'):
+        conn.close()
+        return {"success": True, "body": email_data['body'], "cached": True}
+
+    # Load from Gmail using IMAP ID
+    imap_id = email_data.get('imap_id')
+    if not imap_id:
+        conn.close()
+        return {"success": False, "body": "(Contenu non disponible - ID manquant)", "error": "no_imap_id"}
+
+    try:
+        reader = EmailReader()
+        full_content = reader.load_email_content(imap_id)
+        reader.disconnect()
+
+        if full_content and full_content.get('loaded'):
+            body = full_content.get('body', '')
+            attachments = full_content.get('attachments', [])
+
+            # Save body to database for future use
+            c.execute('''
+                UPDATE gmail_emails SET body = ?, body_loaded = 1, attachments_json = ?
+                WHERE id = ?
+            ''', (body, json.dumps([{'filename': a.get('filename', 'file')} for a in attachments]), email_id))
+            conn.commit()
+            conn.close()
+
+            return {"success": True, "body": body, "attachments": attachments, "cached": False}
+        else:
+            conn.close()
+            return {"success": False, "body": "(Erreur chargement)", "error": "load_failed"}
+
+    except Exception as e:
+        conn.close()
+        print(f"[LOAD] Error: {e}")
+        return {"success": False, "body": f"(Erreur: {str(e)})", "error": str(e)}
 
 @app.post("/api/coach/client/{client_email:path}/magic-link")
 async def send_magic_link(client_email: str, user: Dict = Depends(get_current_coach)):
