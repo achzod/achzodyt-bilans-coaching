@@ -608,25 +608,34 @@ async function showEvolution() {
             progression: 'Progression'
         };
 
-        // Calculate evolution for each KPI
-        if (kpiHistory.length >= 2) {
-            const first = kpiHistory[0];
-            const last = kpiHistory[kpiHistory.length - 1];
+        // Show KPIs - with evolution if we have 2+ entries
+        const first = kpiHistory[0];
+        const last = kpiHistory[kpiHistory.length - 1];
+        const hasEvolution = kpiHistory.length >= 2;
 
-            for (const [key, label] of Object.entries(kpiLabels)) {
+        for (const [key, label] of Object.entries(kpiLabels)) {
+            const lastVal = last[key] || 0;
+            let diffHtml = '';
+            let cardClass = '';
+
+            if (hasEvolution) {
                 const firstVal = first[key] || 0;
-                const lastVal = last[key] || 0;
                 const diff = lastVal - firstVal;
                 const isPositive = diff >= 0;
-
-                html += `
-                    <div class="evo-card ${isPositive ? 'positive' : 'negative'}">
-                        <div class="evo-label">${label}</div>
-                        <div class="evo-value ${isPositive ? 'up' : 'down'}">${lastVal}/10</div>
-                        <div class="evo-diff">${isPositive ? '+' : ''}${diff} depuis debut</div>
-                    </div>
-                `;
+                cardClass = isPositive ? 'positive' : 'negative';
+                diffHtml = `<div class="evo-diff">${isPositive ? '+' : ''}${diff} depuis debut</div>`;
+            } else {
+                cardClass = lastVal >= 7 ? 'positive' : lastVal >= 5 ? '' : 'negative';
+                diffHtml = `<div class="evo-diff">1 analyse</div>`;
             }
+
+            html += `
+                <div class="evo-card ${cardClass}">
+                    <div class="evo-label">${label}</div>
+                    <div class="evo-value ${lastVal >= 7 ? 'up' : lastVal < 5 ? 'down' : ''}">${lastVal}/10</div>
+                    ${diffHtml}
+                </div>
+            `;
         }
         html += '</div>';
 
