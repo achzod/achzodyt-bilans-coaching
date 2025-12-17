@@ -126,6 +126,41 @@
         /* EMPTY STATE */
         .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
         .empty-icon { font-size: 3rem; margin-bottom: 10px; }
+
+        /* MODAL EVOLUTION */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: var(--bg-card); border-radius: 16px; width: 90%; max-width: 900px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
+        .modal-header h2 { font-size: 1.2rem; }
+        .modal-body { padding: 24px; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--muted); }
+        .modal-close:hover { color: var(--text); }
+
+        /* CHART */
+        .chart-container { height: 250px; margin-bottom: 24px; background: var(--bg); border-radius: 12px; padding: 16px; position: relative; }
+        .chart-title { font-weight: 600; margin-bottom: 12px; color: var(--text); }
+        .chart { display: flex; align-items: flex-end; justify-content: space-around; height: 180px; padding: 0 10px; }
+        .chart-bar { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 60px; }
+        .bar { width: 30px; background: linear-gradient(to top, var(--primary), #a78bfa); border-radius: 4px 4px 0 0; transition: height 0.3s; }
+        .bar-label { font-size: 0.65rem; color: var(--muted); margin-top: 6px; text-align: center; }
+        .bar-value { font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; }
+
+        /* EVOLUTION STATS */
+        .evo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .evo-card { background: var(--bg); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); }
+        .evo-card.positive { border-color: var(--success); background: rgba(22,163,74,0.08); }
+        .evo-card.negative { border-color: var(--danger); background: rgba(220,38,38,0.08); }
+        .evo-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
+        .evo-value { font-size: 1.8rem; font-weight: 700; }
+        .evo-value.up { color: var(--success); }
+        .evo-value.down { color: var(--danger); }
+        .evo-diff { font-size: 0.8rem; margin-top: 4px; }
+
+        /* HISTORY TABLE */
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .history-table th { text-align: left; padding: 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-weight: 600; }
+        .history-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+        .history-table tr:hover { background: var(--bg-hover); }
     </style>
 </head>
 <body>
@@ -147,6 +182,7 @@
                 <div class="logo">Achzod Coach</div>
                 <div class="sync-row">
                     <button class="btn btn-primary btn-sm" onclick="sync()">Sync</button>
+                    <button class="btn btn-sm" style="background:#3b82f6;color:white;" id="btn-evolution" onclick="showEvolution()" disabled>Evolution</button>
                     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
                 </div>
                 <div id="sync-status" style="font-size:0.75rem;color:var(--muted);margin-top:8px;"></div>
@@ -194,6 +230,19 @@
     <!-- LIGHTBOX -->
     <div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
         <img id="lightbox-img" src="">
+    </div>
+
+    <!-- EVOLUTION MODAL -->
+    <div id="evolution-modal" class="modal hidden" onclick="if(event.target===this)closeEvolution()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="evo-modal-title">Evolution Client</h2>
+                <button class="modal-close" onclick="closeEvolution()">&times;</button>
+            </div>
+            <div class="modal-body" id="evo-modal-body">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
     </div>
 
 <script>
@@ -265,6 +314,9 @@ async function selectClient(email) {
     currentClient = email;
     document.querySelectorAll('.client').forEach(el => el.classList.remove('active'));
     event.currentTarget.classList.add('active');
+
+    // Enable evolution button
+    document.getElementById('btn-evolution').disabled = false;
 
     const data = await api(`/coach/client/${encodeURIComponent(email)}`);
     document.getElementById('emails-title').textContent = data.client.name || email.split('@')[0];
@@ -504,6 +556,151 @@ function showLightbox(src) {
     document.getElementById('lightbox').classList.remove('hidden');
 }
 function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+
+// EVOLUTION MODAL
+async function showEvolution() {
+    if (!currentClient) return;
+    document.getElementById('evolution-modal').classList.remove('hidden');
+    document.getElementById('evo-modal-title').textContent = `Evolution - ${currentClient}`;
+    document.getElementById('evo-modal-body').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:10px">Chargement des donnees...</div></div>';
+
+    try {
+        const data = await api(`/coach/client/${encodeURIComponent(currentClient)}/metrics`);
+        const metrics = data.metrics || [];
+        const evolution = data.evolution || {};
+
+        if (metrics.length === 0) {
+            document.getElementById('evo-modal-body').innerHTML = `
+                <div class="empty">
+                    <div class="empty-icon">📊</div>
+                    <div>Aucune donnee d'evolution pour ce client</div>
+                    <div style="margin-top:12px;font-size:0.85rem;color:var(--muted);">
+                        Les KPIs sont automatiquement enregistres a chaque analyse IA.<br>
+                        Analyse quelques bilans pour voir l'evolution!
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Parse full KPIs from notes field
+        const kpiHistory = metrics.map(m => {
+            let kpis = {};
+            try { kpis = JSON.parse(m.notes) || {}; } catch(e) {}
+            return {
+                date: m.date_recorded,
+                ...kpis,
+                energie: m.energie || kpis.energie,
+                sommeil: m.sommeil || kpis.sommeil,
+                adherence: m.adherence || kpis.adherence_training
+            };
+        });
+
+        // Build evolution cards
+        let html = '<div class="evo-grid">';
+        const kpiLabels = {
+            adherence_training: 'Adherence Training',
+            adherence_nutrition: 'Adherence Nutrition',
+            sommeil: 'Sommeil',
+            energie: 'Energie',
+            sante: 'Sante',
+            mindset: 'Mindset',
+            progression: 'Progression'
+        };
+
+        // Calculate evolution for each KPI
+        if (kpiHistory.length >= 2) {
+            const first = kpiHistory[0];
+            const last = kpiHistory[kpiHistory.length - 1];
+
+            for (const [key, label] of Object.entries(kpiLabels)) {
+                const firstVal = first[key] || 0;
+                const lastVal = last[key] || 0;
+                const diff = lastVal - firstVal;
+                const isPositive = diff >= 0;
+
+                html += `
+                    <div class="evo-card ${isPositive ? 'positive' : 'negative'}">
+                        <div class="evo-label">${label}</div>
+                        <div class="evo-value ${isPositive ? 'up' : 'down'}">${lastVal}/10</div>
+                        <div class="evo-diff">${isPositive ? '+' : ''}${diff} depuis debut</div>
+                    </div>
+                `;
+            }
+        }
+        html += '</div>';
+
+        // Build chart for main KPIs
+        html += '<div class="chart-container"><div class="chart-title">Evolution des KPIs dans le temps</div><div class="chart">';
+
+        // Show last 10 entries
+        const chartData = kpiHistory.slice(-10);
+        const maxVal = 10;
+
+        chartData.forEach((entry, i) => {
+            const avg = Math.round(((entry.adherence_training || 7) + (entry.energie || 7) + (entry.sommeil || 7) + (entry.progression || 7)) / 4);
+            const height = (avg / maxVal) * 160;
+            const dateStr = new Date(entry.date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
+
+            html += `
+                <div class="chart-bar">
+                    <div class="bar-value">${avg}</div>
+                    <div class="bar" style="height:${height}px;"></div>
+                    <div class="bar-label">${dateStr}</div>
+                </div>
+            `;
+        });
+
+        html += '</div></div>';
+
+        // History table
+        html += `
+            <div style="margin-top:24px;">
+                <h3 style="margin-bottom:12px;">Historique des analyses</h3>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Training</th>
+                            <th>Nutrition</th>
+                            <th>Energie</th>
+                            <th>Sommeil</th>
+                            <th>Mindset</th>
+                            <th>Progression</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Reverse to show newest first
+        [...kpiHistory].reverse().forEach(entry => {
+            const dateStr = new Date(entry.date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit', year: '2-digit'});
+            html += `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${entry.adherence_training || '-'}</td>
+                    <td>${entry.adherence_nutrition || '-'}</td>
+                    <td>${entry.energie || '-'}</td>
+                    <td>${entry.sommeil || '-'}</td>
+                    <td>${entry.mindset || '-'}</td>
+                    <td>${entry.progression || '-'}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+
+        document.getElementById('evo-modal-body').innerHTML = html;
+
+    } catch(e) {
+        console.error(e);
+        document.getElementById('evo-modal-body').innerHTML = `<div class="empty"><div class="empty-icon">❌</div><div>Erreur: ${e.message}</div></div>`;
+    }
+}
+
+function closeEvolution() {
+    document.getElementById('evolution-modal').classList.add('hidden');
+}
 
 // INIT
 checkAuth();

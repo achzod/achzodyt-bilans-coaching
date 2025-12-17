@@ -745,6 +745,33 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
     try:
         result = analyze_coaching_bilan(email_for_analysis, history, email_data['sender_email'])
         analysis = result.get('analysis') or {}  # Handle None case
+
+        # AUTO-SAVE KPIs to client_metrics for evolution tracking
+        if result.get('success') and analysis.get('kpis'):
+            try:
+                conn2 = get_db()
+                c2 = conn2.cursor()
+                kpis = analysis['kpis']
+                c2.execute('''
+                    INSERT INTO client_metrics
+                    (client_email, date_recorded, energie, sommeil, stress, adherence, notes, source, email_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'ai_analysis', ?)
+                ''', (
+                    email_data['sender_email'],
+                    email_data.get('date_sent') or datetime.now().isoformat(),
+                    kpis.get('energie'),
+                    kpis.get('sommeil'),
+                    10 - kpis.get('mindset', 7),  # Convert mindset to stress (inverse)
+                    kpis.get('adherence_training'),
+                    json.dumps(kpis),  # Store full KPIs in notes
+                    email_id
+                ))
+                conn2.commit()
+                conn2.close()
+                print(f"[KPI] Saved KPIs for {email_data['sender_email']}")
+            except Exception as kpi_err:
+                print(f"[KPI] Error saving: {kpi_err}")
+
         return {
             "success": result.get('success', False),
             "analysis": analysis,
