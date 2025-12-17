@@ -490,8 +490,8 @@ GMAIL_PASS = os.getenv("MAIL_PASS", "")
 @app.post("/api/coach/gmail/sync")
 async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5):
     """
-    FAST Sync - Headers only, body loaded on demand when viewing
-    Timeout: 30 seconds max
+    ULTRA FAST Sync - Headers only, 15s timeout, NO sent emails
+    Sent emails loaded on-demand during analysis
     """
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
@@ -499,65 +499,49 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
     def do_sync():
         reader = EmailReader()
         try:
-            print(f"[SYNC] Starting sync for last {days} days...")
+            print(f"[SYNC] Starting FAST sync for last {days} days (unread only)...")
             emails = reader.get_all_emails(days=days, unread_only=True)
-            print(f"[SYNC] Found {len(emails)} emails")
-            return emails, reader
+            print(f"[SYNC] Found {len(emails)} unread emails")
+            reader.disconnect()
+            return emails
         except Exception as e:
             print(f"[SYNC ERROR] {e}")
-            return [], None
+            try:
+                reader.disconnect()
+            except:
+                pass
+            return []
 
-    # Run sync with timeout
+    # Run sync with 15s timeout (was 30s)
     try:
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as pool:
-            emails, reader = await asyncio.wait_for(
+            emails = await asyncio.wait_for(
                 loop.run_in_executor(pool, do_sync),
-                timeout=30.0
+                timeout=15.0
             )
     except asyncio.TimeoutError:
-        return {"success": False, "error": "Sync timeout (30s) - try again", "synced": 0}
+        return {"success": False, "error": "Sync timeout (15s) - essaie encore", "synced": 0}
     except Exception as e:
         return {"success": False, "error": str(e), "synced": 0}
 
     if not emails:
-        return {"success": False, "error": "No emails found or connection failed", "synced": 0}
+        return {"success": True, "synced": 0, "message": "Aucun nouveau mail non lu"}
 
     try:
-        print(f"[SYNC] Processing {len(emails)} received emails")
-
         synced = 0
         filtered = 0
 
-        for email_data in emails:
-            # Filter spam
+        for email_data in emails[:100]:  # Max 100 emails
             if is_spam_email(email_data):
                 filtered += 1
                 continue
 
-            # NO body loading during sync - just save headers + IMAP ID
             email_data['direction'] = 'received'
-
             if save_email(email_data):
                 synced += 1
 
-        # 2. Sync SENT emails (coach responses) - CRITICAL for full history!
-        print(f"[SYNC] Now syncing sent emails...")
-        sent_emails = reader.get_sent_emails(days=days)
-        print(f"[SYNC] Found {len(sent_emails)} sent emails")
-
-        sent_synced = 0
-        for email_data in sent_emails:
-            email_data['direction'] = 'sent'
-            if save_email(email_data):
-                sent_synced += 1
-
-        print(f"[SYNC] Synced {sent_synced} sent emails")
-        synced += sent_synced
-
-        reader.disconnect()
-
-        # Get updated stats
+        # Get stats (no sent sync - too slow)
         conn = get_db()
         c = conn.cursor()
         c.execute('SELECT COUNT(*) as total FROM gmail_emails')
@@ -568,7 +552,7 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
         unread = c.fetchone()['unread']
         conn.close()
 
-        print(f"[SYNC] Done: {synced} synced, {filtered} filtered, {total} total")
+        print(f"[SYNC] Done: {synced} synced, {filtered} filtered")
 
         return {
             "success": True,
@@ -580,10 +564,6 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
         }
     except Exception as e:
         print(f"[SYNC] Error: {e}")
-        try:
-            reader.disconnect()
-        except:
-            pass
         raise HTTPException(status_code=500, detail=f"Erreur sync: {str(e)}")
 
 @app.post("/api/coach/gmail/clean-spam")
