@@ -396,6 +396,10 @@ async function analyzeAll() {
         document.getElementById('btn-copy').disabled = false;
         document.getElementById('btn-send').disabled = false;
 
+        // AUTO-SHOW PREVIEW (rendered HTML)
+        previewMode = false; // Reset then toggle
+        togglePreview();
+
     } catch(e) {
         document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${e.message}</div>`;
     }
