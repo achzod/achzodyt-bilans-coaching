@@ -487,6 +487,30 @@ async def get_me(user: Dict = Depends(get_current_coach)):
 GMAIL_USER = os.getenv("MAIL_USER", "achzodyt@gmail.com")
 GMAIL_PASS = os.getenv("MAIL_PASS", "")
 
+@app.get("/api/test-gmail")
+async def test_gmail_connection():
+    """Test Gmail IMAP connection - no auth required for debugging"""
+    import imaplib
+    import socket
+
+    mail_user = os.getenv("MAIL_USER", "")
+    mail_pass = os.getenv("MAIL_PASS", "")
+
+    if not mail_user or not mail_pass:
+        return {"success": False, "error": "MAIL_USER ou MAIL_PASS non configuré", "user": mail_user[:10] if mail_user else "VIDE"}
+
+    try:
+        socket.setdefaulttimeout(15)
+        conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+        conn.login(mail_user, mail_pass)
+        conn.select("INBOX")
+        status, messages = conn.search(None, 'ALL')
+        total = len(messages[0].split()) if messages[0] else 0
+        conn.logout()
+        return {"success": True, "message": f"Connexion OK - {total} emails dans INBOX", "user": mail_user}
+    except Exception as e:
+        return {"success": False, "error": str(e), "user": mail_user}
+
 @app.post("/api/coach/gmail/sync")
 async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5):
     """
