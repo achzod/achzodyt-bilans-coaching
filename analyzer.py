@@ -151,30 +151,34 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
 
 STYLE: Direct, tutoiement, JAMAIS d'asterisques (*), HONNETE sur le physique, pas de flatterie.
 
-GUIDE MASSE GRASSE (UTILISE OBLIGATOIREMENT):
+GUIDE MASSE GRASSE:
 FEMME: 18-20%=fit+abdos visibles | 24-28%=normale, PAS d'abdos, gras hanches/cuisses | 30-35%=surpoids, cellulite | 35%+=obesite
 HOMME: 10-12%=abdos decoupes | 15-18%=fit, abdos peu visibles | 20-25%=gras ventre, pas abdos | 28%+=surpoids
+REGLE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme.
 
-REGLE STRICTE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme. NE JAMAIS sous-estimer.
+HISTORIQUE COMPLET (pour comparaison avec JOUR 1):
+{history_text[:4000] if history_text else "Premier contact - pas d'historique"}
 
-HISTORIQUE:
-{history_text[:3000] if history_text else "Premier contact"}
-
-BILAN ({date_str}):
+BILAN ACTUEL ({date_str}):
 {body_text[:4000]}
 
 DONNEES: {len(photos)} photos, {len(excels)} Excel
 {excel_content[:2000] if excel_content else ""}
 
-ANALYSE HONNETE:
-1. PHOTOS: masse grasse REALISTE, gras visible ou, cellulite, points forts musculaires
-2. METABOLIQUE: poids, retention eau
-3. PLAN: deficit calorique si gras, cardio, training adapte
+ANALYSE AVEC EVOLUTION DEPUIS JOUR 1:
+1. PHOTOS ACTUELLES: masse grasse %, description honnete
+2. COMPARAISON JOUR 1: qu'est-ce qui a change? Progres visibles? Perte de gras? Gain musculaire?
+3. Ce qui reste a faire pour atteindre l'objectif
 
-EMAIL (400 mots): Analyse VRAIE du physique (pas de mensonge), encouragements sur le travail, plan concret. Signe "Achzod"
+EMAIL (400 mots):
+- Compare avec le debut du coaching (pas juste aujourd'hui!)
+- Montre les progres realises depuis jour 1
+- Encourage sur le chemin parcouru
+- Plan pour la suite
+Signe "Achzod"
 
 JSON:
-{{"resume":"analyse HONNETE","analyse_photos":{{"masse_grasse":"X% REALISTE","zones_grasses":["hanches","cuisses","ventre si applicable"],"cellulite":"visible ou non","points_forts":["muscle"]}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["victoire"],"points_ameliorer":[{{"probleme":"x","solution":"y","priorite":"haute"}}],"ajustements_proposes":{{"diete":"deficit si gras","training":"x","cardio":"si besoin"}},"draft_email":"EMAIL HONNETE 400 mots"}}"""
+{{"resume":"analyse avec evolution depuis jour 1","analyse_photos":{{"masse_grasse_actuelle":"X%","masse_grasse_jour1":"X% si connu","evolution":"description des changements depuis le debut","zones_ameliorees":["zone"],"zones_restantes":["zone"],"progres_visible":"oui/non et details"}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["progres depuis jour 1"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"ajustements_proposes":{{"diete":"x","training":"x","cardio":"x"}},"draft_email":"EMAIL 400 mots AVEC COMPARAISON JOUR 1"}}"""
 
     content.append({"type": "text", "text": prompt})
 
