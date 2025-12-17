@@ -441,10 +441,14 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 18
             # Load full email content if not already loaded
             if not email_data.get('body') or len(email_data.get('body', '')) < 10:
                 try:
-                    full_content = reader.load_full_email(email_data.get('message_id'))
-                    if full_content and full_content.get('loaded'):
-                        email_data['body'] = full_content.get('body', '')
-                        email_data['attachments'] = full_content.get('attachments', [])
+                    # Use the IMAP email ID (not message_id header) with load_email_content
+                    email_imap_id = email_data.get('id')
+                    if email_imap_id:
+                        full_content = reader.load_email_content(email_imap_id)
+                        if full_content and full_content.get('loaded'):
+                            email_data['body'] = full_content.get('body', '')
+                            email_data['attachments'] = full_content.get('attachments', [])
+                            print(f"[SYNC] Loaded body: {len(email_data['body'])} chars")
                 except Exception as e:
                     print(f"[SYNC] Error loading full email: {e}")
 
