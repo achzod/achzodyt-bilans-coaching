@@ -499,9 +499,9 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
     def do_sync():
         reader = EmailReader()
         try:
-            print(f"[SYNC] Starting FAST sync for last {days} days (unread only)...")
-            emails = reader.get_all_emails(days=days, unread_only=True)
-            print(f"[SYNC] Found {len(emails)} unread emails")
+            print(f"[SYNC] Starting sync for last {days} days (ALL emails)...")
+            emails = reader.get_all_emails(days=days, unread_only=False)
+            print(f"[SYNC] Found {len(emails)} emails")
             reader.disconnect()
             return emails
         except Exception as e:
@@ -512,16 +512,16 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
                 pass
             return []
 
-    # Run sync with 15s timeout (was 30s)
+    # Run sync with 30s timeout
     try:
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as pool:
             emails = await asyncio.wait_for(
                 loop.run_in_executor(pool, do_sync),
-                timeout=15.0
+                timeout=30.0
             )
     except asyncio.TimeoutError:
-        return {"success": False, "error": "Sync timeout (15s) - essaie encore", "synced": 0}
+        return {"success": False, "error": "Sync timeout (30s) - essaie encore", "synced": 0}
     except Exception as e:
         return {"success": False, "error": str(e), "synced": 0}
 
