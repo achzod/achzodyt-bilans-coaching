@@ -488,7 +488,7 @@ GMAIL_USER = os.getenv("MAIL_USER", "achzodyt@gmail.com")
 GMAIL_PASS = os.getenv("MAIL_PASS", "")
 
 @app.post("/api/coach/gmail/sync")
-async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30):
+async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5):
     """
     FAST Sync - Headers only, body loaded on demand when viewing
     Includes BOTH received (INBOX) AND sent emails (for full conversation history)
