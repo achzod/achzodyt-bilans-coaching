@@ -491,17 +491,40 @@ GMAIL_PASS = os.getenv("MAIL_PASS", "")
 async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5):
     """
     FAST Sync - Headers only, body loaded on demand when viewing
-    Includes BOTH received (INBOX) AND sent emails (for full conversation history)
-    Default: 30 days for faster sync
+    Timeout: 30 seconds max
     """
-    reader = EmailReader()
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    def do_sync():
+        reader = EmailReader()
+        try:
+            print(f"[SYNC] Starting sync for last {days} days...")
+            emails = reader.get_all_emails(days=days, unread_only=False)
+            print(f"[SYNC] Found {len(emails)} emails")
+            return emails, reader
+        except Exception as e:
+            print(f"[SYNC ERROR] {e}")
+            return [], None
+
+    # Run sync with timeout
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as pool:
+            emails, reader = await asyncio.wait_for(
+                loop.run_in_executor(pool, do_sync),
+                timeout=30.0
+            )
+    except asyncio.TimeoutError:
+        return {"success": False, "error": "Sync timeout (30s) - try again", "synced": 0}
+    except Exception as e:
+        return {"success": False, "error": str(e), "synced": 0}
+
+    if not emails:
+        return {"success": False, "error": "No emails found or connection failed", "synced": 0}
 
     try:
-        print(f"[SYNC] Starting FAST sync for last {days} days (headers only)...")
-
-        # 1. Sync received emails (INBOX)
-        emails = reader.get_all_emails(days=days, unread_only=False)
-        print(f"[SYNC] Found {len(emails)} received emails")
+        print(f"[SYNC] Processing {len(emails)} received emails")
 
         synced = 0
         filtered = 0
