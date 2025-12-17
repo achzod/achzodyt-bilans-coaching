@@ -180,7 +180,7 @@ JSON:
 
 
 def call_gpt4(prompt: str, images: list) -> Dict:
-    """Appel GPT-4 Turbo (meilleur modele OpenAI avec vision)"""
+    """Appel GPT-4o (dernier modele OpenAI - decembre 2024)"""
     try:
         content = [{"type": "text", "text": prompt}]
         for img_data, img_type in images:
@@ -190,19 +190,19 @@ def call_gpt4(prompt: str, images: list) -> Dict:
             })
 
         response = openai_client.chat.completions.create(
-            model="gpt-4-turbo",  # Meilleur GPT-4 avec vision
+            model="gpt-4o",  # GPT-4 Omni - LE PLUS RECENT (dec 2024)
             max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
-        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-4-Turbo"}
+        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-4o (Latest)"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "GPT-4-Turbo"}
+        return {"success": False, "error": str(e), "model": "GPT-4o"}
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
-    """Appel Google Gemini"""
+    """Appel Gemini 1.5 Pro (dernier modele Google - decembre 2024)"""
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-1.5-pro')  # LE PLUS RECENT disponible
 
         # Construire le contenu
         parts = [prompt]
