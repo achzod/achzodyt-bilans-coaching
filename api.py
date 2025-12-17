@@ -746,10 +746,11 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
 
     try:
         result = analyze_coaching_bilan(email_for_analysis, history, email_data['sender_email'])
+        analysis = result.get('analysis') or {}  # Handle None case
         return {
             "success": result.get('success', False),
-            "analysis": result.get('analysis', {}),
-            "draft": result.get('analysis', {}).get('draft_email', ''),
+            "analysis": analysis,
+            "draft": analysis.get('draft_email', '') if analysis else '',
             "error": result.get('error', '')
         }
     except Exception as e:

@@ -333,9 +333,12 @@ def _build_history_context(history):
         return "Aucun historique - premier contact."
     parts = [f"=== {len(history)} EMAILS ==="]
     for i, e in enumerate(history[-10:], 1):
+        if not e or not isinstance(e, dict):
+            continue
         d = "CLIENT" if e.get("direction") == "received" else "TOI"
         dt = e.get("date").strftime("%d/%m/%Y") if e.get("date") else "?"
-        parts.append(f"--- {d} ({dt}) ---" + chr(10) + e.get('body', '')[:800])
+        body = e.get('body', '') or ''
+        parts.append(f"--- {d} ({dt}) ---" + chr(10) + body[:800])
     return chr(10).join(parts)
 
 
