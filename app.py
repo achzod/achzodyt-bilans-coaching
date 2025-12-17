@@ -663,10 +663,13 @@ def main():
                 # Icone direction
                 icon = "📥" if email_data.get('direction') == 'received' else "📤"
                 
-                # Subject
-                subject = email_data.get('subject', 'Sans sujet')[:30]
+                # Subject - nettoyer "Re:" et autres prefixes
+                subject = email_data.get('subject', 'Sans sujet')
+                # Enlever les prefixes courants
+                subject = subject.replace('Re: ', '').replace('RE: ', '').replace('Fwd: ', '').replace('FWD: ', '')
+                subject = subject[:40]  # Limiter la longueur
                 
-                if st.button(f"{icon} {date_str} - {subject}", key=f"sel_{message_id}", use_container_width=True):
+                if st.button(f"{icon} {date_str} | {subject}", key=f"sel_{message_id}", use_container_width=True):
                     st.session_state.selected_email = email_data
                     # Pour l'historique, si on a cherche un client, on a deja tout
                     # Sinon on recharge l'historique specifique de ce client
