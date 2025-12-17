@@ -392,6 +392,45 @@ async function analyze() {
             </div>`;
         }
 
+        // Analyse globale (energie, sommeil, stress, etc)
+        if (a.analyse_globale) {
+            const ag = a.analyse_globale;
+            html += `<div style="margin-bottom:16px;">
+                <div class="section-title">Analyse Globale</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    ${ag.poids_evolution ? `<div class="point"><strong>Poids:</strong> ${ag.poids_evolution}</div>` : ''}
+                    ${ag.energie ? `<div class="point"><strong>Energie:</strong> ${ag.energie}</div>` : ''}
+                    ${ag.sommeil ? `<div class="point"><strong>Sommeil:</strong> ${ag.sommeil}</div>` : ''}
+                    ${ag.stress ? `<div class="point"><strong>Stress:</strong> ${ag.stress}</div>` : ''}
+                    ${ag.digestion ? `<div class="point"><strong>Digestion:</strong> ${ag.digestion}</div>` : ''}
+                    ${ag.mindset ? `<div class="point"><strong>Mindset:</strong> ${ag.mindset}</div>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // Ajustements proposes
+        if (a.ajustements_proposes) {
+            const aj = a.ajustements_proposes;
+            const hasAdjustments = aj.diete || aj.training || aj.supplements || aj.lifestyle;
+            if (hasAdjustments) {
+                html += `<div style="margin-bottom:16px;">
+                    <div class="section-title" style="color:#3b82f6;">Ajustements Proposes</div>
+                    ${aj.diete && aj.diete !== 'null' && aj.diete !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Diete:</strong> ${aj.diete}</div>` : ''}
+                    ${aj.training && aj.training !== 'null' && aj.training !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Training:</strong> ${aj.training}</div>` : ''}
+                    ${aj.supplements && aj.supplements !== 'null' && aj.supplements !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Supplements:</strong> ${aj.supplements}</div>` : ''}
+                    ${aj.lifestyle && aj.lifestyle !== 'null' && aj.lifestyle !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Lifestyle:</strong> ${aj.lifestyle}</div>` : ''}
+                </div>`;
+            }
+        }
+
+        // Questions a poser
+        if (a.questions_a_poser && a.questions_a_poser.length > 0 && a.questions_a_poser[0]) {
+            html += `<div style="margin-bottom:16px;">
+                <div class="section-title" style="color:#ec4899;">Questions a poser</div>
+                ${a.questions_a_poser.filter(q => q && q.length > 2).map(q => `<div class="point" style="border-left-color:#ec4899;">${q}</div>`).join('')}
+            </div>`;
+        }
+
         document.getElementById('ai-result').innerHTML = html;
         document.getElementById('draft-text').value = res.draft || a.draft_email || '';
         document.getElementById('btn-copy').disabled = false;
