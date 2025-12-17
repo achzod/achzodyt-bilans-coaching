@@ -54,7 +54,19 @@ class DatabaseManager:
                         direction TEXT, -- 'received' ou 'sent'
                         is_bilan BOOLEAN,
                         analysis_json TEXT, -- Resultat analyse IA stocke
+                        body_loaded BOOLEAN DEFAULT 0, -- 1 si body/attachments sont charges
+                        email_id TEXT, -- ID IMAP pour charger le contenu a la demande
                         FOREIGN KEY(client_email) REFERENCES clients(email))''')
+            
+            # Migration: Ajouter les colonnes si elles n'existent pas
+            try:
+                c.execute("ALTER TABLE emails ADD COLUMN body_loaded BOOLEAN DEFAULT 0")
+            except:
+                pass  # Colonne existe deja
+            try:
+                c.execute("ALTER TABLE emails ADD COLUMN email_id TEXT")
+            except:
+                pass  # Colonne existe deja
                         
             # Table Attachments
             c.execute('''CREATE TABLE IF NOT EXISTS attachments
@@ -164,10 +176,18 @@ class DatabaseManager:
                 except:
                     pass
                 
+            # Determiner si le body est charge
+            body_loaded = 1 if body else 0
+            email_id_imap = email_data.get('id', '')  # ID IMAP pour charger a la demande
+            
             c.execute("""INSERT OR IGNORE INTO emails 
-                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json))
+                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json, body_loaded, email_id)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json, body_loaded, email_id_imap))
+            
+            # Si body_loaded = 0, on ne sauvegarde pas les attachments (on les chargera a la demande)
+            if body_loaded == 0:
+                return True
             
             # 2. Sauvegarder les pieces jointes
             for att in email_data.get('attachments', []):
@@ -264,12 +284,18 @@ class DatabaseManager:
                     except:
                         email_dict['date'] = datetime.now()
                     
-                    # Recuperer attachments
-                    try:
-                        c.execute("SELECT * FROM attachments WHERE message_id = ?", (email_dict.get('message_id', ''),))
-                        att_rows = c.fetchall()
-                        email_dict['attachments'] = [dict(att) for att in att_rows]
-                    except:
+                    # Recuperer attachments (seulement si body_loaded = 1)
+                    email_dict['body_loaded'] = email_dict.get('body_loaded', 0)
+                    email_dict['email_id'] = email_dict.get('email_id', '')
+                    
+                    if email_dict['body_loaded']:
+                        try:
+                            c.execute("SELECT * FROM attachments WHERE message_id = ?", (email_dict.get('message_id', ''),))
+                            att_rows = c.fetchall()
+                            email_dict['attachments'] = [dict(att) for att in att_rows]
+                        except:
+                            email_dict['attachments'] = []
+                    else:
                         email_dict['attachments'] = []
                     
                     history.append(email_dict)
@@ -551,32 +577,14 @@ def main():
 
                         # Verifier si deja en DB
                         if not st.session_state.db.email_exists(str(message_id)):
-                            # Besoin de charger le contenu complet pour sauvegarder
-                            email_id = email.get('id')
-                            if not email_id:
-                                error_count += 1
-                                continue
-                                
-                            try:
-                                # Pas de message pour chaque email (trop de spam visuel)
-                                content = st.session_state.reader.load_email_content(str(email_id))
-                                
-                                if content and content.get("loaded"):
-                                    email['body'] = content.get('body', '')
-                                    email['attachments'] = content.get('attachments', [])
-                                    
-                                    # Sauvegarder en DB
-                                    if st.session_state.db.save_email(email):
-                                        saved_count += 1
-                                
-                                # Nettoyage memoire
-                                if 'content' in locals():
-                                    del content
-                                    
-                            except Exception as e:
-                                print(f"[SYNC] Erreur chargement email {email_id}: {e}")
-                                error_count += 1
-                                continue
+                            # OPTIMISATION: Sauvegarder seulement les headers (sans body/attachments)
+                            # Le contenu complet sera charge a la demande quand on clique sur l'email
+                            email['body'] = ''  # Pas de body pour l'instant
+                            email['attachments'] = []  # Pas d'attachments pour l'instant
+                            
+                            # Sauvegarder en DB (headers seulement)
+                            if st.session_state.db.save_email(email):
+                                saved_count += 1
                         
                         # Nettoyage memoire (sans clear() qui casse la boucle)
                         if 'attachments' in email:
