@@ -708,6 +708,29 @@ def main():
                 st.error("Erreur: email_data invalide")
                 st.session_state.selected_email = None
             else:
+                # Charger le contenu complet a la demande si pas deja charge
+                body_loaded = email_data.get('body_loaded', 0)
+                if not body_loaded and not email_data.get('body'):
+                    email_id_imap = email_data.get('email_id') or email_data.get('id')
+                    if email_id_imap and st.session_state.reader:
+                        with st.spinner("📥 Chargement du contenu..."):
+                            try:
+                                content = st.session_state.reader.load_email_content(str(email_id_imap))
+                                if content and content.get("loaded"):
+                                    email_data['body'] = content.get('body', '')
+                                    email_data['attachments'] = content.get('attachments', [])
+                                    email_data['body_loaded'] = 1
+                                    
+                                    # Mettre a jour la DB avec le contenu
+                                    st.session_state.db.save_email(email_data)
+                                    
+                                    # Mettre a jour session_state pour eviter de recharger
+                                    st.session_state.selected_email = email_data
+                            except Exception as e:
+                                st.error(f"Erreur chargement contenu: {e}")
+                                email_data['body'] = "Erreur lors du chargement du contenu"
+                                email_data['attachments'] = []
+                
                 # Header
                 col1, col2, col3 = st.columns([3, 1, 1])
                 with col1:
