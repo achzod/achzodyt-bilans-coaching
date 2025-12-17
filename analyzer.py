@@ -170,16 +170,23 @@ CONSEILS ADAPTES AU PROFIL (TRES IMPORTANT):
 DONNEES: {len(photos)} photos actuelles, {len(excels)} Excel
 {excel_content[:2000] if excel_content else ""}
 
-EXTRACTION DES DONNEES (TRES IMPORTANT - LIS BIEN L'HISTORIQUE):
-1. Trouve le POIDS DE DEPART dans le PREMIER email (cherche "Xkg", "X kg", "poids X")
-2. Trouve le POIDS ACTUEL dans le bilan actuel
-3. Calcule la VRAIE difference (poids actuel - poids depart)
-4. NE JAMAIS INVENTER de donnees! Si tu ne trouves pas le poids de depart, dis-le.
+EXTRACTION DES DONNEES (LIS TOUT L'HISTORIQUE!):
+1. POIDS DE DEPART: Trouve dans le PREMIER email client (cherche "Xkg", "X kg", "pour Xkg")
+2. POIDS ACTUEL: Dans le bilan actuel
+3. PROGRAMME DU CLIENT: Lis les reponses du COACH dans l'historique - tu y trouveras le programme exact (split, nombre de seances, diet, macros, cardio). UTILISE CE PROGRAMME pour tes conseils!
+4. NE JAMAIS INVENTER de donnees! Si tu trouves pas quelque chose, dis-le.
 
 ANALYSE OBLIGATOIRE:
 1. PHYSIQUE ACTUEL: masse grasse % HONNETE (voir guide), description zones
 2. EVOLUTION DEPUIS JOUR 1: Compare avec le DEBUT du coaching! UTILISE LE VRAI POIDS DE DEPART!
-3. Ce qui reste pour l'objectif
+3. RESPECT DU PROGRAMME: Le client suit-il le programme que le coach lui a donne? Quels ajustements par rapport a CE programme specifique?
+4. Ce qui reste pour l'objectif
+
+CONSEILS SPECIFIQUES (PAS GENERIQUES!):
+- Relis les reponses du COACH dans l'historique pour voir le programme actuel
+- Tes conseils doivent etre COHERENTS avec ce programme (pas inventer un nouveau)
+- Si le client doit faire 4 seances PPL, dis "retour a tes 4 seances PPL" pas "4 seances minimum"
+- Reference les exercices/macros/cardio specifiques du programme si mentionnes
 
 EMAIL HTML (format OBLIGATOIRE):
 - Tu DOIS generer un email en HTML avec du style inline

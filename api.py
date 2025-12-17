@@ -716,10 +716,12 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
         conn.close()
         return {"success": False, "error": "Aucun email non repondu", "analysis": {}, "draft": ""}
 
-    # Get FULL history - ALL emails since day 1 (not just 30!)
+    # Get FULL history - ALL emails since day 1 (CLIENT + COACH responses!)
     c.execute('''
-        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent ASC
-    ''', (client_email.lower(),))
+        SELECT * FROM gmail_emails
+        WHERE sender_email = ? OR (direction = 'sent' AND body LIKE ?)
+        ORDER BY date_sent ASC
+    ''', (client_email.lower(), f'%{client_email}%'))
     all_emails = [dict(r) for r in c.fetchall()]
 
     # Build history with ALL emails
@@ -731,15 +733,18 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
     first_email = all_emails[0] if all_emails else None
     first_date = datetime.fromisoformat(first_email['date_sent']).strftime("%d/%m/%Y") if first_email and first_email.get('date_sent') else "?"
 
-    # Combine all unreplied emails into one analysis
-    combined_body = f"=== DEBUT COACHING: {first_date} ===\n"
-    combined_body += f"=== NOMBRE TOTAL D'EMAILS DEPUIS JOUR 1: {len(all_emails)} ===\n"
+    # INCLURE TOUS LES ECHANGES (client + coach) pour avoir le programme!
+    combined_body = f"=== HISTORIQUE COMPLET AVEC {client_email} ===\n"
+    combined_body += f"=== DEBUT COACHING: {first_date} | TOTAL: {len(all_emails)} emails ===\n\n"
 
-    # CRUCIAL: Inclure le PREMIER EMAIL pour avoir le poids de depart!
-    if first_email and first_email.get('body'):
-        combined_body += f"\n\n=== PREMIER EMAIL (JOUR 1 - {first_date}) - DONNEES DE DEPART ===\n"
-        combined_body += first_email.get('body', '')[:2000]
-        combined_body += "\n=== FIN PREMIER EMAIL ===\n"
+    # Ajouter TOUS les emails (client ET coach) pour avoir le contexte complet
+    for i, email in enumerate(all_emails):
+        direction = "CLIENT" if email.get('direction') == 'received' else "COACH (toi)"
+        date_str = datetime.fromisoformat(email['date_sent']).strftime("%d/%m/%Y") if email.get('date_sent') else "?"
+        body = email.get('body', '') or ''
+        # Limiter chaque email à 1500 chars pour pas exploser le contexte
+        body_preview = body[:1500] + "..." if len(body) > 1500 else body
+        combined_body += f"\n--- Email {i+1} - {direction} ({date_str}) ---\n{body_preview}\n"
 
     all_attachments = []
     email_ids = []
