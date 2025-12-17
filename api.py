@@ -873,18 +873,31 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
             except Exception as kpi_err:
                 print(f"[KPI] Error: {kpi_err}")
 
+        # Nouveau format: 2 analyses (GPT-4 + Gemini)
+        gpt4_analysis = result.get('gpt4', {})
+        gemini_analysis = result.get('gemini', {})
+
         return {
             "success": result.get('success', False),
-            "analysis": analysis,
-            "draft": analysis.get('draft_email', '') if analysis else '',
+            "gpt4": {
+                "analysis": gpt4_analysis,
+                "draft": gpt4_analysis.get('draft_email', ''),
+                "model": gpt4_analysis.get('_model', 'GPT-4-Turbo')
+            },
+            "gemini": {
+                "analysis": gemini_analysis,
+                "draft": gemini_analysis.get('draft_email', ''),
+                "model": gemini_analysis.get('_model', 'Gemini-1.5-Pro')
+            },
             "email_ids": email_ids,
             "emails_count": len(unreplied_emails),
+            "photos_analyzed": result.get('photos_analyzed', 0),
             "error": result.get('error', '')
         }
     except Exception as e:
         import traceback
         print(f"[ANALYZE ERROR] {traceback.format_exc()}")
-        return {"success": False, "analysis": {}, "draft": "", "error": str(e)}
+        return {"success": False, "gpt4": {}, "gemini": {}, "draft": "", "error": str(e)}
 
 
 @app.post("/api/coach/email/{email_id}/analyze")

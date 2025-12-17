@@ -330,18 +330,21 @@ async function selectClient(email) {
     document.getElementById('main-content').innerHTML = html;
 }
 
-// ANALYZE ALL UNREPLIED EMAILS
+// Store both analyses
+let gpt4Analysis = null;
+let geminiAnalysis = null;
+
+// ANALYZE ALL UNREPLIED EMAILS - 2 IA en parallele!
 async function analyzeAll() {
     if (!currentClient) return;
 
     const btn = document.querySelector('.main-actions .btn-primary');
     btn.disabled = true;
-    btn.textContent = 'Analyse en cours...';
-    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Analyse de TOUS les emails (30-60s)...</div></div>';
+    btn.textContent = 'Analyse GPT-4 + Gemini...';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT-4 Turbo + Gemini 1.5 Pro en parallele (30-60s)...</div></div>';
 
     try {
         const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, 'POST');
-        currentAnalysis = res.analysis;
 
         if (!res.success) {
             document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${res.error}</div>`;
@@ -350,65 +353,49 @@ async function analyzeAll() {
             return;
         }
 
-        const a = res.analysis || {};
-        let html = '';
+        // Store both
+        gpt4Analysis = res.gpt4;
+        geminiAnalysis = res.gemini;
 
-        if (res.emails_count) {
-            html += `<div style="background:var(--success);color:white;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-weight:600;">${res.emails_count} email(s) analyses ensemble</div>`;
-        }
+        let html = `<div style="background:var(--success);color:white;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-weight:600;">
+            ${res.emails_count || 1} email(s) - ${res.photos_analyzed || 0} photos - 2 IA utilisees
+        </div>`;
 
-        if (a.resume) {
-            html += `<div style="margin-bottom:20px;line-height:1.7;font-size:1rem;">${a.resume}</div>`;
-        }
-
-        // Evolution Metriques (depuis jour 1)
-        if (a.evolution_metriques) {
-            const em = a.evolution_metriques;
-            html += `<div style="margin-bottom:20px;">
-                <div class="section-title" style="color:#667eea;">📈 Evolution depuis Jour 1</div>
-                <div class="kpi-grid">
-                    ${em.poids ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
-                        <div class="kpi-label">Poids</div>
-                        <div style="font-size:0.9rem;margin:4px 0;">${em.poids.jour1} → ${em.poids.actuel}</div>
-                        <div class="kpi-value ${em.poids.diff?.startsWith('-') ? 'good' : 'bad'}">${em.poids.diff}</div>
-                    </div>` : ''}
-                    ${em.masse_grasse ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
-                        <div class="kpi-label">Masse Grasse</div>
-                        <div style="font-size:0.9rem;margin:4px 0;">${em.masse_grasse.jour1} → ${em.masse_grasse.actuel}</div>
-                        <div class="kpi-value ${em.masse_grasse.diff?.startsWith('-') ? 'good' : 'bad'}">${em.masse_grasse.diff}</div>
-                    </div>` : ''}
-                    ${em.pas_jour ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
-                        <div class="kpi-label">Pas/jour</div>
-                        <div style="font-size:0.9rem;margin:4px 0;">${em.pas_jour.jour1} → ${em.pas_jour.actuel}</div>
-                        <div class="kpi-value ${em.pas_jour.diff?.startsWith('+') ? 'good' : 'bad'}">${em.pas_jour.diff}</div>
-                    </div>` : ''}
-                    ${em.energie ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
-                        <div class="kpi-label">Energie</div>
-                        <div style="font-size:0.9rem;margin:4px 0;">${em.energie.jour1} → ${em.energie.actuel}</div>
-                        <div class="kpi-value ${em.energie.diff?.startsWith('+') ? 'good' : 'bad'}">${em.energie.diff}</div>
-                    </div>` : ''}
+        // Afficher les 2 analyses cote a cote
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+            <div style="border:2px solid #10b981;border-radius:12px;padding:16px;background:#10b98110;">
+                <div style="font-weight:bold;font-size:1.1rem;color:#10b981;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>🤖 GPT-4 Turbo</span>
+                    <button class="btn btn-sm btn-success" onclick="selectAI('gpt4')">Utiliser</button>
                 </div>
-            </div>`;
-        }
+                <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
+                    ${gpt4Analysis?.analysis?.resume || gpt4Analysis?.error || 'Analyse disponible'}
+                </div>
+            </div>
+            <div style="border:2px solid #8b5cf6;border-radius:12px;padding:16px;background:#8b5cf610;">
+                <div style="font-weight:bold;font-size:1.1rem;color:#8b5cf6;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>💎 Gemini 1.5 Pro</span>
+                    <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="selectAI('gemini')">Utiliser</button>
+                </div>
+                <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
+                    ${geminiAnalysis?.analysis?.resume || geminiAnalysis?.error || 'Analyse disponible'}
+                </div>
+            </div>
+        </div>`;
 
-        // Points positifs
-        if (a.points_positifs && a.points_positifs.length > 0) {
-            html += `<div style="margin-bottom:20px;">
-                <div class="section-title" style="color:var(--success);">Points positifs</div>
-                ${a.points_positifs.map(p => `<div class="point positive">${p}</div>`).join('')}
-            </div>`;
-        }
-
-        // Points a ameliorer
-        if (a.points_ameliorer && a.points_ameliorer.length > 0) {
-            html += `<div style="margin-bottom:20px;">
-                <div class="section-title" style="color:var(--warning);">A ameliorer</div>
-                ${a.points_ameliorer.map(p => `<div class="point negative"><strong>${p.probleme || p}</strong>${p.solution ? ` → ${p.solution}` : ''}</div>`).join('')}
-            </div>`;
-        }
+        html += `<p style="text-align:center;color:var(--muted);font-size:0.9rem;">👆 Clique sur "Utiliser" pour choisir l'analyse</p>`;
 
         document.getElementById('ai-result').innerHTML = html;
-        document.getElementById('draft-text').value = res.draft || a.draft_email || '';
+
+        // Par defaut, afficher GPT-4
+        if (gpt4Analysis?.draft) {
+            document.getElementById('draft-text').value = gpt4Analysis.draft;
+            currentAnalysis = gpt4Analysis.analysis;
+        } else if (geminiAnalysis?.draft) {
+            document.getElementById('draft-text').value = geminiAnalysis.draft;
+            currentAnalysis = geminiAnalysis.analysis;
+        }
+
         document.getElementById('btn-copy').disabled = false;
         document.getElementById('btn-send').disabled = false;
 
@@ -422,6 +409,26 @@ async function analyzeAll() {
 
     btn.textContent = `Analyser TOUS (${currentEmailIds.length})`;
     btn.disabled = false;
+}
+
+// SELECT AI - Choisir entre GPT-4 et Gemini
+function selectAI(aiName) {
+    if (aiName === 'gpt4' && gpt4Analysis?.draft) {
+        document.getElementById('draft-text').value = gpt4Analysis.draft;
+        currentAnalysis = gpt4Analysis.analysis;
+        showNotification('GPT-4 Turbo selectionne!', 'success');
+    } else if (aiName === 'gemini' && geminiAnalysis?.draft) {
+        document.getElementById('draft-text').value = geminiAnalysis.draft;
+        currentAnalysis = geminiAnalysis.analysis;
+        showNotification('Gemini 1.5 Pro selectionne!', 'info');
+    } else {
+        alert('Analyse non disponible pour cette IA');
+        return;
+    }
+
+    // Refresh preview
+    previewMode = false;
+    togglePreview();
 }
 
 // MARK ALL AS REPLIED
