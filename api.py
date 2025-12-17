@@ -712,9 +712,9 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
 
     email_data = dict(row)
 
-    # Get history
+    # Get history - charger plus d'emails pour contexte complet
     c.execute('''
-        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent DESC LIMIT 10
+        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent DESC LIMIT 20
     ''', (email_data['sender_email'],))
     history = [{"date": datetime.fromisoformat(r['date_sent']) if r['date_sent'] else datetime.now(),
                 "direction": r['direction'], "body": r['body']}

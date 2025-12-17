@@ -144,42 +144,64 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
 
     date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
 
-    prompt = f"""Tu es Achzod, coach expert transformation physique. ANALYSE ce bilan client en profondeur.
+    # Construire le body complet (pas tronque)
+    body_text = current_email.get("body", "") or ""
 
-REGLES STRICTES:
-- JAMAIS d'asterisques (*) dans ta reponse
+    prompt = f"""Tu es Achzod, coach expert transformation physique avec 10+ ans d'experience.
+
+CONTEXTE: Tu dois analyser ce bilan client et rediger une reponse de coach EXPERTE et PERSONNALISEE.
+
+REGLES ABSOLUES:
+- JAMAIS d'asterisques (*) ou etoiles dans ta reponse
 - Tutoiement obligatoire
-- Analyse REELLE basee sur les DONNEES du client, pas un resume
-- Email personnalise avec conseils SPECIFIQUES
+- Analyse les DONNEES REELLES du client (poids, metriques, photos)
+- Reponds aux QUESTIONS du client
+- Email de reponse = conseils SPECIFIQUES et ACTIONABLES
 
-HISTORIQUE CLIENT:
-{history_text[:800] if history_text else "Premier contact"}
+=== HISTORIQUE COMPLET DU CLIENT ===
+{history_text if history_text else "Premier contact avec ce client"}
 
-BILAN A ANALYSER ({date_str}):
+=== NOUVEAU BILAN A ANALYSER ({date_str}) ===
 Sujet: {current_email.get("subject", "Sans sujet")}
 
-{current_email.get("body", "")[:2000]}
+{body_text}
 
-Pieces jointes: {len(photos)} photo(s), {len(excels)} Excel(s)
-{excel_content[:1200] if excel_content else ""}
+=== PIECES JOINTES ===
+- {len(photos)} photo(s) de progression
+- {len(excels)} fichier(s) Excel avec donnees
+- {len(pdfs)} PDF(s)
 
-CE QUE TU DOIS FAIRE:
+{excel_content if excel_content else ""}
 
-1. RESUME: Synthetise en 3-4 phrases les points cles (poids, adherence, problemes, progres)
+=== CE QUE TU DOIS FAIRE ===
 
-2. PHOTOS (si presentes): Estime masse grasse %, points forts musculaires, zones a travailler
+1. RESUME DETAILLE: Analyse les metriques (poids, tours de taille, adherence diete/training, energie, sommeil). Identifie les tendances.
 
-3. KPIs sur 10 selon les donnees du client:
-   - adherence_training, adherence_nutrition, sommeil, energie, sante, mindset, progression
+2. ANALYSE PHOTOS: Si photos presentes, estime la masse grasse (%), decris le physique (points forts musculaires, zones a developper), compare avec les photos precedentes si historique.
 
-4. POINTS POSITIFS: 2-3 victoires specifiques du client
+3. KPIs sur 10 - Note CHAQUE aspect selon les donnees du bilan:
+   - adherence_training: respect du programme d'entrainement
+   - adherence_nutrition: respect du plan alimentaire
+   - sommeil: qualite et duree du sommeil
+   - energie: niveau d'energie rapporte
+   - sante: indicateurs sante (digestion, libido, stress, douleurs)
+   - mindset: motivation, discipline, mental
+   - progression: evolution globale vers les objectifs
 
-5. A AMELIORER: Problemes concrets + solutions detaillees
+4. POINTS POSITIFS: Celebre les victoires du client (meme petites). Sois specifique.
 
-6. EMAIL: 200-300 mots, personnalise, conseils ACTIONABLES, sans asterisques
+5. POINTS A AMELIORER: Pour chaque probleme, donne une solution CONCRETE avec le POURQUOI.
 
-JSON:
-{{"resume": "...", "analyse_photos": {{"masse_grasse_estimee": "X%", "points_forts": [...], "zones_a_travailler": [...]}}, "kpis": {{"adherence_training": X, "adherence_nutrition": X, "sommeil": X, "energie": X, "sante": X, "mindset": X, "progression": X}}, "points_positifs": [...], "points_ameliorer": [{{"probleme": "...", "solution": "...", "priorite": "haute"}}], "draft_email": "EMAIL PERSONNALISE"}}"""
+6. EMAIL DE REPONSE (300-400 mots):
+   - Salutation personnalisee
+   - Reponds a SES questions
+   - Felicite les progres
+   - Donne des conseils PRECIS et EXPERTS
+   - Motive-le pour la suite
+   - Signe "Achzod"
+
+REPONDS EN JSON VALIDE:
+{{"resume": "Resume detaille 4-5 phrases avec les chiffres", "analyse_photos": {{"masse_grasse_estimee": "X-Y%", "points_forts": ["muscle1", "muscle2"], "zones_a_travailler": ["zone1", "zone2"], "evolution": "comparaison avec avant"}}, "kpis": {{"adherence_training": X, "adherence_nutrition": X, "sommeil": X, "energie": X, "sante": X, "mindset": X, "progression": X}}, "points_positifs": ["point1 specifique", "point2 specifique"], "points_ameliorer": [{{"probleme": "description", "solution": "solution detaillee", "priorite": "haute/moyenne/basse"}}], "questions_reponses": [{{"question": "question du client", "reponse": "ta reponse experte"}}], "draft_email": "EMAIL COMPLET 300-400 mots sans asterisques"}}"""
 
     content.append({"type": "text", "text": prompt})
 
@@ -203,10 +225,10 @@ JSON:
         content.append({"type": "text", "text": f"{images_added} PHOTO(S) - Analyse en DETAIL: masse grasse, zones musculaires, points forts, zones a travailler."})
 
     try:
-        # Utiliser claude-sonnet-4-20250514 pour rapidite + max_tokens reduit
+        # Utiliser claude-sonnet-4-20250514 avec assez de tokens pour reponse complete
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=4000,
+            max_tokens=6000,
             messages=[{"role": "user", "content": content}]
         )
         response_text = response.content[0].text
@@ -353,15 +375,18 @@ JSON:
 
 def _build_history_context(history):
     if not history:
-        return "Aucun historique - premier contact."
-    parts = [f"=== {len(history)} EMAILS ==="]
-    for i, e in enumerate(history[-10:], 1):
+        return ""
+    parts = [f"[{len(history)} emails precedents avec ce client]"]
+    # Prendre les 15 derniers emails pour contexte complet
+    for i, e in enumerate(history[-15:], 1):
         if not e or not isinstance(e, dict):
             continue
-        d = "CLIENT" if e.get("direction") == "received" else "TOI"
+        direction = "CLIENT" if e.get("direction") == "received" else "COACH (toi)"
         dt = e.get("date").strftime("%d/%m/%Y") if e.get("date") else "?"
         body = e.get('body', '') or ''
-        parts.append(f"--- {d} ({dt}) ---" + chr(10) + body[:800])
+        # Garder plus de contenu par email (1500 chars)
+        body_preview = body[:1500] + "..." if len(body) > 1500 else body
+        parts.append(f"\n--- Email {i} - {direction} ({dt}) ---\n{body_preview}")
     return chr(10).join(parts)
 
 
