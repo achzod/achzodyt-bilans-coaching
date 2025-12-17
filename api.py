@@ -26,6 +26,7 @@ from models import (
 
 from analyzer import analyze_coaching_bilan
 from email_reader import EmailReader
+from email_sender import send_html_email
 
 # ============ INIT ============
 init_platform_db()
@@ -968,6 +969,41 @@ async def mark_all_replied(client_email: str, user: Dict = Depends(get_current_c
     conn.commit()
     conn.close()
     return {"success": True, "marked": updated}
+
+
+class SendEmailRequest(BaseModel):
+    subject: str
+    html_body: str
+    message_id: Optional[str] = None
+
+
+@app.post("/api/coach/client/{client_email:path}/send-email")
+async def send_email_to_client(client_email: str, data: SendEmailRequest, user: Dict = Depends(get_current_coach)):
+    """Send HTML email directly to client via SMTP"""
+    print(f"[SEND] Sending email to {client_email}...")
+
+    # Send the email
+    result = send_html_email(
+        to_email=client_email,
+        subject=data.subject,
+        html_body=data.html_body,
+        reply_to_message_id=data.message_id
+    )
+
+    if result.get('success'):
+        # Mark all unreplied emails as replied
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            UPDATE gmail_emails SET status = 'replied', replied_at = ?
+            WHERE sender_email = ? AND direction = 'received' AND status != 'replied'
+        """, (datetime.now().isoformat(), client_email.lower()))
+        conn.commit()
+        conn.close()
+        print(f"[SEND] Marked emails as replied for {client_email}")
+
+    return result
+
 
 @app.get("/api/coach/client/{client_email:path}/dashboard-html")
 async def generate_client_dashboard_html(client_email: str, user: Dict = Depends(get_current_coach)):

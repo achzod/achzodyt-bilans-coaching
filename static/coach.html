@@ -262,7 +262,7 @@ async function selectClient(email) {
     document.getElementById('main-actions').innerHTML = `
         <button class="btn btn-primary" onclick="analyzeAll()">Analyser TOUS (${unreplied.length})</button>
         <button class="btn btn-success" id="btn-copy" onclick="copyDraft()" disabled>Copier</button>
-        <button class="btn" style="background:#0ea5e9;color:white;" id="btn-send" onclick="sendEmail()" disabled>Envoyer Gmail</button>
+        <button class="btn" style="background:#0ea5e9;color:white;" id="btn-send" onclick="sendEmail()" disabled>📤 Envoyer</button>
         <button class="btn btn-blue" id="btn-dashboard" onclick="generateDashboard()">Dashboard HTML</button>
         <button class="btn btn-pink" onclick="markAllReplied()">Repondu</button>
     `;
@@ -527,17 +527,73 @@ function insertEvolution() {
     textarea.focus();
 }
 
-// SEND EMAIL via Gmail
-function sendEmail() {
+// SEND EMAIL - Direct via API
+async function sendEmail() {
     if (!currentClient) return;
-    const body = document.getElementById('draft-text').value;
-    if (!body) { alert('Genere d\'abord une reponse!'); return; }
+    const htmlBody = document.getElementById('draft-text').value;
+    if (!htmlBody) {
+        alert('Génère d\'abord une réponse!');
+        return;
+    }
 
-    // Open Gmail compose with pre-filled content
-    const subject = encodeURIComponent('Re: Ton bilan');
-    const bodyEncoded = encodeURIComponent(body);
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(currentClient)}&su=${subject}&body=${bodyEncoded}`;
-    window.open(gmailUrl, '_blank');
+    // Confirm before sending
+    if (!confirm(`Envoyer cet email à ${currentClient}?`)) return;
+
+    const btn = document.getElementById('btn-send');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Envoi en cours...';
+
+    try {
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/send-email`, 'POST', {
+            subject: 'Re: Ton bilan',
+            html_body: htmlBody
+        });
+
+        if (res.success) {
+            btn.textContent = '✓ Envoyé!';
+            btn.style.background = '#22c55e';
+
+            // Show success notification
+            showNotification('Email envoyé avec succès!', 'success');
+
+            // Refresh client list after 2s
+            setTimeout(() => {
+                loadClients();
+                // Reset button
+                btn.textContent = originalText;
+                btn.style.background = '#0ea5e9';
+            }, 2000);
+        } else {
+            throw new Error(res.error || 'Erreur envoi');
+        }
+    } catch(e) {
+        console.error(e);
+        alert('Erreur: ' + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notif = document.createElement('div');
+    notif.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 16px 24px;
+        background: ${type === 'success' ? '#22c55e' : '#0ea5e9'};
+        color: white;
+        border-radius: 8px;
+        font-weight: 600;
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    `;
+    notif.textContent = message;
+    document.body.appendChild(notif);
+    setTimeout(() => notif.remove(), 3000);
 }
 
 // GENERATE DASHBOARD HTML
