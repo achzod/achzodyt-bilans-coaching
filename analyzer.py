@@ -188,31 +188,49 @@ TEMPLATE HTML A SUIVRE pour draft_email:
   <p>Salut [prenom],</p>
   <p>[Intro personnalisee]</p>
 
-  <div style='background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;padding:20px;margin:20px 0;color:white;'>
-    <h3 style='margin:0 0 15px 0;font-size:18px;'>📊 Tes KPIs cette semaine</h3>
-    <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;'>
-      <div style='background:rgba(255,255,255,0.2);border-radius:8px;padding:12px;text-align:center;'>
-        <div style='font-size:24px;font-weight:bold;'>X/10</div>
-        <div style='font-size:12px;opacity:0.9;'>Training</div>
+  <div style='background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:24px;margin:24px 0;color:white;'>
+    <h3 style='margin:0 0 20px 0;font-size:20px;text-align:center;'>📈 Ton Evolution depuis le Jour 1</h3>
+    <div style='display:flex;flex-wrap:wrap;gap:12px;justify-content:center;'>
+      <div style='background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;'>
+        <div style='font-size:14px;opacity:0.9;'>Poids</div>
+        <div style='font-size:20px;font-weight:bold;margin:8px 0;'>XXkg → XXkg</div>
+        <div style='font-size:16px;color:#4ade80;'>-Xkg</div>
       </div>
-      [... autres KPIs ...]
+      <div style='background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;'>
+        <div style='font-size:14px;opacity:0.9;'>Masse Grasse</div>
+        <div style='font-size:20px;font-weight:bold;margin:8px 0;'>XX% → XX%</div>
+        <div style='font-size:16px;color:#4ade80;'>-X%</div>
+      </div>
+      <div style='background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;'>
+        <div style='font-size:14px;opacity:0.9;'>Pas/jour</div>
+        <div style='font-size:20px;font-weight:bold;margin:8px 0;'>XXXX → XXXX</div>
+        <div style='font-size:16px;color:#4ade80;'>+XX%</div>
+      </div>
+      <div style='background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;'>
+        <div style='font-size:14px;opacity:0.9;'>Energie</div>
+        <div style='font-size:20px;font-weight:bold;margin:8px 0;'>X/10 → X/10</div>
+        <div style='font-size:16px;color:#4ade80;'>+X</div>
+      </div>
     </div>
   </div>
 
-  <h3 style='color:#667eea;'>📈 Evolution depuis le debut</h3>
-  <p>[Comparaison avec jour 1 - progres realises]</p>
-
-  <h3 style='color:#22c55e;'>✅ Points positifs</h3>
-  <p>[Ce qui va bien]</p>
+  <h3 style='color:#22c55e;'>✅ Ce qui a change depuis le debut</h3>
+  <p>[Progres concrets visibles sur photos et metriques]</p>
 
   <h3 style='color:#f59e0b;'>🎯 Plan d'action</h3>
-  <p>[Actions concretes pour la semaine]</p>
+  <p>[Actions concretes pour continuer la progression]</p>
 
   <p style='margin-top:30px;'>Achzod</p>
 </div>
 
+IMPORTANT POUR LES METRIQUES D'EVOLUTION:
+- Extrais les donnees du JOUR 1 depuis l'historique (poids initial, pas, energie, etc.)
+- Compare avec les donnees ACTUELLES du bilan
+- Si une metrique n'est pas disponible, ne l'inclus pas
+- Colorie en VERT les progressions positives, ROUGE les regressions
+
 JSON OBLIGATOIRE:
-{{"resume":"analyse evolution depuis jour 1","analyse_photos":{{"masse_grasse_actuelle":"X%","masse_grasse_jour1":"X% si connu dans historique","evolution":"description changements depuis debut","zones_ameliorees":["zone"],"zones_restantes":["zone"],"progres_visible":"oui/non details"}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["progres depuis jour 1"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"ajustements_proposes":{{"diete":"x","training":"x","cardio":"x"}},"draft_email":"EMAIL HTML COMPLET AVEC KPIS INTEGRES"}}"""
+{{"resume":"analyse evolution depuis jour 1","analyse_photos":{{"masse_grasse_actuelle":"X%","masse_grasse_jour1":"X%","evolution":"description changements"}},"evolution_metriques":{{"poids":{{"jour1":"Xkg","actuel":"Xkg","diff":"-Xkg"}},"masse_grasse":{{"jour1":"X%","actuel":"X%","diff":"-X%"}},"pas_jour":{{"jour1":"XXXX","actuel":"XXXX","diff":"+XX%"}},"energie":{{"jour1":"X/10","actuel":"X/10","diff":"+X"}}}},"points_positifs":["progres concrets"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"plan_action":{{"training":"x","nutrition":"x","cardio":"x"}},"draft_email":"EMAIL HTML AVEC EVOLUTION METRIQUES"}}"""
 
     content.append({"type": "text", "text": prompt})
 

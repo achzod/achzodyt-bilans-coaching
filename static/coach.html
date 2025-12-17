@@ -315,7 +315,7 @@ async function selectClient(email) {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <div class="section-title" style="color:var(--success);margin:0;">✉️ REPONSE A ENVOYER</div>
                 <div style="display:flex;gap:8px;">
-                    <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="insertKPIs()">+ KPIs Design</button>
+                    <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="insertEvolution()">+ Evolution</button>
                     <button class="btn btn-sm" id="btn-preview" onclick="togglePreview()">Preview HTML</button>
                 </div>
             </div>
@@ -360,17 +360,32 @@ async function analyzeAll() {
             html += `<div style="margin-bottom:20px;line-height:1.7;font-size:1rem;">${a.resume}</div>`;
         }
 
-        // KPIs
-        if (a.kpis) {
+        // Evolution Metriques (depuis jour 1)
+        if (a.evolution_metriques) {
+            const em = a.evolution_metriques;
             html += `<div style="margin-bottom:20px;">
-                <div class="section-title">KPIs</div>
+                <div class="section-title" style="color:#667eea;">📈 Evolution depuis Jour 1</div>
                 <div class="kpi-grid">
-                    ${Object.entries(a.kpis).map(([k, v]) => `
-                        <div class="kpi">
-                            <div class="kpi-value ${v >= 8 ? 'good' : v >= 6 ? 'ok' : 'bad'}">${v}</div>
-                            <div class="kpi-label">${k.replace(/_/g, ' ')}</div>
-                        </div>
-                    `).join('')}
+                    ${em.poids ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
+                        <div class="kpi-label">Poids</div>
+                        <div style="font-size:0.9rem;margin:4px 0;">${em.poids.jour1} → ${em.poids.actuel}</div>
+                        <div class="kpi-value ${em.poids.diff?.startsWith('-') ? 'good' : 'bad'}">${em.poids.diff}</div>
+                    </div>` : ''}
+                    ${em.masse_grasse ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
+                        <div class="kpi-label">Masse Grasse</div>
+                        <div style="font-size:0.9rem;margin:4px 0;">${em.masse_grasse.jour1} → ${em.masse_grasse.actuel}</div>
+                        <div class="kpi-value ${em.masse_grasse.diff?.startsWith('-') ? 'good' : 'bad'}">${em.masse_grasse.diff}</div>
+                    </div>` : ''}
+                    ${em.pas_jour ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
+                        <div class="kpi-label">Pas/jour</div>
+                        <div style="font-size:0.9rem;margin:4px 0;">${em.pas_jour.jour1} → ${em.pas_jour.actuel}</div>
+                        <div class="kpi-value ${em.pas_jour.diff?.startsWith('+') ? 'good' : 'bad'}">${em.pas_jour.diff}</div>
+                    </div>` : ''}
+                    ${em.energie ? `<div class="kpi" style="background:linear-gradient(135deg,#667eea20,#764ba220);">
+                        <div class="kpi-label">Energie</div>
+                        <div style="font-size:0.9rem;margin:4px 0;">${em.energie.jour1} → ${em.energie.actuel}</div>
+                        <div class="kpi-value ${em.energie.diff?.startsWith('+') ? 'good' : 'bad'}">${em.energie.diff}</div>
+                    </div>` : ''}
                 </div>
             </div>`;
         }
@@ -449,42 +464,58 @@ function togglePreview() {
     }
 }
 
-// INSERT KPIs DESIGN
-function insertKPIs() {
-    if (!currentAnalysis || !currentAnalysis.kpis) {
-        alert('Analyse d\'abord les emails pour avoir les KPIs!');
+// INSERT EVOLUTION METRIQUES
+function insertEvolution() {
+    if (!currentAnalysis || !currentAnalysis.evolution_metriques) {
+        alert('Analyse d\'abord les emails pour avoir les metriques d\'evolution!');
         return;
     }
 
-    const kpis = currentAnalysis.kpis;
-    const kpiHtml = `
+    const em = currentAnalysis.evolution_metriques;
+    let metricsHtml = '';
+
+    if (em.poids) {
+        const color = em.poids.diff?.startsWith('-') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Poids</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.poids.jour1} → ${em.poids.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.poids.diff}</div>
+        </div>`;
+    }
+    if (em.masse_grasse) {
+        const color = em.masse_grasse.diff?.startsWith('-') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Masse Grasse</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.masse_grasse.jour1} → ${em.masse_grasse.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.masse_grasse.diff}</div>
+        </div>`;
+    }
+    if (em.pas_jour) {
+        const color = em.pas_jour.diff?.startsWith('+') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Pas/jour</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.pas_jour.jour1} → ${em.pas_jour.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.pas_jour.diff}</div>
+        </div>`;
+    }
+    if (em.energie) {
+        const color = em.energie.diff?.startsWith('+') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Energie</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.energie.jour1} → ${em.energie.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.energie.diff}</div>
+        </div>`;
+    }
+
+    const evolutionHtml = `
 <div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:24px;margin:24px 0;color:white;font-family:Arial,sans-serif;">
-    <h3 style="margin:0 0 20px 0;font-size:20px;text-align:center;">📊 Tes KPIs de la semaine</h3>
+    <h3 style="margin:0 0 20px 0;font-size:20px;text-align:center;">📈 Ton Evolution depuis le Jour 1</h3>
     <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
-        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
-            <div style="font-size:32px;font-weight:bold;">${kpis.adherence_training || 7}/10</div>
-            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Training</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
-            <div style="font-size:32px;font-weight:bold;">${kpis.adherence_nutrition || 7}/10</div>
-            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Nutrition</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
-            <div style="font-size:32px;font-weight:bold;">${kpis.energie || 7}/10</div>
-            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Energie</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
-            <div style="font-size:32px;font-weight:bold;">${kpis.sommeil || 7}/10</div>
-            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Sommeil</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
-            <div style="font-size:32px;font-weight:bold;">${kpis.mindset || 7}/10</div>
-            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Mindset</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px 20px;text-align:center;min-width:100px;">
-            <div style="font-size:32px;font-weight:bold;">${kpis.progression || 7}/10</div>
-            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Progression</div>
-        </div>
+        ${metricsHtml}
     </div>
 </div>`;
 
@@ -492,7 +523,7 @@ function insertKPIs() {
     const cursorPos = textarea.selectionStart;
     const textBefore = textarea.value.substring(0, cursorPos);
     const textAfter = textarea.value.substring(cursorPos);
-    textarea.value = textBefore + kpiHtml + textAfter;
+    textarea.value = textBefore + evolutionHtml + textAfter;
     textarea.focus();
 }
 
