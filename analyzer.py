@@ -193,10 +193,10 @@ JSON OBLIGATOIRE:
         content.append({"type": "text", "text": f"{images_added} PHOTO(S) - Analyse en DETAIL: masse grasse, zones musculaires, points forts, zones a travailler."})
 
     try:
-        # Utiliser claude-sonnet-4-20250514 avec assez de tokens pour reponse complete
+        # Utiliser claude-opus-4-5-20251101 pour analyse ELITE
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=6000,
+            model="claude-opus-4-5-20251101",
+            max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
         response_text = response.content[0].text
@@ -365,7 +365,7 @@ Draft actuel: {current_draft}
 Instructions: {instructions}
 Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement. Va a l'essentiel."""
     try:
-        r = client.messages.create(model="claude-sonnet-4-20250514", max_tokens=2000, messages=[{"role": "user", "content": prompt}])
+        r = client.messages.create(model="claude-opus-4-5-20251101", max_tokens=2000, messages=[{"role": "user", "content": prompt}])
         return r.content[0].text
     except Exception as e:
         return f"Erreur: {e}"
