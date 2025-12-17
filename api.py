@@ -157,31 +157,56 @@ init_tables()
 
 # ============ HELPER FUNCTIONS ============
 
-# Spam/useless email filter
+# Spam/useless email filter - AGGRESSIVE
 SPAM_DOMAINS = [
-    'typeform.com', 'typeform.io', 'shopify.com', 'stripe.com', 'paypal.com',
+    # Transactional/notifications
+    'typeform.com', 'typeform.io', 'shopify.com', 'stripe.com', 'paypal',
     'noreply', 'no-reply', 'mailer-daemon', 'postmaster', 'notification',
+    'donotreply', 'automated', 'mailer@', 'bounce', 'service@',
+    # Marketing
     'newsletter', 'marketing', 'promo', 'pub@', 'info@', 'contact@',
     'support@', 'help@', 'billing@', 'invoice', 'receipt', 'confirmation',
-    'donotreply', 'automated', 'mailer@', 'bounce', 'unsubscribe',
     'mailchimp', 'sendgrid', 'sendinblue', 'brevo', 'klaviyo', 'hubspot',
-    'calendly', 'zoom.us', 'google.com', 'facebook.com', 'instagram.com',
-    'twitter.com', 'linkedin.com', 'youtube.com', 'tiktok.com',
+    'mailjet', 'constantcontact', 'campaign', 'email.', 'mail@',
+    # Social/Tech platforms
+    'calendly', 'zoom.us', 'zoom.com', 'google.com', 'facebook', 'facebookmail',
+    'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok', 'meta.com',
+    'metamail', 'business.fb', 'fb.com', 'whatsapp',
+    # Dev/hosting
     'render.com', 'github.com', 'gitlab.com', 'vercel.com', 'netlify.com',
-    'amazon.', 'aws.amazon', 'apple.com', 'microsoft.com', 'outlook.com',
-    'googlemail', 'facebookmail', 'account-security', 'security@',
-    'alerts@', 'updates@', 'team@', 'hello@', 'bonjour@'
+    'heroku', 'digitalocean', 'cloudflare',
+    # Ecommerce
+    'amazon.', 'aws.amazon', 'ebay', 'aliexpress', 'wish.com',
+    # Big tech
+    'apple.com', 'microsoft.com', 'outlook.com', 'googlemail', 'icloud',
+    'account-security', 'security@', 'alerts@', 'updates@',
+    # Generic
+    'team@', 'hello@', 'bonjour@', 'sales@', 'admin@', 'webmaster@',
+    # Specific spam I see
+    'theharmonist', 'eklipse', 'zohomail', 'zohocorp',
 ]
 
 SPAM_SUBJECTS = [
+    # Orders/payments
     'confirmation de commande', 'order confirmation', 'votre commande',
     'your order', 'receipt', 'reçu', 'facture', 'invoice', 'payment',
-    'paiement', 'subscription', 'abonnement', 'newsletter', 'unsubscribe',
+    'paiement', 'subscription', 'abonnement', 'your money', 'bank account',
+    'transaction', 'purchase', 'achat',
+    # Account stuff
     'verify your email', 'vérifiez votre', 'confirm your', 'confirmez votre',
     'password reset', 'réinitialisation', 'security alert', 'alerte sécurité',
     'welcome to', 'bienvenue', 'thank you for signing', 'merci de vous être',
-    'your account', 'votre compte', 'notification', 'reminder', 'rappel',
-    'automatic reply', 'réponse automatique', 'out of office', 'absence'
+    'your account', 'votre compte', 'account update', 'mise à jour',
+    # Notifications
+    'notification', 'reminder', 'rappel', 'newsletter', 'unsubscribe',
+    'automatic reply', 'réponse automatique', 'out of office', 'absence',
+    # Marketing
+    'cadeaux', 'promo', 'offre', 'soldes', 'réduction', 'discount',
+    'fêtes', 'holidays', 'black friday', 'cyber monday', 'special offer',
+    'limited time', 'don\'t miss', 'exclusive', 'gratuit', 'free',
+    # Spam patterns
+    'contribution à notre plateforme', 'meta for business', 'ad account',
+    'boost your', 'grow your', 'increase your',
 ]
 
 def is_spam_email(email_data: Dict) -> bool:
@@ -517,6 +542,37 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 18
         except:
             pass
         raise HTTPException(status_code=500, detail=f"Erreur sync: {str(e)}")
+
+@app.post("/api/coach/gmail/clean-spam")
+async def clean_spam_emails(user: Dict = Depends(get_current_coach)):
+    """Remove spam emails from database"""
+    conn = get_db()
+    c = conn.cursor()
+
+    # Get all emails
+    c.execute('SELECT id, sender_email, subject FROM gmail_emails')
+    emails = c.fetchall()
+
+    deleted = 0
+    deleted_clients = set()
+
+    for email in emails:
+        email_data = {'from_email': email['sender_email'], 'subject': email['subject']}
+        if is_spam_email(email_data):
+            c.execute('DELETE FROM gmail_emails WHERE id = ?', (email['id'],))
+            deleted_clients.add(email['sender_email'])
+            deleted += 1
+
+    # Remove clients with no emails left
+    for client_email in deleted_clients:
+        c.execute('SELECT COUNT(*) as cnt FROM gmail_emails WHERE sender_email = ?', (client_email,))
+        if c.fetchone()['cnt'] == 0:
+            c.execute('DELETE FROM clients WHERE email = ?', (client_email,))
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True, "deleted_emails": deleted, "cleaned_clients": len(deleted_clients)}
 
 @app.get("/api/coach/dashboard")
 async def coach_dashboard(user: Dict = Depends(get_current_coach)):

@@ -109,6 +109,7 @@
             <div class="navbar-brand">Achzod Coach</div>
             <div class="navbar-right">
                 <button class="btn btn-primary" onclick="syncGmail()">Sync Gmail</button>
+                <button class="btn btn-secondary" onclick="cleanSpam()" title="Supprimer les emails spam">Nettoyer</button>
                 <span id="sync-status" style="font-size:0.85rem;color:var(--text-muted);"></span>
                 <button class="btn btn-secondary" onclick="logout()">Deconnexion</button>
             </div>
@@ -425,6 +426,17 @@
             } catch (e) { status.textContent = 'Erreur sync'; }
         }
 
+        async function cleanSpam() {
+            const status = document.getElementById('sync-status');
+            status.textContent = 'Nettoyage spam...';
+            try {
+                const res = await api('/coach/gmail/clean-spam', 'POST');
+                status.textContent = `${res.deleted_emails} spam supprimes`;
+                loadDashboard();
+                setTimeout(() => status.textContent = '', 5000);
+            } catch (e) { status.textContent = 'Erreur nettoyage'; }
+        }
+
         async function loadClient(email) {
             currentClient = email;
             try {
@@ -450,8 +462,12 @@
         }
 
         function showClientTab(tab) {
-            document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
+            document.querySelectorAll('.tabs .tab').forEach((t, i) => {
+                t.classList.remove('active');
+                if ((tab === 'emails' && i === 0) || (tab === 'kpi' && i === 1)) {
+                    t.classList.add('active');
+                }
+            });
 
             document.getElementById('client-emails-tab').classList.toggle('hidden', tab !== 'emails');
             document.getElementById('client-kpi-tab').classList.toggle('hidden', tab !== 'kpi');
