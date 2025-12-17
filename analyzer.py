@@ -22,7 +22,11 @@ except ImportError:
 
 load_dotenv()
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# Client avec timeout explicite pour eviter les 502 sur Render
+client = Anthropic(
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    timeout=55.0  # Render a 60s max, on prend 55s pour avoir une marge
+)
 
 MAX_IMAGE_SIZE = 4 * 1024 * 1024  # 4 MB (marge sous les 5 MB de Claude)
 
@@ -140,54 +144,19 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
 
     date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
 
-    prompt = f"""Tu es Achzod, coach de HAUT NIVEAU avec 10+ ans en transformation physique et optimisation hormonale.
+    prompt = f"""Tu es Achzod, coach expert transformation physique. JAMAIS d asterisques. Tutoiement. Concis mais expert.
 
-REGLES STRICTES:
-- JAMAIS d asterisques ou etoiles dans tes reponses
-- Sois DETAILLE et EXPERT, explique le POURQUOI de chaque conseil
-- Utilise ton expertise: anatomie, physiologie, nutrition, hormones
-- Ecris comme un vrai coach humain, pas comme une IA
-- Tutoiement obligatoire, emojis ok avec moderation
-- Email de reponse: MINIMUM 500 mots, hyper detaille et personnalise
+CLIENT: {current_email.get("subject", "Sans sujet")} - {date_str}
+{history_text[:500] if history_text else "Premier contact"}
 
-HISTORIQUE CLIENT:
-{history_text}
+MESSAGE:
+{current_email.get("body", "")[:1500]}
 
-BILAN A ANALYSER:
-Date: {date_str}
-Sujet: {current_email.get("subject", "Sans sujet")}
+{len(photos)} photo(s), {len(excels)} Excel(s)
+{excel_content[:800] if excel_content else ""}
 
-Message du client:
-{current_email.get("body", "")}
-
-Pieces jointes: {len(photos)} photo(s), {len(pdfs)} PDF(s), {len(excels)} Excel(s)
-{excel_content if excel_content else ""}
-
-CE QUE TU DOIS FAIRE:
-
-1. PHOTOS (si presentes): estime masse grasse (ex: 14-16 pourcent), decris chaque zone musculaire en detail, points forts avec explications, zones a bosser avec conseils precis
-
-2. METRIQUES: analyse poids, energie, sommeil, perfs avec interpretation et tendances
-
-3. QUESTIONS: reponds a CHAQUE question du client avec PROFONDEUR et expertise, explique les mecanismes physiologiques
-
-4. KPIs sur 10 avec justification pour chaque note:
-   - adherence_training: respect du programme entrainement
-   - adherence_nutrition: respect du plan alimentaire
-   - sommeil: qualite et quantite de sommeil
-   - energie: niveau energie ressenti
-   - sante: indicateurs sante (digestion, libido, stress, douleurs)
-   - mindset: mental, motivation, discipline, confiance
-   - progression: evolution globale vers objectifs
-
-5. POINTS POSITIFS: celebre les victoires meme petites, sois specifique sur ce qui est bien
-
-6. A AMELIORER: probleme + pourquoi important physiologiquement + solution detaillee + resultat attendu
-
-7. EMAIL DE REPONSE: 250-400 mots MAXIMUM, structure claire, ZERO asterisque, va a l'essentiel
-
-Reponds en JSON valide avec cette structure:
-{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "sante": 7, "mindset": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL 250-400 mots sans asterisques"}}"""
+ANALYSE RAPIDE en JSON:
+{{"resume": "2-3 phrases", "analyse_photos": {{"masse_grasse_estimee": "X%", "points_forts": ["1-2 points"], "zones_a_travailler": ["1-2 zones"]}}, "kpis": {{"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}}, "points_positifs": ["2-3 points"], "points_ameliorer": [{{"probleme": "X", "solution": "Y", "priorite": "haute"}}], "draft_email": "EMAIL 200 mots max, direct, sans asterisques, conseils concrets"}}"""
 
     content.append({"type": "text", "text": prompt})
 
@@ -211,9 +180,10 @@ Reponds en JSON valide avec cette structure:
         content.append({"type": "text", "text": f"{images_added} PHOTO(S) - Analyse en DETAIL: masse grasse, zones musculaires, points forts, zones a travailler."})
 
     try:
+        # Utiliser claude-3-5-sonnet-20241022 pour rapidite + max_tokens reduit
         response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=8000,
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4000,
             messages=[{"role": "user", "content": content}]
         )
         response_text = response.content[0].text
@@ -376,7 +346,7 @@ Draft actuel: {current_draft}
 Instructions: {instructions}
 Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement. Va a l'essentiel."""
     try:
-        r = client.messages.create(model="claude-sonnet-4-5-20250929", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+        r = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=2000, messages=[{"role": "user", "content": prompt}])
         return r.content[0].text
     except Exception as e:
         return f"Erreur: {e}"
