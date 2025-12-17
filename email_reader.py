@@ -241,9 +241,9 @@ class EmailReader:
             email_ids = data[0].split()
             print(f"[EMAILS] {len(email_ids)} emails trouves, chargement...")
 
-            # Limiter a 200 max
-            if len(email_ids) > 200:
-                email_ids = email_ids[-200:]
+            # Limiter selon max_emails
+            if len(email_ids) > max_emails:
+                email_ids = email_ids[-max_emails:]
 
             # Charger par lots (Batch Fetching)
             # On reduit a 10 pour economiser la RAM sur Render (512MB limit)
