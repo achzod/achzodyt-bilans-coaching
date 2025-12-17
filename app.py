@@ -508,7 +508,7 @@ def main():
                         new_emails = []
                     if not isinstance(new_emails, list):
                         new_emails = []
-                    st.write(f"📨 {len(new_emails)} emails trouves sur Gmail")
+                    st.write(f"📨 {len(new_emails)} emails trouves")
                 except Exception as e:
                     st.error(f"❌ Erreur connexion Gmail: {e}")
                     import traceback
@@ -520,7 +520,15 @@ def main():
                 ignored_count = 0
                 error_count = 0
                 
+                # Progress bar pour le chargement
+                progress_bar = st.progress(0)
+                total_emails = len(new_emails)
+                
                 for idx, email in enumerate(new_emails):
+                    # Update progress bar
+                    if total_emails > 0:
+                        progress = (idx + 1) / total_emails
+                        progress_bar.progress(progress)
                     try:
                         # Validation: email doit etre un dict avec les champs essentiels
                         if not isinstance(email, dict):
@@ -550,7 +558,7 @@ def main():
                                 continue
                                 
                             try:
-                                st.write(f"📥 Telechargement: {email.get('subject', 'Sans sujet')[:40]}...")
+                                # Pas de message pour chaque email (trop de spam visuel)
                                 content = st.session_state.reader.load_email_content(str(email_id))
                                 
                                 if content and content.get("loaded"):
@@ -585,6 +593,8 @@ def main():
                         error_count += 1
                         continue
                 
+                progress_bar.empty()
+                
                 final_msg = f"✅ {saved_count} nouveaux emails sauvegardes"
                 if ignored_count > 0:
                     final_msg += f" ({ignored_count} ignores)"
@@ -592,10 +602,11 @@ def main():
                     final_msg += f" ({error_count} erreurs)"
                     
                 status.update(label=final_msg, state="complete", expanded=False)
-                st.success(f"Base de donnees a jour (+{saved_count} emails)")
+                st.success(f"✅ {saved_count} nouveaux emails sauvegardes")
                 if error_count > 0:
-                    st.warning(f"⚠️ {error_count} email(s) n'ont pas pu etre traites")
-                st.rerun()
+                    st.warning(f"⚠️ {error_count} erreur(s)")
+                # Pas de rerun automatique pour éviter le rechargement
+                # st.rerun()
 
         st.divider()
         st.header("📂 Clients")
