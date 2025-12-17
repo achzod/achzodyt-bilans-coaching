@@ -144,19 +144,42 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
 
     date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
 
-    prompt = f"""Tu es Achzod, coach expert transformation physique. JAMAIS d asterisques. Tutoiement. Concis mais expert.
+    prompt = f"""Tu es Achzod, coach expert transformation physique. ANALYSE ce bilan client en profondeur.
 
-CLIENT: {current_email.get("subject", "Sans sujet")} - {date_str}
-{history_text[:500] if history_text else "Premier contact"}
+REGLES STRICTES:
+- JAMAIS d'asterisques (*) dans ta reponse
+- Tutoiement obligatoire
+- Analyse REELLE basee sur les DONNEES du client, pas un resume
+- Email personnalise avec conseils SPECIFIQUES
 
-MESSAGE:
-{current_email.get("body", "")[:1500]}
+HISTORIQUE CLIENT:
+{history_text[:800] if history_text else "Premier contact"}
 
-{len(photos)} photo(s), {len(excels)} Excel(s)
-{excel_content[:800] if excel_content else ""}
+BILAN A ANALYSER ({date_str}):
+Sujet: {current_email.get("subject", "Sans sujet")}
 
-ANALYSE RAPIDE en JSON:
-{{"resume": "2-3 phrases", "analyse_photos": {{"masse_grasse_estimee": "X%", "points_forts": ["1-2 points"], "zones_a_travailler": ["1-2 zones"]}}, "kpis": {{"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7}}, "points_positifs": ["2-3 points"], "points_ameliorer": [{{"probleme": "X", "solution": "Y", "priorite": "haute"}}], "draft_email": "EMAIL 200 mots max, direct, sans asterisques, conseils concrets"}}"""
+{current_email.get("body", "")[:2000]}
+
+Pieces jointes: {len(photos)} photo(s), {len(excels)} Excel(s)
+{excel_content[:1200] if excel_content else ""}
+
+CE QUE TU DOIS FAIRE:
+
+1. RESUME: Synthetise en 3-4 phrases les points cles (poids, adherence, problemes, progres)
+
+2. PHOTOS (si presentes): Estime masse grasse %, points forts musculaires, zones a travailler
+
+3. KPIs sur 10 selon les donnees du client:
+   - adherence_training, adherence_nutrition, sommeil, energie, sante, mindset, progression
+
+4. POINTS POSITIFS: 2-3 victoires specifiques du client
+
+5. A AMELIORER: Problemes concrets + solutions detaillees
+
+6. EMAIL: 200-300 mots, personnalise, conseils ACTIONABLES, sans asterisques
+
+JSON:
+{{"resume": "...", "analyse_photos": {{"masse_grasse_estimee": "X%", "points_forts": [...], "zones_a_travailler": [...]}}, "kpis": {{"adherence_training": X, "adherence_nutrition": X, "sommeil": X, "energie": X, "sante": X, "mindset": X, "progression": X}}, "points_positifs": [...], "points_ameliorer": [{{"probleme": "...", "solution": "...", "priorite": "haute"}}], "draft_email": "EMAIL PERSONNALISE"}}"""
 
     content.append({"type": "text", "text": prompt})
 
