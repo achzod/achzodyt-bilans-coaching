@@ -500,7 +500,7 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
         reader = EmailReader()
         try:
             print(f"[SYNC] Starting sync for last {days} days...")
-            emails = reader.get_all_emails(days=days, unread_only=False)
+            emails = reader.get_all_emails(days=days, unread_only=True)
             print(f"[SYNC] Found {len(emails)} emails")
             return emails, reader
         except Exception as e:
