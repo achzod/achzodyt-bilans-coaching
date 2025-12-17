@@ -311,20 +311,22 @@ def get_all_emails_grouped() -> Dict:
     conn = get_db()
     c = conn.cursor()
 
-    # Get clients with their email counts - inclure unreplied_count
+    # Get clients with their email counts - SEULEMENT status='new' (jamais ouvert)
     c.execute('''
         SELECT c.*,
-               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new') as unread_count,
-               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND direction = 'received' AND status != 'replied') as unreplied_count
+               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new' AND direction = 'received') as unread_count,
+               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new' AND direction = 'received') as unreplied_count
         FROM clients c
         ORDER BY c.last_email_date DESC
     ''')
-    clients = [dict(row) for row in c.fetchall()]
+    all_clients = [dict(row) for row in c.fetchall()]
+    # Filtrer: seulement les clients avec au moins 1 mail NEW
+    clients = [c for c in all_clients if c.get('unread_count', 0) > 0]
 
-    # Get recent emails - seulement non repondus
+    # Get recent emails - SEULEMENT status='new' (jamais ouvert)
     c.execute('''
         SELECT * FROM gmail_emails
-        WHERE direction = 'received' AND status != 'replied'
+        WHERE direction = 'received' AND status = 'new'
         ORDER BY date_sent DESC
         LIMIT 100
     ''')
