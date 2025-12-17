@@ -727,7 +727,7 @@ class EmailReader:
                     if len(email_ids) > 300:
                         email_ids = email_ids[-300:]
 
-                    # Batch fetch
+                    # Batch fetch - FULL BODY pour sent emails (contiennent le programme!)
                     batch_size = 10
                     for i in range(0, len(email_ids), batch_size):
                         batch_ids = email_ids[i:i + batch_size]
@@ -735,7 +735,8 @@ class EmailReader:
                         id_range = ",".join(clean_ids)
 
                         try:
-                            status, data = conn.fetch(id_range, "(BODY.PEEK[HEADER] UID)")
+                            # Fetch FULL email (not just header) - important for coach responses!
+                            status, data = conn.fetch(id_range, "(RFC822 UID)")
                             if status != "OK":
                                 continue
 
@@ -772,6 +773,29 @@ class EmailReader:
                                     if uid_match:
                                         imap_id = uid_match.group(1)
 
+                                    # Extraire le BODY (important pour les reponses coach!)
+                                    body = ""
+                                    if msg.is_multipart():
+                                        for part in msg.walk():
+                                            ctype = part.get_content_type()
+                                            if ctype == "text/plain":
+                                                try:
+                                                    payload = part.get_payload(decode=True)
+                                                    if payload:
+                                                        charset = part.get_content_charset() or 'utf-8'
+                                                        body = payload.decode(charset, errors='replace')
+                                                        break
+                                                except:
+                                                    pass
+                                    else:
+                                        try:
+                                            payload = msg.get_payload(decode=True)
+                                            if payload:
+                                                charset = msg.get_content_charset() or 'utf-8'
+                                                body = payload.decode(charset, errors='replace')
+                                        except:
+                                            pass
+
                                     emails.append({
                                         "from": from_addr,
                                         "sender_email": to_email,  # Pour les sent, le "sender" est le destinataire (client)
@@ -780,8 +804,8 @@ class EmailReader:
                                         "date": date_obj,
                                         "message_id": message_id,
                                         "imap_id": imap_id,
-                                        "body": "",  # Charge a la demande
-                                        "body_loaded": False,
+                                        "body": body,
+                                        "body_loaded": True,
                                         "attachments": [],
                                         "has_attachments": False,
                                         "direction": "sent"

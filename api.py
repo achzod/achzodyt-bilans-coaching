@@ -749,6 +749,29 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
     sent = sum(1 for e in all_emails if e.get('direction') == 'sent')
     print(f"[ANALYZE] Breakdown: {received} received (client), {sent} sent (coach)")
 
+    # LOAD BODIES for emails that don't have them (CRITICAL pour historique complet!)
+    reader = None
+    bodies_loaded = 0
+    for email in all_emails:
+        if not email.get('body') and email.get('imap_id'):
+            try:
+                if reader is None:
+                    reader = EmailReader()
+                full_content = reader.load_email_content(email['imap_id'])
+                if full_content and full_content.get('loaded'):
+                    email['body'] = full_content.get('body', '')
+                    # Update in DB for next time
+                    c.execute('UPDATE gmail_emails SET body = ?, body_loaded = 1 WHERE id = ?',
+                              (email['body'], email['id']))
+                    bodies_loaded += 1
+            except Exception as e:
+                print(f"[ANALYZE] Failed to load body for email {email['id']}: {e}")
+    if reader:
+        reader.disconnect()
+    if bodies_loaded > 0:
+        conn.commit()
+        print(f"[ANALYZE] Loaded {bodies_loaded} email bodies from Gmail")
+
     # Build history with ALL emails
     history = [{"date": datetime.fromisoformat(r['date_sent']) if r['date_sent'] else datetime.now(),
                 "direction": r['direction'], "body": r['body']}
