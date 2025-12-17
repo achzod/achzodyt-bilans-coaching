@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 .DS_Store
 *.log
+*.db
+uploads/
+attachments/
+test_*.db

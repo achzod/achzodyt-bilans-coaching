@@ -1,21 +1,34 @@
 """
-Module d'analyse IA des bilans de coaching avec Claude
+Module d'analyse IA des bilans de coaching - GPT-5.2 + Gemini 3 Pro
 """
 
 import os
 import base64
 import json
 import io
+import re
 from typing import List, Dict, Any, Optional
-from anthropic import Anthropic
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from openai import OpenAI
+import google.generativeai as genai
 from dotenv import load_dotenv
 from PIL import Image
 
+# Excel support
+try:
+    import openpyxl
+    EXCEL_SUPPORT = True
+except ImportError:
+    EXCEL_SUPPORT = False
+    print("Warning: openpyxl not installed, Excel parsing disabled")
+
 load_dotenv()
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# Clients IA
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=55.0)
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-MAX_IMAGE_SIZE = 4 * 1024 * 1024  # 4 MB (marge sous les 5 MB de Claude)
+MAX_IMAGE_SIZE = 4 * 1024 * 1024
 
 
 def compress_image_if_needed(b64_data: str, media_type: str) -> tuple:
@@ -56,265 +69,283 @@ def compress_image_if_needed(b64_data: str, media_type: str) -> tuple:
 def detect_image_type(b64_data: str) -> Optional[str]:
     try:
         raw = base64.b64decode(b64_data[:32])
-        if raw[0] == 0xFF and raw[1] == 0xD8 and raw[2] == 0xFF:
+        if raw[0] == 0xFF and raw[1] == 0xD8:
             return 'image/jpeg'
-        if raw[0] == 0x89 and raw[1] == 0x50 and raw[2] == 0x4E and raw[3] == 0x47:
+        if raw[0] == 0x89 and raw[1] == 0x50:
             return 'image/png'
-        if raw[0] == 0x47 and raw[1] == 0x49 and raw[2] == 0x46 and raw[3] == 0x38:
+        if raw[0] == 0x47 and raw[1] == 0x49:
             return 'image/gif'
-        if raw[0] == 0x52 and raw[1] == 0x49 and raw[2] == 0x46 and raw[3] == 0x46:
-            if len(raw) > 11 and raw[8] == 0x57 and raw[9] == 0x45:
-                return 'image/webp'
+        if raw[0] == 0x52 and raw[1] == 0x49:
+            return 'image/webp'
     except:
         pass
     return None
 
 
-def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
-    history_text = _build_history_context(conversation_history)
-    photos = [att for att in current_email.get("attachments", []) if att["content_type"].startswith("image/")]
-    pdfs = [att for att in current_email.get("attachments", []) if "pdf" in att["content_type"].lower()]
-
-    content = []
-
-    date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
-    
-    prompt = f"""Tu es Achzod, coach de HAUT NIVEAU avec 10+ ans en transformation physique et optimisation hormonale.
-
-REGLES STRICTES:
-- JAMAIS d asterisques ou etoiles dans tes reponses
-- Sois DETAILLE et EXPERT, explique le POURQUOI de chaque conseil
-- Utilise ton expertise: anatomie, physiologie, nutrition, hormones
-- Ecris comme un vrai coach humain, pas comme une IA
-- Tutoiement obligatoire, emojis ok avec moderation
-- Email de reponse: MINIMUM 500 mots, hyper detaille et personnalise
-
-HISTORIQUE CLIENT:
-{history_text}
-
-BILAN A ANALYSER:
-Date: {date_str}
-Sujet: {current_email.get("subject", "Sans sujet")}
-
-Message du client:
-{current_email.get("body", "")}
-
-Pieces jointes: {len(photos)} photo(s), {len(pdfs)} PDF(s)
-
-CE QUE TU DOIS FAIRE:
-
-1. PHOTOS (si presentes): estime masse grasse (ex: 14-16 pourcent), decris chaque zone musculaire en detail, points forts avec explications, zones a bosser avec conseils precis
-
-2. METRIQUES: analyse poids, energie, sommeil, perfs avec interpretation et tendances
-
-3. QUESTIONS: reponds a CHAQUE question du client avec PROFONDEUR et expertise, explique les mecanismes physiologiques
-
-4. KPIs sur 10 avec justification pour chaque note:
-   - adherence_training: respect du programme entrainement
-   - adherence_nutrition: respect du plan alimentaire
-   - sommeil: qualite et quantite de sommeil
-   - energie: niveau energie ressenti
-   - sante: indicateurs sante (digestion, libido, stress, douleurs)
-   - mindset: mental, motivation, discipline, confiance
-   - progression: evolution globale vers objectifs
-
-5. POINTS POSITIFS: celebre les victoires meme petites, sois specifique sur ce qui est bien
-
-6. A AMELIORER: probleme + pourquoi important physiologiquement + solution detaillee + resultat attendu
-
-7. EMAIL DE REPONSE: 250-400 mots MAXIMUM, structure claire, ZERO asterisque, va a l'essentiel
-
-Reponds en JSON valide avec cette structure:
-{{"resume": "Resume detaille 4-5 phrases", "analyse_photos": {{"masse_grasse_estimee": "14-16%", "masse_musculaire": "Description detaillee", "points_forts": ["Zone avec explication"], "zones_a_travailler": ["Zone avec conseil"], "evolution_visuelle": "Comparaison", "note_physique": 7}}, "metriques": {{"poids": "Analyse", "energie": "Analyse", "sommeil": "Analyse", "autres": []}}, "evolution": {{"poids": "Analyse", "energie": "Analyse", "performance": "Analyse", "adherence": "Analyse", "global": "Synthese"}}, "kpis": {{"adherence_training": 8, "adherence_nutrition": 7, "sommeil": 6, "energie": 7, "sante": 7, "mindset": 7, "progression": 8}}, "points_positifs": ["Point detaille"], "points_ameliorer": [{{"probleme": "Description", "solution": "Solution detaillee", "priorite": "haute"}}], "questions_reponses": [{{"question": "Question", "reponse": "Reponse DETAILLEE"}}], "ajustements": ["Ajustement avec raison"], "draft_email": "EMAIL 250-400 mots sans asterisques"}}"""
-
-    content.append({"type": "text", "text": prompt})
-
-    VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-    images_added = 0
-    for att in current_email.get("attachments", []):
-        if att["content_type"].startswith("image/") and images_added < 5:
-            try:
-                real_type = detect_image_type(att["data"])
-                if real_type and real_type in VALID_IMAGE_TYPES:
-                    compressed_data, final_type = compress_image_if_needed(att["data"], real_type)
-                    content.append({
-                        "type": "image",
-                        "source": {"type": "base64", "media_type": final_type, "data": compressed_data}
-                    })
-                    images_added += 1
-            except:
-                pass
-
-    if images_added > 0:
-        content.append({"type": "text", "text": f"{images_added} PHOTO(S) - Analyse en DETAIL: masse grasse, zones musculaires, points forts, zones a travailler."})
-
+def parse_excel_content(b64_data: str, filename: str = "file.xlsx") -> str:
+    if not EXCEL_SUPPORT:
+        return f"[Fichier Excel: {filename} - openpyxl non installe]"
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=8000,
+        excel_bytes = base64.b64decode(b64_data)
+        excel_file = io.BytesIO(excel_bytes)
+        wb = openpyxl.load_workbook(excel_file, data_only=True)
+        result_parts = [f"=== CONTENU FICHIER EXCEL: {filename} ==="]
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            result_parts.append(f"\n--- Feuille: {sheet_name} ---")
+            rows_content = []
+            for row in sheet.iter_rows(values_only=True):
+                if any(cell is not None for cell in row):
+                    row_str = " | ".join(str(cell) if cell is not None else "" for cell in row)
+                    rows_content.append(row_str)
+            if rows_content:
+                result_parts.extend(rows_content[:100])
+            else:
+                result_parts.append("(Feuille vide)")
+        wb.close()
+        return "\n".join(result_parts)
+    except Exception as e:
+        return f"[Erreur lecture Excel {filename}: {str(e)}]"
+
+
+def build_prompt(history_text, date_str, body_text, photos_count, excel_content):
+    return f"""Coach ELITE transformation physique. Analyse ce bilan HONNETEMENT et reponds en JSON.
+
+STYLE: Direct, tutoiement, JAMAIS d'asterisques (*), HONNETE sur le physique, pas de flatterie.
+
+GUIDE MASSE GRASSE (STRICT):
+FEMME: 18-20%=fit+abdos visibles | 24-28%=normale, PAS d'abdos, gras hanches/cuisses | 30-35%=surpoids | 35%+=obesite
+HOMME: 10-12%=abdos decoupes | 15-18%=fit, abdos peu visibles | 20-25%=gras ventre | 28%+=surpoids
+REGLE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme.
+
+CONSEILS ADAPTES AU PROFIL:
+- SURPOIDS: JAMAIS de snacks/barres! Structure et discipline sur les repas.
+- SEC en seche: collation de secours OK.
+
+=== HISTORIQUE COMPLET DEPUIS JOUR 1 ===
+{history_text[:6000] if history_text else "Premier contact"}
+
+=== BILAN ACTUEL ({date_str}) ===
+{body_text[:5000]}
+
+DONNEES: {photos_count} photos, Excel: {bool(excel_content)}
+{excel_content[:2000] if excel_content else ""}
+
+EXTRACTION (LIS TOUT L'HISTORIQUE!):
+1. POIDS DE DEPART: Premier email client
+2. POIDS ACTUEL: Bilan actuel
+3. PROGRAMME: Dans les reponses COACH de l'historique
+4. NE JAMAIS INVENTER!
+
+CONSEILS ULTRA-SPECIFIQUES (JAMAIS DE VAGUE!):
+Tu es un coach EXPERT avec 11 certifications. JAMAIS de conseils generiques!
+
+INTERDIT: "ajoute du volume", "resserre la diet", "fais plus de cardio"
+OBLIGATOIRE:
+- EXERCICES PRECIS: "4x10 developpe incline + 3x12 ecarte poulie"
+- MACROS EXACTES: "200P / 180G / 60L = 2060kcal"
+- DUREE/FREQUENCE: "35min LISS, 4x/semaine"
+
+EMAIL HTML OBLIGATOIRE avec:
+1. Bloc "Ton Evolution depuis le Jour 1" (gradient violet, boxes blanches)
+2. Poids jour1→actuel, Masse grasse, Pas/jour, Energie
+3. Ce qui a change (progres concrets)
+4. Plan d'action PRECIS
+5. Signe "Achzod"
+
+TEMPLATE HTML:
+<div style='font-family:Arial,sans-serif;max-width:600px;'>
+  <p>Salut [prenom],</p>
+  <p>[Intro]</p>
+  <div style='background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:24px;margin:24px 0;color:white;'>
+    <h3 style='margin:0 0 20px 0;text-align:center;'>📈 Ton Evolution depuis le Jour 1</h3>
+    <div style='display:flex;flex-wrap:wrap;gap:12px;justify-content:center;'>
+      <div style='background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;'>
+        <div style='font-size:14px;opacity:0.9;'>Poids</div>
+        <div style='font-size:20px;font-weight:bold;margin:8px 0;'>XXkg → XXkg</div>
+        <div style='color:#4ade80;'>-Xkg</div>
+      </div>
+      <!-- Ajouter Masse Grasse, Pas/jour, Energie -->
+    </div>
+  </div>
+  <h3 style='color:#22c55e;'>✅ Progres</h3>
+  <p>[Details]</p>
+  <h3 style='color:#f59e0b;'>🎯 Plan d'action</h3>
+  <p>[Actions PRECISES]</p>
+  <p style='margin-top:30px;'>Achzod</p>
+</div>
+
+JSON:
+{{"resume":"analyse","analyse_photos":{{"masse_grasse_actuelle":"X%","evolution":"desc"}},"evolution_metriques":{{"poids":{{"jour1":"Xkg","actuel":"Xkg","diff":"-Xkg"}}}},"points_positifs":["x"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"plan_action":{{"training":"x","nutrition":"x","cardio":"x"}},"draft_email":"HTML COMPLET"}}"""
+
+
+def call_gpt4(prompt: str, images: list) -> Dict:
+    """Appel GPT-5.2 (dernier modele OpenAI - Dec 2025)"""
+    try:
+        content = [{"type": "text", "text": prompt}]
+        for img_data, img_type in images:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{img_type};base64,{img_data}", "detail": "high"}
+            })
+
+        response = openai_client.chat.completions.create(
+            model="gpt-5.2-pro",  # GPT-5.2 Pro - Top tier OpenAI (Dec 2025)
+            max_completion_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
-        response_text = response.content[0].text
-
-        # Parser le JSON de maniere robuste avec plusieurs strategies
-        analysis = None
-        json_str = ""
-
-        # Strategy 1: Nettoyer et parser directement
-        try:
-            text = response_text.strip()
-
-            # Enlever les blocs de code markdown
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0]
-            elif "```" in text:
-                parts = text.split("```")
-                for p in parts:
-                    if "{" in p and "draft_email" in p:
-                        text = p
-                        break
-
-            # Trouver le JSON complet
-            start = text.find("{")
-            end = text.rfind("}")
-            if start != -1 and end != -1 and end > start:
-                json_str = text[start:end+1]
-                analysis = json.loads(json_str)
-                print("JSON parse OK (strategy 1)")
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error (strategy 1): {e}")
-            analysis = None
-
-        # Strategy 2: Fixer les problemes courants de JSON
-        if analysis is None and json_str:
-            try:
-                # Fixer les newlines non echappees dans les strings
-                fixed = json_str
-                # Remplacer les vrais newlines par \\n dans les valeurs de string
-                fixed = re.sub(r'(?<!\\)\n', '\\\\n', fixed)
-                # Fixer les guillemets non echappes
-                fixed = re.sub(r'(?<!\\)"(?=[^:,\[\]{}]*[,\]}])', '\\"', fixed)
-                analysis = json.loads(fixed)
-                print("JSON parse OK (strategy 2 - fixed)")
-            except:
-                analysis = None
-
-        # Strategy 3: Extraire champ par champ avec regex
-        if analysis is None:
-            print("Fallback: extraction champ par champ")
-            analysis = {"resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
-                       "kpis": {}, "points_positifs": [], "points_ameliorer": [],
-                       "questions_reponses": [], "ajustements": [], "draft_email": ""}
-
-            # Extraire resume
-            resume_match = re.search(r'"resume"\s*:\s*"([^"]*(?:\\"[^"]*)*)"', response_text)
-            if resume_match:
-                analysis["resume"] = resume_match.group(1).replace('\\"', '"').replace('\\n', '\n')
-
-            # Extraire KPIs (chercher les nombres)
-            for kpi in ["adherence_training", "adherence_nutrition", "sommeil", "energie", "sante", "mindset", "progression"]:
-                kpi_match = re.search(rf'"{kpi}"\s*:\s*(\d+)', response_text)
-                if kpi_match:
-                    analysis["kpis"][kpi] = int(kpi_match.group(1))
-                else:
-                    analysis["kpis"][kpi] = 7  # default
-
-        # Assurer que analysis est un dict avec tous les champs
-        defaults = {
-            "resume": "", "analyse_photos": {}, "metriques": {}, "evolution": {},
-            "kpis": {"adherence_training": 7, "adherence_nutrition": 7, "sommeil": 7, "energie": 7, "sante": 7, "mindset": 7, "progression": 7},
-            "points_positifs": [], "points_ameliorer": [], "questions_reponses": [], "ajustements": [], "draft_email": ""
-        }
-
-        if not isinstance(analysis, dict):
-            analysis = defaults.copy()
-
-        # Ajouter les champs manquants
-        for k, v in defaults.items():
-            if k not in analysis:
-                analysis[k] = v
-            # S'assurer que kpis est un dict avec tous les kpis
-            if k == "kpis" and isinstance(analysis.get("kpis"), dict):
-                for kpi_key, kpi_default in v.items():
-                    if kpi_key not in analysis["kpis"]:
-                        analysis["kpis"][kpi_key] = kpi_default
-
-        # Extraire draft_email si manquant ou invalide
-        draft = analysis.get("draft_email", "")
-        if not draft or not isinstance(draft, str) or len(draft) < 50:
-            print("Extraction draft_email depuis reponse brute...")
-            # Methode 1: Regex standard
-            draft_match = re.search(r'"draft_email"\s*:\s*"((?:[^"\\]|\\.)*)"', response_text, re.DOTALL)
-            if draft_match:
-                draft = draft_match.group(1)
-                draft = draft.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
-                print(f"Draft extrait (methode 1): {len(draft)} chars")
-            else:
-                # Methode 2: Chercher entre "draft_email": " et la fin du JSON
-                draft_start = response_text.find('"draft_email"')
-                if draft_start != -1:
-                    after = response_text[draft_start:]
-                    # Trouver le debut de la valeur (apres : ")
-                    colon_idx = after.find(':')
-                    if colon_idx != -1:
-                        after_colon = after[colon_idx+1:].lstrip()
-                        if after_colon.startswith('"'):
-                            # Chercher la fin de la string
-                            content = after_colon[1:]  # Apres le premier "
-                            # Trouver le " de fermeture (pas precede de \)
-                            end_idx = 0
-                            while end_idx < len(content):
-                                if content[end_idx] == '"' and (end_idx == 0 or content[end_idx-1] != '\\'):
-                                    break
-                                end_idx += 1
-                            if end_idx > 0:
-                                draft = content[:end_idx]
-                                draft = draft.replace('\\n', '\n').replace('\\"', '"')
-                                print(f"Draft extrait (methode 2): {len(draft)} chars")
-
-            if draft and len(draft) > 50:
-                analysis["draft_email"] = draft
-
-        # Verifier que draft_email est une string propre
-        draft = analysis.get("draft_email", "")
-        if not isinstance(draft, str):
-            draft = str(draft) if draft else ""
-        if not draft or draft.startswith("{") or draft.startswith("["):
-            # Generer email depuis les donnees
-            parts = ["Bonjour,", ""]
-            if analysis.get("resume"):
-                parts.append(analysis["resume"])
-                parts.append("")
-            parts.append("A bientot,")
-            parts.append("Achzod")
-            analysis["draft_email"] = chr(10).join(parts)
-
-        print(f"Draft email extrait: {len(analysis.get('draft_email', ''))} chars")
-
-        return {"success": True, "analysis": analysis, "raw_response": response_text, "photos_analyzed": images_added}
+        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-5.2-Pro"}
     except Exception as e:
-        return {"success": False, "error": str(e), "analysis": None}
+        return {"success": False, "error": str(e), "model": "GPT-5.2-Pro"}
+
+
+def call_gemini(prompt: str, images: list) -> Dict:
+    """Appel Gemini 3 Pro Preview (dernier modele Google - Dec 2025)"""
+    try:
+        model = genai.GenerativeModel('gemini-3-pro-preview')  # Gemini 3 Pro Preview - Top tier Google (Dec 2025)
+
+        # Construire le contenu
+        parts = [prompt]
+        for img_data, img_type in images:
+            img_bytes = base64.b64decode(img_data)
+            parts.append({"mime_type": img_type, "data": img_bytes})
+
+        response = model.generate_content(parts)
+        return {"success": True, "text": response.text, "model": "Gemini-3-Pro"}
+    except Exception as e:
+        return {"success": False, "error": str(e), "model": "Gemini-3-Pro"}
+
+
+def parse_json_response(response_text: str) -> Dict:
+    """Parse JSON depuis la reponse IA"""
+    try:
+        text = response_text.strip()
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            for p in text.split("```"):
+                if "{" in p and "draft_email" in p:
+                    text = p
+                    break
+
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            json_str = text[start:end+1]
+            return json.loads(json_str)
+    except:
+        pass
+
+    # Fallback: extraire les champs manuellement
+    analysis = {"resume": "", "draft_email": "", "points_positifs": [], "points_ameliorer": []}
+
+    # Extraire draft_email
+    draft_match = re.search(r'"draft_email"\s*:\s*"((?:[^"\\]|\\.)*)"', response_text, re.DOTALL)
+    if draft_match:
+        analysis["draft_email"] = draft_match.group(1).replace('\\n', '\n').replace('\\"', '"')
+
+    return analysis
+
+
+def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
+    """Analyse avec GPT-5.2 ET Gemini 3 Pro - retourne les 2 resultats"""
+
+    history_text = _build_history_context(conversation_history)
+    attachments = current_email.get("attachments", [])
+    photos = [att for att in attachments if att.get("content_type", "").startswith("image/")]
+    excels = [att for att in attachments if any(ext in att.get("filename", "").lower() for ext in ['.xlsx', '.xls'])]
+
+    # Parse Excel
+    excel_content = ""
+    for excel_att in excels:
+        if excel_att.get("data"):
+            excel_content += "\n\n" + parse_excel_content(excel_att["data"], excel_att.get("filename", "fichier.xlsx"))
+
+    date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
+    body_text = current_email.get("body", "") or ""
+
+    # Build prompt
+    prompt = build_prompt(history_text, date_str, body_text, len(photos), excel_content)
+
+    # Prepare images
+    images = []
+    VALID_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    for att in photos[:5]:
+        try:
+            real_type = detect_image_type(att["data"])
+            if real_type and real_type in VALID_TYPES:
+                compressed, final_type = compress_image_if_needed(att["data"], real_type)
+                images.append((compressed, final_type))
+        except:
+            pass
+
+    print(f"[ANALYZE] Running GPT-5.2 and Gemini 3 Pro in parallel with {len(images)} images...")
+
+    # Appels en parallele
+    results = {"gpt4": None, "gemini": None}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {
+            executor.submit(call_gpt4, prompt, images): "gpt4",
+            executor.submit(call_gemini, prompt, images): "gemini"
+        }
+        for future in as_completed(futures):
+            ai_name = futures[future]
+            try:
+                results[ai_name] = future.result()
+            except Exception as e:
+                results[ai_name] = {"success": False, "error": str(e), "model": ai_name}
+
+    # Parser les resultats
+    analyses = {}
+
+    for ai_name, result in results.items():
+        if result and result.get("success"):
+            parsed = parse_json_response(result["text"])
+            parsed["_model"] = result["model"]
+            parsed["_raw"] = result["text"][:500]
+            analyses[ai_name] = parsed
+        else:
+            analyses[ai_name] = {"error": result.get("error", "Unknown error"), "_model": result.get("model", ai_name)}
+
+    # Retourner les 2 analyses
+    return {
+        "success": True,
+        "gpt4": analyses.get("gpt4", {}),
+        "gemini": analyses.get("gemini", {}),
+        "photos_analyzed": len(images)
+    }
 
 
 def _build_history_context(history):
     if not history:
-        return "Aucun historique - premier contact."
-    parts = [f"=== {len(history)} EMAILS ==="]
-    for i, e in enumerate(history[-10:], 1):
-        d = "CLIENT" if e.get("direction") == "received" else "TOI"
+        return ""
+    parts = [f"[{len(history)} emails precedents]"]
+    for i, e in enumerate(history[-15:], 1):
+        if not e or not isinstance(e, dict):
+            continue
+        direction = "CLIENT" if e.get("direction") == "received" else "COACH (toi)"
         dt = e.get("date").strftime("%d/%m/%Y") if e.get("date") else "?"
-        parts.append(f"--- {d} ({dt}) ---" + chr(10) + e.get('body', '')[:800])
-    return chr(10).join(parts)
+        body = e.get('body', '') or ''
+        body_preview = body[:1500] + "..." if len(body) > 1500 else body
+        parts.append(f"\n--- Email {i} - {direction} ({dt}) ---\n{body_preview}")
+    return "\n".join(parts)
 
 
 def regenerate_email_draft(analysis, instructions, current_draft):
-    prompt = f"""Tu es Achzod, coach expert. JAMAIS d asterisques.
+    """Regenere le draft avec GPT-5.2"""
+    prompt = f"""Tu es Achzod, coach expert. JAMAIS d'asterisques.
 Analyse: {json.dumps(analysis, ensure_ascii=False)[:3000]}
 Draft actuel: {current_draft}
 Instructions: {instructions}
-Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement. Va a l'essentiel."""
+Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement."""
+
     try:
-        r = client.messages.create(model="claude-sonnet-4-5-20250929", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
-        return r.content[0].text
+        r = openai_client.chat.completions.create(
+            model="gpt-5.2-pro",  # GPT-5.2 Pro pour regeneration
+            max_completion_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return r.choices[0].message.content
     except Exception as e:
         return f"Erreur: {e}"
