@@ -147,61 +147,49 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     # Construire le body complet (pas tronque)
     body_text = current_email.get("body", "") or ""
 
-    prompt = f"""Tu es Achzod, coach expert transformation physique avec 10+ ans d'experience.
-
-CONTEXTE: Tu dois analyser ce bilan client et rediger une reponse de coach EXPERTE et PERSONNALISEE.
+    prompt = f"""Tu es Achzod, coach expert transformation physique avec 10+ ans d'experience. Tu DOIS analyser ce bilan en PROFONDEUR.
 
 REGLES ABSOLUES:
-- JAMAIS d'asterisques (*) ou etoiles dans ta reponse
+- JAMAIS d'asterisques (*) ou etoiles
 - Tutoiement obligatoire
-- Analyse les DONNEES REELLES du client (poids, metriques, photos)
-- Reponds aux QUESTIONS du client
-- Email de reponse = conseils SPECIFIQUES et ACTIONABLES
+- Si PHOTOS presentes: analyse OBLIGATOIRE et DETAILLEE du physique
 
-=== HISTORIQUE COMPLET DU CLIENT ===
-{history_text if history_text else "Premier contact avec ce client"}
+=== HISTORIQUE CLIENT ===
+{history_text if history_text else "Premier contact"}
 
-=== NOUVEAU BILAN A ANALYSER ({date_str}) ===
-Sujet: {current_email.get("subject", "Sans sujet")}
+=== BILAN DU {date_str} ===
+{current_email.get("subject", "")}
 
 {body_text}
 
-=== PIECES JOINTES ===
-- {len(photos)} photo(s) de progression
-- {len(excels)} fichier(s) Excel avec donnees
-- {len(pdfs)} PDF(s)
-
+=== DONNEES ===
+Photos: {len(photos)} | Excel: {len(excels)} | PDF: {len(pdfs)}
 {excel_content if excel_content else ""}
 
-=== CE QUE TU DOIS FAIRE ===
+=== INSTRUCTIONS ===
 
-1. RESUME DETAILLE: Analyse les metriques (poids, tours de taille, adherence diete/training, energie, sommeil). Identifie les tendances.
+**SI PHOTOS PRESENTES - ANALYSE PHYSIQUE OBLIGATOIRE:**
+- Masse grasse estimee en % (ex: 12-14%)
+- Description de CHAQUE zone: pectoraux (epaisseur, separation, insertion), epaules (deltoide ant/lat/post, largeur), dos (largeur, epaisseur, V-taper), bras (biceps peak, triceps, avant-bras), abdos (definition, separation, serratus), jambes (quadriceps, ischio, mollets)
+- Points forts: quels muscles ressortent le plus, pourquoi
+- Zones a travailler: quels muscles sont en retard, conseils specifiques
+- Evolution vs photos precedentes si historique: changements visibles, progres, regressions
 
-2. ANALYSE PHOTOS: Si photos presentes, estime la masse grasse (%), decris le physique (points forts musculaires, zones a developper), compare avec les photos precedentes si historique.
+**ANALYSE DES METRIQUES:**
+- Poids: evolution, tendance, vitesse de perte/prise
+- Adherence diete: analyse des ecarts rapportes
+- Adherence training: seances faites vs prevues
+- Energie/Sommeil/Sante: analyse des indicateurs
 
-3. KPIs sur 10 - Note CHAQUE aspect selon les donnees du bilan:
-   - adherence_training: respect du programme d'entrainement
-   - adherence_nutrition: respect du plan alimentaire
-   - sommeil: qualite et duree du sommeil
-   - energie: niveau d'energie rapporte
-   - sante: indicateurs sante (digestion, libido, stress, douleurs)
-   - mindset: motivation, discipline, mental
-   - progression: evolution globale vers les objectifs
+**EMAIL DE REPONSE (300-400 mots):**
+- Commence par analyser les PHOTOS en detail (si presentes)
+- Felicite les progres SPECIFIQUES visibles
+- Reponds aux questions du client
+- Donne des conseils EXPERTS et PRECIS
+- Pas de banalites generiques
 
-4. POINTS POSITIFS: Celebre les victoires du client (meme petites). Sois specifique.
-
-5. POINTS A AMELIORER: Pour chaque probleme, donne une solution CONCRETE avec le POURQUOI.
-
-6. EMAIL DE REPONSE (300-400 mots):
-   - Salutation personnalisee
-   - Reponds a SES questions
-   - Felicite les progres
-   - Donne des conseils PRECIS et EXPERTS
-   - Motive-le pour la suite
-   - Signe "Achzod"
-
-REPONDS EN JSON VALIDE:
-{{"resume": "Resume detaille 4-5 phrases avec les chiffres", "analyse_photos": {{"masse_grasse_estimee": "X-Y%", "points_forts": ["muscle1", "muscle2"], "zones_a_travailler": ["zone1", "zone2"], "evolution": "comparaison avec avant"}}, "kpis": {{"adherence_training": X, "adherence_nutrition": X, "sommeil": X, "energie": X, "sante": X, "mindset": X, "progression": X}}, "points_positifs": ["point1 specifique", "point2 specifique"], "points_ameliorer": [{{"probleme": "description", "solution": "solution detaillee", "priorite": "haute/moyenne/basse"}}], "questions_reponses": [{{"question": "question du client", "reponse": "ta reponse experte"}}], "draft_email": "EMAIL COMPLET 300-400 mots sans asterisques"}}"""
+JSON:
+{{"resume": "4-5 phrases avec chiffres et observations visuelles", "analyse_photos": {{"masse_grasse_estimee": "X-Y%", "description_physique": "Description DETAILLEE de chaque zone musculaire visible", "points_forts": ["muscle1 - pourquoi", "muscle2 - pourquoi"], "zones_a_travailler": ["zone1 - conseil specifique", "zone2 - conseil specifique"], "evolution_vs_avant": "Comparaison detaillee avec avant"}}, "kpis": {{"adherence_training": X, "adherence_nutrition": X, "sommeil": X, "energie": X, "sante": X, "mindset": X, "progression": X}}, "points_positifs": ["victoire1", "victoire2"], "points_ameliorer": [{{"probleme": "...", "solution": "...", "priorite": "haute"}}], "draft_email": "EMAIL 300-400 mots avec analyse photos detaillee"}}"""
 
     content.append({"type": "text", "text": prompt})
 
