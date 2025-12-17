@@ -1,5 +1,5 @@
 """
-Module d'analyse IA des bilans de coaching - GPT-4o + Gemini
+Module d'analyse IA des bilans de coaching - GPT-5.2 + Gemini 3 Pro
 """
 
 import os
@@ -180,7 +180,7 @@ JSON:
 
 
 def call_gpt4(prompt: str, images: list) -> Dict:
-    """Appel GPT-4o (dernier modele OpenAI - decembre 2024)"""
+    """Appel GPT-5.2 (dernier modele OpenAI - Dec 2025)"""
     try:
         content = [{"type": "text", "text": prompt}]
         for img_data, img_type in images:
@@ -190,19 +190,19 @@ def call_gpt4(prompt: str, images: list) -> Dict:
             })
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o",  # GPT-4 Omni - LE PLUS RECENT (dec 2024)
+            model="gpt-5.2",  # GPT-5.2 - Top tier OpenAI (Dec 2025)
             max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
-        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-4o (Latest)"}
+        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-5.2"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "GPT-4o"}
+        return {"success": False, "error": str(e), "model": "GPT-5.2"}
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
-    """Appel Gemini 1.5 Pro (dernier modele Google - decembre 2024)"""
+    """Appel Gemini 3 Pro (dernier modele Google - Dec 2025)"""
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')  # LE PLUS RECENT disponible
+        model = genai.GenerativeModel('gemini-3-pro')  # Gemini 3 Pro - Top tier Google (Dec 2025)
 
         # Construire le contenu
         parts = [prompt]
@@ -211,9 +211,9 @@ def call_gemini(prompt: str, images: list) -> Dict:
             parts.append({"mime_type": img_type, "data": img_bytes})
 
         response = model.generate_content(parts)
-        return {"success": True, "text": response.text, "model": "Gemini-1.5-Pro"}
+        return {"success": True, "text": response.text, "model": "Gemini-3-Pro"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "Gemini-1.5-Pro"}
+        return {"success": False, "error": str(e), "model": "Gemini-3-Pro"}
 
 
 def parse_json_response(response_text: str) -> Dict:
@@ -248,7 +248,7 @@ def parse_json_response(response_text: str) -> Dict:
 
 
 def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
-    """Analyse avec GPT-4o ET Gemini - retourne les 2 resultats"""
+    """Analyse avec GPT-5.2 ET Gemini 3 Pro - retourne les 2 resultats"""
 
     history_text = _build_history_context(conversation_history)
     attachments = current_email.get("attachments", [])
@@ -279,7 +279,7 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
         except:
             pass
 
-    print(f"[ANALYZE] Running GPT-4o and Gemini in parallel with {len(images)} images...")
+    print(f"[ANALYZE] Running GPT-5.2 and Gemini 3 Pro in parallel with {len(images)} images...")
 
     # Appels en parallele
     results = {"gpt4": None, "gemini": None}
@@ -333,7 +333,7 @@ def _build_history_context(history):
 
 
 def regenerate_email_draft(analysis, instructions, current_draft):
-    """Regenere le draft avec GPT-4o"""
+    """Regenere le draft avec GPT-5.2"""
     prompt = f"""Tu es Achzod, coach expert. JAMAIS d'asterisques.
 Analyse: {json.dumps(analysis, ensure_ascii=False)[:3000]}
 Draft actuel: {current_draft}
@@ -342,7 +342,7 @@ Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoie
 
     try:
         r = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.2",  # GPT-5.2 pour regeneration
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )

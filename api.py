@@ -873,7 +873,7 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
             except Exception as kpi_err:
                 print(f"[KPI] Error: {kpi_err}")
 
-        # Nouveau format: 2 analyses (GPT-4 + Gemini)
+        # Nouveau format: 2 analyses (GPT-5.2 + Gemini 3 Pro)
         gpt4_analysis = result.get('gpt4', {})
         gemini_analysis = result.get('gemini', {})
 
@@ -882,12 +882,12 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
             "gpt4": {
                 "analysis": gpt4_analysis,
                 "draft": gpt4_analysis.get('draft_email', ''),
-                "model": gpt4_analysis.get('_model', 'GPT-4-Turbo')
+                "model": gpt4_analysis.get('_model', 'GPT-5.2')
             },
             "gemini": {
                 "analysis": gemini_analysis,
                 "draft": gemini_analysis.get('draft_email', ''),
-                "model": gemini_analysis.get('_model', 'Gemini-1.5-Pro')
+                "model": gemini_analysis.get('_model', 'Gemini-3-Pro')
             },
             "email_ids": email_ids,
             "emails_count": len(unreplied_emails),

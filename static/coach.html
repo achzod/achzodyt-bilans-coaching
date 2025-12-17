@@ -340,8 +340,8 @@ async function analyzeAll() {
 
     const btn = document.querySelector('.main-actions .btn-primary');
     btn.disabled = true;
-    btn.textContent = 'Analyse GPT-4 + Gemini...';
-    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT-4 Turbo + Gemini 1.5 Pro en parallele (30-60s)...</div></div>';
+    btn.textContent = 'Analyse GPT-5.2 + Gemini 3...';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT-5.2 + Gemini 3 Pro en parallele (30-60s)...</div></div>';
 
     try {
         const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, 'POST');
@@ -365,7 +365,7 @@ async function analyzeAll() {
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
             <div style="border:2px solid #10b981;border-radius:12px;padding:16px;background:#10b98110;">
                 <div style="font-weight:bold;font-size:1.1rem;color:#10b981;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-                    <span>🤖 GPT-4 Turbo</span>
+                    <span>🤖 GPT-5.2</span>
                     <button class="btn btn-sm btn-success" onclick="selectAI('gpt4')">Utiliser</button>
                 </div>
                 <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
@@ -374,7 +374,7 @@ async function analyzeAll() {
             </div>
             <div style="border:2px solid #8b5cf6;border-radius:12px;padding:16px;background:#8b5cf610;">
                 <div style="font-weight:bold;font-size:1.1rem;color:#8b5cf6;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-                    <span>💎 Gemini 1.5 Pro</span>
+                    <span>💎 Gemini 3 Pro</span>
                     <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="selectAI('gemini')">Utiliser</button>
                 </div>
                 <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
@@ -387,7 +387,7 @@ async function analyzeAll() {
 
         document.getElementById('ai-result').innerHTML = html;
 
-        // Par defaut, afficher GPT-4
+        // Par defaut, afficher GPT-5.2
         if (gpt4Analysis?.draft) {
             document.getElementById('draft-text').value = gpt4Analysis.draft;
             currentAnalysis = gpt4Analysis.analysis;
@@ -411,16 +411,16 @@ async function analyzeAll() {
     btn.disabled = false;
 }
 
-// SELECT AI - Choisir entre GPT-4 et Gemini
+// SELECT AI - Choisir entre GPT-5.2 et Gemini 3 Pro
 function selectAI(aiName) {
     if (aiName === 'gpt4' && gpt4Analysis?.draft) {
         document.getElementById('draft-text').value = gpt4Analysis.draft;
         currentAnalysis = gpt4Analysis.analysis;
-        showNotification('GPT-4 Turbo selectionne!', 'success');
+        showNotification('GPT-5.2 selectionne!', 'success');
     } else if (aiName === 'gemini' && geminiAnalysis?.draft) {
         document.getElementById('draft-text').value = geminiAnalysis.draft;
         currentAnalysis = geminiAnalysis.analysis;
-        showNotification('Gemini 1.5 Pro selectionne!', 'info');
+        showNotification('Gemini 3 Pro selectionne!', 'info');
     } else {
         alert('Analyse non disponible pour cette IA');
         return;
