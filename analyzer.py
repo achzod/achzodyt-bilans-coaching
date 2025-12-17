@@ -147,9 +147,15 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     # Construire le body complet (pas tronque)
     body_text = current_email.get("body", "") or ""
 
-    prompt = f"""Coach ELITE transformation physique. Analyse ce bilan et reponds en JSON.
+    prompt = f"""Coach ELITE transformation physique. Analyse ce bilan HONNETEMENT et reponds en JSON.
 
-STYLE: Direct, tutoiement, JAMAIS d'asterisques (*), conseils EXPERTS avec dosages precis.
+STYLE: Direct, tutoiement, JAMAIS d'asterisques (*), HONNETE sur le physique, pas de flatterie.
+
+GUIDE MASSE GRASSE (UTILISE OBLIGATOIREMENT):
+FEMME: 18-20%=fit+abdos visibles | 24-28%=normale, PAS d'abdos, gras hanches/cuisses | 30-35%=surpoids, cellulite | 35%+=obesite
+HOMME: 10-12%=abdos decoupes | 15-18%=fit, abdos peu visibles | 20-25%=gras ventre, pas abdos | 28%+=surpoids
+
+REGLE STRICTE: Pas d'abdos visibles = MINIMUM 25% femme / 20% homme. NE JAMAIS sous-estimer.
 
 HISTORIQUE:
 {history_text[:3000] if history_text else "Premier contact"}
@@ -160,16 +166,15 @@ BILAN ({date_str}):
 DONNEES: {len(photos)} photos, {len(excels)} Excel
 {excel_content[:2000] if excel_content else ""}
 
-ANALYSE:
-1. PHOTOS: masse grasse %, description physique zone par zone, points forts, zones a bosser, evolution
-2. METABOLIQUE: poids, retention eau, signes hormonaux
-3. COMPORTEMENT: adherence diete/training, sommeil, stress
-4. RECOMMANDATIONS: diete (calories/macros), training, supplements (produit+dose), lifestyle
+ANALYSE HONNETE:
+1. PHOTOS: masse grasse REALISTE, gras visible ou, cellulite, points forts musculaires
+2. METABOLIQUE: poids, retention eau
+3. PLAN: deficit calorique si gras, cardio, training adapte
 
-EMAIL (400 mots): Analyse photos detaillee, victoires, conseils experts avec POURQUOI, questions si infos manquantes, next steps. Signe "Achzod"
+EMAIL (400 mots): Analyse VRAIE du physique (pas de mensonge), encouragements sur le travail, plan concret. Signe "Achzod"
 
-JSON OBLIGATOIRE:
-{{"resume":"analyse 4-5 phrases","analyse_photos":{{"masse_grasse":"X%","description":"zone par zone","points_forts":["muscle"],"zones_a_travailler":["zone"],"evolution":"vs avant"}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["victoire"],"points_ameliorer":[{{"probleme":"x","solution":"y","priorite":"haute"}}],"ajustements_proposes":{{"diete":"x","training":"x","supplements":"x","lifestyle":"x"}},"questions_a_poser":["question"],"draft_email":"EMAIL COMPLET 400 mots"}}"""
+JSON:
+{{"resume":"analyse HONNETE","analyse_photos":{{"masse_grasse":"X% REALISTE","zones_grasses":["hanches","cuisses","ventre si applicable"],"cellulite":"visible ou non","points_forts":["muscle"]}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["victoire"],"points_ameliorer":[{{"probleme":"x","solution":"y","priorite":"haute"}}],"ajustements_proposes":{{"diete":"deficit si gras","training":"x","cardio":"si besoin"}},"draft_email":"EMAIL HONNETE 400 mots"}}"""
 
     content.append({"type": "text", "text": prompt})
 
