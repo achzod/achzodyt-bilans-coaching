@@ -147,73 +147,29 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     # Construire le body complet (pas tronque)
     body_text = current_email.get("body", "") or ""
 
-    prompt = f"""Tu es Achzod, coach ELITE transformation physique. 10+ ans d'experience, des centaines de transformations reussies. Tu analyses comme un EXPERT, pas comme une IA generique.
+    prompt = f"""Coach ELITE transformation physique. Analyse ce bilan et reponds en JSON.
 
-STYLE ACHZOD:
-- Direct, cash, zero bullshit
-- JAMAIS d'asterisques (*) dans ta reponse
-- Tutoiement, bienveillant mais exigeant
-- Tu CONNAIS ton client, tu suis son parcours
-- Tu poses des questions si t'as pas toutes les infos
-- Tu proposes des SOLUTIONS concretes, pas des generalites
+STYLE: Direct, tutoiement, JAMAIS d'asterisques (*), conseils EXPERTS avec dosages precis.
 
-=== HISTORIQUE CLIENT ===
-{history_text if history_text else "Premier contact"}
+HISTORIQUE:
+{history_text[:3000] if history_text else "Premier contact"}
 
-=== BILAN DU {date_str} ===
-{current_email.get("subject", "")}
+BILAN ({date_str}):
+{body_text[:4000]}
 
-{body_text}
+DONNEES: {len(photos)} photos, {len(excels)} Excel
+{excel_content[:2000] if excel_content else ""}
 
-=== DONNEES ===
-Photos: {len(photos)} | Excel: {len(excels)} | PDF: {len(pdfs)}
-{excel_content if excel_content else ""}
+ANALYSE:
+1. PHOTOS: masse grasse %, description physique zone par zone, points forts, zones a bosser, evolution
+2. METABOLIQUE: poids, retention eau, signes hormonaux
+3. COMPORTEMENT: adherence diete/training, sommeil, stress
+4. RECOMMANDATIONS: diete (calories/macros), training, supplements (produit+dose), lifestyle
 
-=== ANALYSE EXPERT NIVEAU COACH ELITE ===
+EMAIL (400 mots): Analyse photos detaillee, victoires, conseils experts avec POURQUOI, questions si infos manquantes, next steps. Signe "Achzod"
 
-1. ANALYSE PHYSIQUE DETAILLEE (si photos):
-   - Masse grasse: estimation precise en % (pas de fourchette large, sois precis)
-   - PECTORAUX: epaisseur, separation sternale, faisceau claviculaire, insertion
-   - EPAULES: deltoide anterieur/lateral/posterieur, rapport largeur/taille, 3D look
-   - DOS: largeur dorsaux, epaisseur trapeze, V-taper, rhomboides, lombaires
-   - BRAS: biceps (peak, longueur), triceps (chef long/lateral), avant-bras, vascularisation
-   - ABDOS: definition des 6 pack, separation, ligne alba, serratus, obliques
-   - JAMBES: quadriceps (sweep, separation), ischio, mollets, proportions
-   - EVOLUTION: compare avec les photos precedentes - qu'est-ce qui a change? Progres ou regression?
-
-2. ANALYSE METABOLIQUE & HORMONALE:
-   - Poids: vitesse de perte/prise, est-ce optimal pour preserver le muscle? Metabolisme adaptatif?
-   - Retention d'eau: signes visibles? Impact du sodium/stress/sommeil?
-   - Signes hormonaux: energie, libido, humeur, recuperation - thyroide, cortisol, testosterone?
-   - Digestion: impact sur absorption, inflammation, ballonnements?
-
-3. ANALYSE COMPORTEMENTALE:
-   - Adherence diete: ou sont les ecarts? Pourquoi? Faim? Stress? Social?
-   - Adherence training: intensite reelle? Volume optimal? Signes de surentrainement?
-   - Sommeil: impact sur recuperation et hormones - solutions concretes
-   - Stress: impact cortisol, retention eau, fringales - strategies
-
-4. DIAGNOSTIC & RECOMMANDATIONS EXPERT:
-   - Diete: ajustements PRECIS (calories, macros, timing, refeeds, aliments specifiques)
-   - Training: modifications (volume, frequence, exercices, intensite, deload necessaire?)
-   - Supplements: recommandations SPECIFIQUES avec dosages (omega3, magnesium, vitD, ashwagandha, etc)
-   - Lifestyle: hacks concrets pour optimiser resultats
-
-5. QUESTIONS A POSER (si infos manquantes):
-   - Sois SPECIFIQUE: "T'as fait combien de pas cette semaine?" pas "Comment va l'activite?"
-
-6. EMAIL DE REPONSE (400-600 mots):
-   - Commence par reconnaitre son effort et ses victoires SPECIFIQUES
-   - Analyse DETAILLEE des photos si presentes (chaque zone)
-   - Reponds a TOUTES ses questions avec expertise
-   - Explique le POURQUOI de chaque conseil (physiologie, hormones)
-   - Propose des ajustements CONCRETS avec le raisonnement
-   - Pose tes questions sur ce qui manque
-   - Finis par les NEXT STEPS clairs
-   - Signe "Achzod"
-
-JSON:
-{{"resume": "6-8 phrases: analyse complete physique + metabolique + comportementale", "analyse_photos": {{"masse_grasse_estimee": "X%", "description_physique": "Description DETAILLEE zone par zone avec termes techniques", "points_forts": ["muscle specifique - pourquoi c'est un point fort"], "zones_a_travailler": ["zone - exercices/techniques pour l'ameliorer"], "evolution_vs_avant": "Comparaison precise avec avant: ce qui a change, progres, stagnation"}}, "analyse_globale": {{"poids_evolution": "analyse metabolique detaillee", "energie": "analyse causes profondes", "sommeil": "impact hormonal et solutions", "digestion": "analyse si mentionne", "stress": "impact cortisol et strategies", "mindset": "analyse motivation et blocages"}}, "kpis": {{"adherence_training": X, "adherence_nutrition": X, "sommeil": X, "energie": X, "sante": X, "mindset": X, "progression": X}}, "points_positifs": ["victoire specifique detaillee"], "points_ameliorer": [{{"probleme": "description precise", "solution": "solution concrete avec le pourquoi", "priorite": "haute/moyenne"}}], "ajustements_proposes": {{"diete": "ajustement precis avec calories/macros si pertinent", "training": "modification specifique", "supplements": "produit + dosage + timing", "lifestyle": "hack concret"}}, "questions_a_poser": ["question specifique et actionable"], "draft_email": "EMAIL 400-600 mots EXPERT niveau coach elite"}}"""
+JSON OBLIGATOIRE:
+{{"resume":"analyse 4-5 phrases","analyse_photos":{{"masse_grasse":"X%","description":"zone par zone","points_forts":["muscle"],"zones_a_travailler":["zone"],"evolution":"vs avant"}},"kpis":{{"adherence_training":7,"adherence_nutrition":7,"sommeil":7,"energie":7,"sante":7,"mindset":7,"progression":7}},"points_positifs":["victoire"],"points_ameliorer":[{{"probleme":"x","solution":"y","priorite":"haute"}}],"ajustements_proposes":{{"diete":"x","training":"x","supplements":"x","lifestyle":"x"}},"questions_a_poser":["question"],"draft_email":"EMAIL COMPLET 400 mots"}}"""
 
     content.append({"type": "text", "text": prompt})
 
