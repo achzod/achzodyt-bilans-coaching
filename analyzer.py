@@ -200,34 +200,55 @@ def call_gpt4(prompt: str, images: list) -> Dict:
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
-    """Appel Gemini 3.0 Pro via REST API"""
-    try:
-        # Gemini 3.0 Pro - Dec 2025
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-pro:generateContent?key={GOOGLE_API_KEY}"
+    """Appel Gemini via REST API avec fallback automatique"""
 
-        # Build parts
-        parts = [{"text": prompt}]
-        for img_data, img_type in images:
-            parts.append({
-                "inline_data": {
-                    "mime_type": img_type,
-                    "data": img_data
-                }
-            })
+    # Liste des modeles a essayer (du plus recent au plus stable)
+    models_to_try = [
+        "gemini-3.0-pro",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro-latest",
+        "gemini-1.5-flash"
+    ]
 
-        payload = {"contents": [{"parts": parts}]}
+    # Build parts
+    parts = [{"text": prompt}]
+    for img_data, img_type in images:
+        parts.append({
+            "inline_data": {
+                "mime_type": img_type,
+                "data": img_data
+            }
+        })
 
-        response = requests.post(url, json=payload, timeout=120)
-        data = response.json()
+    # Config pour precision (pas d'hallucination)
+    payload = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "topP": 0.95,
+            "topK": 40,
+            "maxOutputTokens": 8192
+        }
+    }
 
-        if "candidates" in data and data["candidates"]:
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            return {"success": True, "text": text, "model": "Gemini-3.0-Pro"}
-        else:
-            error = data.get("error", {}).get("message", "Unknown error")
-            return {"success": False, "error": error, "model": "Gemini-3.0-Pro"}
-    except Exception as e:
-        return {"success": False, "error": str(e), "model": "Gemini-3.0-Pro"}
+    last_error = ""
+    for model_name in models_to_try:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GOOGLE_API_KEY}"
+            response = requests.post(url, json=payload, timeout=120)
+            data = response.json()
+
+            if "candidates" in data and data["candidates"]:
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                return {"success": True, "text": text, "model": f"Gemini ({model_name})"}
+            else:
+                last_error = data.get("error", {}).get("message", "No candidates")
+                continue  # Try next model
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return {"success": False, "error": last_error, "model": "Gemini"}
 
 
 def parse_json_response(response_text: str) -> Dict:
