@@ -340,11 +340,30 @@ async function analyzeAll() {
 
     const btn = document.querySelector('.main-actions .btn-primary');
     btn.disabled = true;
-    btn.textContent = 'Analyse GPT-5.2 Pro + Gemini 3...';
-    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT-5.2 Pro + Gemini 3 Pro Preview en parallele (30-60s)...</div></div>';
+    btn.textContent = 'Analyse en cours...';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT + Gemini en parallele (30-90s max)...</div></div>';
 
     try {
-        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, 'POST');
+        console.log('[ANALYZE] Starting analysis for', currentClient);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2min timeout
+
+        const response = await fetch(API + `/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const res = await response.json();
+        console.log('[ANALYZE] Result:', res);
 
         if (!res.success) {
             document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${res.error}</div>`;
@@ -404,7 +423,15 @@ async function analyzeAll() {
         togglePreview();
 
     } catch(e) {
-        document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${e.message}</div>`;
+        console.error('[ANALYZE] Error:', e);
+        let errorMsg = e.message;
+        if (e.name === 'AbortError') {
+            errorMsg = 'Timeout (2min) - Réessaie, le serveur était peut-être occupé';
+        }
+        document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;background:#fee2e2;border-radius:8px;">
+            <strong>Erreur:</strong> ${errorMsg}<br>
+            <small style="color:#666;">Ouvre la console (F12) pour plus de détails</small>
+        </div>`;
     }
 
     btn.textContent = `Analyser TOUS (${currentEmailIds.length})`;
