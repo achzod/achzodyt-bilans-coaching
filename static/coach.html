@@ -57,11 +57,10 @@
         .section-title { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 16px; font-weight: 700; }
 
         /* EMAILS LIST in main panel */
-        .emails-preview { background: var(--bg); border-radius: 10px; padding: 16px; margin-bottom: 16px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); }
-        .email-item { padding: 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--warning); }
-        .email-item-date { font-size: 0.7rem; color: var(--muted); }
-        .email-item-subject { font-weight: 600; font-size: 0.9rem; margin: 4px 0; }
-        .email-item-preview { font-size: 0.8rem; color: var(--muted); }
+        .emails-preview { background: var(--bg); border-radius: 10px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--border); }
+        .email-item { padding: 16px; background: #fff; border-radius: 10px; margin-bottom: 12px; border-left: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .email-item-date { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+        .email-item-subject { font-weight: 700; font-size: 1rem; color: var(--primary); margin-bottom: 8px; }
 
         /* RESPONSE - MUCH BIGGER */
         .response-section { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 3px solid var(--success); }
@@ -277,10 +276,10 @@ async function selectClient(email) {
         const dateStr = new Date(e.date_sent).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
 
         emailsHtml += `
-            <div class="email-item">
+            <div class="email-item" style="border-left-color:var(--primary);">
                 <div class="email-item-date">${dateStr}</div>
                 <div class="email-item-subject">${e.subject || '(Sans sujet)'}</div>
-                <div class="email-item-preview">${(loadRes.body || '').substring(0, 200)}...</div>
+                <div style="margin-top:10px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:0.9rem;line-height:1.6;white-space:pre-wrap;max-height:300px;overflow-y:auto;">${loadRes.body || '(vide)'}</div>
             </div>
         `;
 
