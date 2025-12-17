@@ -180,9 +180,9 @@ ANALYSE RAPIDE en JSON:
         content.append({"type": "text", "text": f"{images_added} PHOTO(S) - Analyse en DETAIL: masse grasse, zones musculaires, points forts, zones a travailler."})
 
     try:
-        # Utiliser claude-3-5-sonnet-20241022 pour rapidite + max_tokens reduit
+        # Utiliser claude-sonnet-4-20250514 pour rapidite + max_tokens reduit
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4000,
             messages=[{"role": "user", "content": content}]
         )
@@ -349,7 +349,7 @@ Draft actuel: {current_draft}
 Instructions: {instructions}
 Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement. Va a l'essentiel."""
     try:
-        r = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=2000, messages=[{"role": "user", "content": prompt}])
+        r = client.messages.create(model="claude-sonnet-4-20250514", max_tokens=2000, messages=[{"role": "user", "content": prompt}])
         return r.content[0].text
     except Exception as e:
         return f"Erreur: {e}"
