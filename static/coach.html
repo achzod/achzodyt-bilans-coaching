@@ -15,152 +15,110 @@
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: auto; }
 
-        /* LAYOUT */
-        .app { display: grid; grid-template-columns: 280px 350px 1fr; min-height: 100vh; }
+        /* LAYOUT - 2 panels now */
+        .app { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
         .panel { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg); }
         .panel:last-child { border-right: none; }
-        .panel-header { padding: 16px; border-bottom: 1px solid var(--border); background: var(--bg-card); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .panel-content { flex: 1; overflow-y: auto; padding: 12px; max-height: calc(100vh - 100px); }
+        .panel-header { padding: 16px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+        .panel-content { flex: 1; overflow-y: auto; padding: 12px; }
 
         /* SIDEBAR */
         .logo { font-size: 1.3rem; font-weight: 700; background: linear-gradient(135deg, var(--primary), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .sync-row { display: flex; gap: 8px; margin-top: 12px; }
-        .client { padding: 12px; border-radius: 8px; cursor: pointer; border-left: 3px solid transparent; margin-bottom: 6px; background: var(--bg-card); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .client:hover { background: var(--bg-hover); }
+        .sync-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .client { padding: 14px; border-radius: 10px; cursor: pointer; border-left: 4px solid var(--warning); margin-bottom: 8px; background: var(--bg-card); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+        .client:hover { background: var(--bg-hover); transform: translateX(2px); }
         .client.active { border-left-color: var(--primary); background: rgba(124,58,237,0.1); }
-        .client.unread { border-left-color: var(--warning); background: rgba(217,119,6,0.1); }
-        .client-name { font-weight: 600; font-size: 0.9rem; }
+        .client-name { font-weight: 600; font-size: 0.95rem; }
         .client-email { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-        .client-meta { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
-        .badge { background: var(--warning); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; }
+        .client-meta { font-size: 0.7rem; color: var(--warning); margin-top: 4px; font-weight: 600; }
+        .badge { background: var(--warning); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; }
 
-        /* EMAILS */
-        .email { padding: 12px; border-radius: 8px; cursor: pointer; margin-bottom: 6px; background: var(--bg-card); border-left: 3px solid var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .email:hover { background: var(--bg-hover); }
-        .email.active { border-left-color: var(--success); background: rgba(22,163,74,0.1); }
-        .email.unread { background: rgba(217,119,6,0.1); border-left-color: var(--warning); }
-        .email-subject { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
-        .email-preview { font-size: 0.75rem; color: var(--muted); max-height: 40px; overflow: hidden; }
-        .email-date { font-size: 0.7rem; color: var(--muted); margin-top: 6px; }
-
-        /* ANALYSIS PANEL */
-        .analysis-panel { background: var(--bg); }
-        .analysis-header { display: flex; justify-content: space-between; align-items: center; }
-        .section { background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid var(--border); }
-        .section-title { font-size: 0.8rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 700; }
-        .section-title.green { color: var(--success); }
-        .section-title.orange { color: var(--warning); }
-        .section-title.purple { color: var(--primary); }
-
-        /* RESPONSE SECTION - PLUS VISIBLE */
-        .response-section { background: linear-gradient(135deg, #f0fdf4, #ecfdf5); border: 2px solid var(--success); }
-        .response-section textarea { background: #fff; font-size: 1.05rem; }
+        /* MAIN PANEL */
+        .main-panel { display: flex; flex-direction: column; }
+        .main-header { padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .main-title { font-size: 1.2rem; font-weight: 700; }
+        .main-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .main-content { flex: 1; overflow-y: auto; padding: 24px; }
 
         /* BUTTONS */
-        .btn { padding: 8px 14px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { box-shadow: 0 0 20px var(--primary-glow); }
+        .btn-primary:hover { box-shadow: 0 4px 15px var(--primary-glow); transform: translateY(-1px); }
         .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { box-shadow: 0 4px 15px rgba(22,163,74,0.3); }
+        .btn-blue { background: #3b82f6; color: white; }
+        .btn-pink { background: #ec4899; color: white; }
         .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
-        .btn-sm { padding: 6px 10px; font-size: 0.75rem; }
+        .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+        /* SECTIONS */
+        .section { background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+        .section-title { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 16px; font-weight: 700; }
+
+        /* EMAILS LIST in main panel */
+        .emails-preview { background: var(--bg); border-radius: 10px; padding: 16px; margin-bottom: 16px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); }
+        .email-item { padding: 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--warning); }
+        .email-item-date { font-size: 0.7rem; color: var(--muted); }
+        .email-item-subject { font-weight: 600; font-size: 0.9rem; margin: 4px 0; }
+        .email-item-preview { font-size: 0.8rem; color: var(--muted); }
+
+        /* RESPONSE - MUCH BIGGER */
+        .response-section { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 3px solid var(--success); }
+        .response-section textarea {
+            background: #fff;
+            font-size: 1.1rem;
+            min-height: 350px;
+            line-height: 1.8;
+            padding: 20px;
+        }
+
+        /* TEXTAREA */
+        textarea { width: 100%; padding: 16px; background: #fff; border: 2px solid var(--border); border-radius: 10px; color: var(--text); resize: vertical; font-family: inherit; font-size: 1rem; line-height: 1.7; }
+        textarea:focus { outline: none; border-color: var(--primary); }
+
         /* KPI GRID */
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .kpi { background: var(--bg); padding: 10px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
-        .kpi-value { font-size: 1.5rem; font-weight: 700; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; }
+        .kpi { background: var(--bg); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
+        .kpi-value { font-size: 1.6rem; font-weight: 700; }
         .kpi-value.good { color: var(--success); }
         .kpi-value.ok { color: var(--warning); }
         .kpi-value.bad { color: var(--danger); }
-        .kpi-label { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
-
-        /* EMAIL BODY */
-        .email-body { background: var(--bg); padding: 16px; border-radius: 8px; max-height: 300px; overflow-y: auto; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; border: 1px solid var(--border); }
+        .kpi-label { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
 
         /* PHOTOS */
-        .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
-        .photo { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; cursor: pointer; }
-
-        /* TEXTAREA */
-        textarea { width: 100%; padding: 16px; background: #fff; border: 2px solid var(--border); border-radius: 8px; color: var(--text); resize: vertical; min-height: 200px; font-family: inherit; font-size: 1rem; line-height: 1.7; }
-        textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
-        input { padding: 10px; background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; }
-        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
-
-        /* PHYSIQUE ANALYSIS */
-        .physique-section { background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(22,163,74,0.08)); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-        .physique-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 0.95rem; }
-        .physique-row:last-child { border-bottom: none; }
-        .physique-row span:first-child { font-weight: 600; color: var(--primary); }
+        .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+        .photo { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; cursor: pointer; }
 
         /* POINTS */
-        .point { padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 0.95rem; border: 1px solid var(--border); line-height: 1.5; }
-        .point.positive { border-left: 4px solid var(--success); background: rgba(22,163,74,0.08); }
-        .point.negative { border-left: 4px solid var(--warning); background: rgba(217,119,6,0.08); }
+        .point { padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; border: 1px solid var(--border); }
+        .point.positive { border-left: 4px solid var(--success); background: rgba(22,163,74,0.06); }
+        .point.negative { border-left: 4px solid var(--warning); background: rgba(217,119,6,0.06); }
 
         /* LOGIN */
         .login-page { height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
         .login-box { background: var(--bg-card); padding: 40px; border-radius: 16px; width: 360px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         .login-box h2 { margin-bottom: 24px; text-align: center; }
-        .login-box input { width: 100%; margin-bottom: 12px; }
-        .login-box .btn { width: 100%; padding: 12px; }
+        .login-box input { width: 100%; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+        .login-box .btn { width: 100%; padding: 14px; }
 
-        /* HIDDEN */
         .hidden { display: none !important; }
-
-        /* SCROLLBAR */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+        .loading { text-align: center; padding: 40px; color: var(--muted); }
+        .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+        .empty-icon { font-size: 3rem; margin-bottom: 10px; }
 
         /* LIGHTBOX */
         .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; cursor: pointer; }
         .lightbox img { max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; }
 
-        /* LOADING */
-        .loading { text-align: center; padding: 40px; color: var(--muted); }
-        .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* EMPTY STATE */
-        .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
-        .empty-icon { font-size: 3rem; margin-bottom: 10px; }
-
-        /* MODAL EVOLUTION */
+        /* MODAL */
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: var(--bg-card); border-radius: 16px; width: 90%; max-width: 900px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
-        .modal-header h2 { font-size: 1.2rem; }
+        .modal-content { background: var(--bg-card); border-radius: 16px; width: 90%; max-width: 900px; max-height: 85vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
         .modal-body { padding: 24px; }
         .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--muted); }
-        .modal-close:hover { color: var(--text); }
-
-        /* CHART */
-        .chart-container { height: 250px; margin-bottom: 24px; background: var(--bg); border-radius: 12px; padding: 16px; position: relative; }
-        .chart-title { font-weight: 600; margin-bottom: 12px; color: var(--text); }
-        .chart { display: flex; align-items: flex-end; justify-content: space-around; height: 180px; padding: 0 10px; }
-        .chart-bar { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 60px; }
-        .bar { width: 30px; background: linear-gradient(to top, var(--primary), #a78bfa); border-radius: 4px 4px 0 0; transition: height 0.3s; }
-        .bar-label { font-size: 0.65rem; color: var(--muted); margin-top: 6px; text-align: center; }
-        .bar-value { font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; }
-
-        /* EVOLUTION STATS */
-        .evo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .evo-card { background: var(--bg); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); }
-        .evo-card.positive { border-color: var(--success); background: rgba(22,163,74,0.08); }
-        .evo-card.negative { border-color: var(--danger); background: rgba(220,38,38,0.08); }
-        .evo-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
-        .evo-value { font-size: 1.8rem; font-weight: 700; }
-        .evo-value.up { color: var(--success); }
-        .evo-value.down { color: var(--danger); }
-        .evo-diff { font-size: 0.8rem; margin-top: 4px; }
-
-        /* HISTORY TABLE */
-        .history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .history-table th { text-align: left; padding: 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-weight: 600; }
-        .history-table td { padding: 10px; border-bottom: 1px solid var(--border); }
-        .history-table tr:hover { background: var(--bg-hover); }
     </style>
 </head>
 <body>
@@ -181,8 +139,7 @@
             <div class="panel-header">
                 <div class="logo">Achzod Coach</div>
                 <div class="sync-row">
-                    <button class="btn btn-primary btn-sm" onclick="sync()">Sync</button>
-                    <button class="btn btn-sm" style="background:#3b82f6;color:white;" id="btn-evolution" onclick="showEvolution()" disabled>Evolution</button>
+                    <button class="btn btn-primary btn-sm" onclick="sync()">Sync Gmail</button>
                     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
                 </div>
                 <div id="sync-status" style="font-size:0.75rem;color:var(--muted);margin-top:8px;"></div>
@@ -192,36 +149,16 @@
             </div>
         </div>
 
-        <!-- PANEL 2: EMAILS -->
-        <div class="panel">
-            <div class="panel-header">
-                <div style="font-weight:600;" id="emails-title">Emails</div>
-                <div style="font-size:0.75rem;color:var(--muted);" id="emails-count"></div>
+        <!-- PANEL 2: MAIN -->
+        <div class="panel main-panel">
+            <div class="main-header">
+                <div class="main-title" id="main-title">Selectionne un client</div>
+                <div class="main-actions" id="main-actions"></div>
             </div>
-            <div class="panel-content" id="emails-panel">
+            <div class="main-content" id="main-content">
                 <div class="empty">
-                    <div class="empty-icon">📧</div>
-                    <div>Selectionne un client</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- PANEL 3: ANALYSIS -->
-        <div class="panel analysis-panel">
-            <div class="panel-header">
-                <div class="analysis-header">
-                    <div style="font-weight:600;" id="analysis-title">Analyse</div>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-primary btn-sm" id="btn-analyze" onclick="analyze()" disabled>Analyser IA</button>
-                        <button class="btn btn-success btn-sm" id="btn-copy" onclick="copyDraft()" disabled>Copier</button>
-                        <button class="btn btn-sm" style="background:#10b981;color:white;" id="btn-replied" onclick="markReplied()" disabled>✓ Répondu</button>
-                    </div>
-                </div>
-            </div>
-            <div class="panel-content" id="analysis-panel">
-                <div class="empty">
-                    <div class="empty-icon">🤖</div>
-                    <div>Selectionne un email pour l'analyser</div>
+                    <div class="empty-icon">👈</div>
+                    <div>Selectionne un client a gauche pour voir ses emails non repondus</div>
                 </div>
             </div>
         </div>
@@ -232,16 +169,14 @@
         <img id="lightbox-img" src="">
     </div>
 
-    <!-- EVOLUTION MODAL -->
-    <div id="evolution-modal" class="modal hidden" onclick="if(event.target===this)closeEvolution()">
+    <!-- DASHBOARD MODAL -->
+    <div id="dashboard-modal" class="modal hidden" onclick="if(event.target===this)closeDashboard()">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="evo-modal-title">Evolution Client</h2>
-                <button class="modal-close" onclick="closeEvolution()">&times;</button>
+                <h2>Dashboard Client</h2>
+                <button class="modal-close" onclick="closeDashboard()">&times;</button>
             </div>
-            <div class="modal-body" id="evo-modal-body">
-                <div class="loading"><div class="spinner"></div></div>
-            </div>
+            <div class="modal-body" id="dashboard-body"></div>
         </div>
     </div>
 
@@ -249,10 +184,9 @@
 const API = '/api';
 let token = localStorage.getItem('coach_token');
 let currentClient = null;
-let currentEmailId = null;
+let currentEmailIds = [];
 let currentAnalysis = null;
 
-// API
 async function api(endpoint, method = 'GET', data = null) {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (token) opts.headers['Authorization'] = `Bearer ${token}`;
@@ -262,7 +196,6 @@ async function api(endpoint, method = 'GET', data = null) {
     return res.json();
 }
 
-// AUTH
 function showLogin() {
     document.getElementById('login').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
@@ -293,133 +226,116 @@ async function checkAuth() {
 async function loadClients() {
     try {
         const data = await api('/coach/dashboard');
-        // Filtrer: seulement clients avec emails non repondus
-        const clientsWithUnreplied = data.clients.filter(c => c.unread_count > 0 || c.unreplied_count > 0);
+        const clientsWithUnreplied = data.clients.filter(c => (c.unreplied_count || 0) > 0);
 
         const html = clientsWithUnreplied.map(c => `
-            <div class="client unread" onclick="selectClient('${c.email}')">
+            <div class="client" onclick="selectClient('${c.email}')">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div class="client-name">${c.name || c.email.split('@')[0]}</div>
-                    <span class="badge">${c.unread_count || c.unreplied_count || '?'}</span>
+                    <span class="badge">${c.unreplied_count} emails</span>
                 </div>
                 <div class="client-email">${c.email}</div>
                 <div class="client-meta">A repondre</div>
             </div>
         `).join('');
-        document.getElementById('clients-panel').innerHTML = html || '<div class="empty">Tous les clients ont ete repondus! 🎉</div>';
+        document.getElementById('clients-panel').innerHTML = html || '<div class="empty"><div class="empty-icon">🎉</div><div>Tous les clients ont ete repondus!</div></div>';
     } catch(e) { console.error(e); }
 }
 
+// SELECT CLIENT - Load ALL unreplied emails
 async function selectClient(email) {
     currentClient = email;
+    currentEmailIds = [];
+    currentAnalysis = null;
+
     document.querySelectorAll('.client').forEach(el => el.classList.remove('active'));
     event.currentTarget.classList.add('active');
 
-    // Enable evolution button
-    document.getElementById('btn-evolution').disabled = false;
-
     const data = await api(`/coach/client/${encodeURIComponent(email)}`);
-    document.getElementById('emails-title').textContent = data.client.name || email.split('@')[0];
-
-    // Filtrer: seulement les emails RECUS non repondus
+    const clientName = data.client.name || email.split('@')[0];
     const unreplied = data.emails.filter(e => e.direction === 'received' && e.status !== 'replied');
-    document.getElementById('emails-count').textContent = `${unreplied.length} non repondus`;
 
-    const html = unreplied.map(e => `
-        <div class="email ${e.status === 'new' ? 'unread' : ''}" onclick="selectEmail(${e.id})">
-            <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
-            <div class="email-preview">${(e.body || '').substring(0, 100)}</div>
-            <div class="email-date">${formatDate(e.date_sent)}</div>
-        </div>
-    `).join('');
-    document.getElementById('emails-panel').innerHTML = html || '<div class="empty">Tous les emails ont ete repondus!</div>';
+    currentEmailIds = unreplied.map(e => e.id);
 
-    // Reset analysis
-    document.getElementById('analysis-panel').innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><div>Selectionne un email</div></div>';
-    document.getElementById('btn-analyze').disabled = true;
-    document.getElementById('btn-copy').disabled = true;
-}
+    document.getElementById('main-title').textContent = `${clientName} - ${unreplied.length} email(s) a repondre`;
 
-async function selectEmail(emailId) {
-    currentEmailId = emailId;
-    currentAnalysis = null;
-    document.querySelectorAll('.email').forEach(el => el.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    // Actions buttons
+    document.getElementById('main-actions').innerHTML = `
+        <button class="btn btn-primary" onclick="analyzeAll()">Analyser TOUS (${unreplied.length})</button>
+        <button class="btn btn-success" id="btn-copy" onclick="copyDraft()" disabled>Copier</button>
+        <button class="btn btn-blue" onclick="generateDashboard()">Dashboard HTML</button>
+        <button class="btn btn-pink" onclick="markAllReplied()">Marquer Repondu</button>
+    `;
 
-    document.getElementById('analysis-panel').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:10px">Chargement...</div></div>';
+    // Load all email bodies
+    let emailsHtml = '';
+    let allPhotos = [];
 
-    // Load body
-    const loadRes = await api(`/coach/email/${emailId}/load-body`, 'POST');
+    for (const e of unreplied) {
+        const loadRes = await api(`/coach/email/${e.id}/load-body`, 'POST');
+        const dateStr = new Date(e.date_sent).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
 
-    // Show email content + attachments
+        emailsHtml += `
+            <div class="email-item">
+                <div class="email-item-date">${dateStr}</div>
+                <div class="email-item-subject">${e.subject || '(Sans sujet)'}</div>
+                <div class="email-item-preview">${(loadRes.body || '').substring(0, 200)}...</div>
+            </div>
+        `;
+
+        if (loadRes.attachments) {
+            allPhotos = allPhotos.concat(loadRes.attachments.filter(a => a.is_image));
+        }
+    }
+
     let html = `
         <div class="section">
-            <div class="section-title">Email</div>
-            <div class="email-body">${loadRes.body || '(vide)'}</div>
+            <div class="section-title">📧 ${unreplied.length} Email(s) a analyser</div>
+            <div class="emails-preview">${emailsHtml}</div>
         </div>
     `;
 
-    // Photos
-    if (loadRes.attachments && loadRes.attachments.length > 0) {
-        const images = loadRes.attachments.filter(a => a.is_image);
-        if (images.length > 0) {
-            html += `<div class="section">
-                <div class="section-title">Photos (${images.length})</div>
+    if (allPhotos.length > 0) {
+        html += `
+            <div class="section">
+                <div class="section-title">📷 Photos (${allPhotos.length})</div>
                 <div class="photos-grid">
-                    ${images.map(a => `<img class="photo" src="data:${a.content_type};base64,${a.data}" onclick="showLightbox(this.src)">`).join('')}
+                    ${allPhotos.map(a => `<img class="photo" src="data:${a.content_type};base64,${a.data}" onclick="showLightbox(this.src)">`).join('')}
                 </div>
-            </div>`;
-        }
+            </div>
+        `;
     }
 
     html += `
         <div class="section">
-            <div class="section-title purple">Analyse IA</div>
-            <div id="ai-result" style="color:var(--text);font-size:0.95rem;line-height:1.6;">Clique sur "Analyser IA" pour generer l'analyse</div>
+            <div class="section-title purple">🤖 Analyse IA</div>
+            <div id="ai-result">Clique sur "Analyser TOUS" pour generer l'analyse de tous les emails</div>
         </div>
         <div class="section response-section">
-            <div class="section-title" style="color:var(--success);">Reponse a copier</div>
-            <textarea id="draft-text" placeholder="L'IA va generer ta reponse..."></textarea>
+            <div class="section-title" style="color:var(--success);">✉️ REPONSE A ENVOYER</div>
+            <textarea id="draft-text" placeholder="L'IA va generer ta reponse complete ici..."></textarea>
         </div>
     `;
 
-    document.getElementById('analysis-panel').innerHTML = html;
-    document.getElementById('btn-analyze').disabled = false;
-    document.getElementById('btn-replied').disabled = false;
-    document.getElementById('analysis-title').textContent = 'Email #' + emailId;
+    document.getElementById('main-content').innerHTML = html;
 }
 
-async function markReplied() {
-    if (!currentEmailId) return;
-    try {
-        await api(`/coach/email/${currentEmailId}/mark-replied`, 'POST');
-        // Retirer l'email de la liste
-        document.querySelector('.email.active')?.remove();
-        // Reset
-        document.getElementById('analysis-panel').innerHTML = '<div class="empty"><div class="empty-icon">✓</div><div>Email marque comme repondu!</div></div>';
-        document.getElementById('btn-analyze').disabled = true;
-        document.getElementById('btn-copy').disabled = true;
-        document.getElementById('btn-replied').disabled = true;
-        // Recharger la liste des clients
-        loadClients();
-    } catch(e) {
-        alert('Erreur: ' + e.message);
-    }
-}
+// ANALYZE ALL UNREPLIED EMAILS
+async function analyzeAll() {
+    if (!currentClient) return;
 
-async function analyze() {
-    const btn = document.getElementById('btn-analyze');
+    const btn = document.querySelector('.main-actions .btn-primary');
     btn.disabled = true;
-    btn.textContent = 'Analyse...';
-    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Analyse en cours (30-60s)...</div></div>';
+    btn.textContent = 'Analyse en cours...';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Analyse de TOUS les emails (30-60s)...</div></div>';
 
     try {
-        const res = await api(`/coach/email/${currentEmailId}/analyze`, 'POST');
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, 'POST');
         currentAnalysis = res.analysis;
 
         if (!res.success) {
-            document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);">Erreur: ${res.error}</div>`;
-            btn.textContent = 'Analyser IA';
+            document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${res.error}</div>`;
+            btn.textContent = `Analyser TOUS (${currentEmailIds.length})`;
             btn.disabled = false;
             return;
         }
@@ -427,32 +343,23 @@ async function analyze() {
         const a = res.analysis || {};
         let html = '';
 
-        // Resume
-        if (a.resume) {
-            html += `<div style="margin-bottom:16px;line-height:1.6;">${a.resume}</div>`;
+        if (res.emails_count) {
+            html += `<div style="background:var(--success);color:white;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-weight:600;">${res.emails_count} email(s) analyses ensemble</div>`;
         }
 
-        // Analyse Physique
-        if (a.analyse_photos && a.analyse_photos.masse_grasse_estimee) {
-            html += `<div class="physique-section">
-                <div class="section-title purple">Analyse Physique</div>
-                <div class="physique-row"><span>Masse grasse</span><strong>${a.analyse_photos.masse_grasse_estimee}</strong></div>
-                ${a.analyse_photos.description_physique ? `<div style="margin:10px 0;font-size:0.85rem;color:var(--muted);">${a.analyse_photos.description_physique}</div>` : ''}
-                ${a.analyse_photos.points_forts ? `<div class="physique-row"><span>Points forts</span><span>${a.analyse_photos.points_forts.join(', ')}</span></div>` : ''}
-                ${a.analyse_photos.zones_a_travailler ? `<div class="physique-row"><span>A travailler</span><span>${a.analyse_photos.zones_a_travailler.join(', ')}</span></div>` : ''}
-                ${a.analyse_photos.evolution_vs_avant ? `<div style="margin-top:10px;font-size:0.85rem;"><strong>Evolution:</strong> ${a.analyse_photos.evolution_vs_avant}</div>` : ''}
-            </div>`;
+        if (a.resume) {
+            html += `<div style="margin-bottom:20px;line-height:1.7;font-size:1rem;">${a.resume}</div>`;
         }
 
         // KPIs
         if (a.kpis) {
-            html += `<div style="margin-bottom:16px;">
+            html += `<div style="margin-bottom:20px;">
                 <div class="section-title">KPIs</div>
                 <div class="kpi-grid">
                     ${Object.entries(a.kpis).map(([k, v]) => `
                         <div class="kpi">
                             <div class="kpi-value ${v >= 8 ? 'good' : v >= 6 ? 'ok' : 'bad'}">${v}</div>
-                            <div class="kpi-label">${k.replace('_', ' ')}</div>
+                            <div class="kpi-label">${k.replace(/_/g, ' ')}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -461,56 +368,17 @@ async function analyze() {
 
         // Points positifs
         if (a.points_positifs && a.points_positifs.length > 0) {
-            html += `<div style="margin-bottom:16px;">
-                <div class="section-title green">Points positifs</div>
+            html += `<div style="margin-bottom:20px;">
+                <div class="section-title" style="color:var(--success);">Points positifs</div>
                 ${a.points_positifs.map(p => `<div class="point positive">${p}</div>`).join('')}
             </div>`;
         }
 
         // Points a ameliorer
         if (a.points_ameliorer && a.points_ameliorer.length > 0) {
-            html += `<div style="margin-bottom:16px;">
-                <div class="section-title orange">A ameliorer</div>
+            html += `<div style="margin-bottom:20px;">
+                <div class="section-title" style="color:var(--warning);">A ameliorer</div>
                 ${a.points_ameliorer.map(p => `<div class="point negative"><strong>${p.probleme || p}</strong>${p.solution ? ` → ${p.solution}` : ''}</div>`).join('')}
-            </div>`;
-        }
-
-        // Analyse globale (energie, sommeil, stress, etc)
-        if (a.analyse_globale) {
-            const ag = a.analyse_globale;
-            html += `<div style="margin-bottom:16px;">
-                <div class="section-title">Analyse Globale</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                    ${ag.poids_evolution ? `<div class="point"><strong>Poids:</strong> ${ag.poids_evolution}</div>` : ''}
-                    ${ag.energie ? `<div class="point"><strong>Energie:</strong> ${ag.energie}</div>` : ''}
-                    ${ag.sommeil ? `<div class="point"><strong>Sommeil:</strong> ${ag.sommeil}</div>` : ''}
-                    ${ag.stress ? `<div class="point"><strong>Stress:</strong> ${ag.stress}</div>` : ''}
-                    ${ag.digestion ? `<div class="point"><strong>Digestion:</strong> ${ag.digestion}</div>` : ''}
-                    ${ag.mindset ? `<div class="point"><strong>Mindset:</strong> ${ag.mindset}</div>` : ''}
-                </div>
-            </div>`;
-        }
-
-        // Ajustements proposes
-        if (a.ajustements_proposes) {
-            const aj = a.ajustements_proposes;
-            const hasAdjustments = aj.diete || aj.training || aj.supplements || aj.lifestyle;
-            if (hasAdjustments) {
-                html += `<div style="margin-bottom:16px;">
-                    <div class="section-title" style="color:#3b82f6;">Ajustements Proposes</div>
-                    ${aj.diete && aj.diete !== 'null' && aj.diete !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Diete:</strong> ${aj.diete}</div>` : ''}
-                    ${aj.training && aj.training !== 'null' && aj.training !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Training:</strong> ${aj.training}</div>` : ''}
-                    ${aj.supplements && aj.supplements !== 'null' && aj.supplements !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Supplements:</strong> ${aj.supplements}</div>` : ''}
-                    ${aj.lifestyle && aj.lifestyle !== 'null' && aj.lifestyle !== '-' ? `<div class="point" style="border-left-color:#3b82f6;"><strong>Lifestyle:</strong> ${aj.lifestyle}</div>` : ''}
-                </div>`;
-            }
-        }
-
-        // Questions a poser
-        if (a.questions_a_poser && a.questions_a_poser.length > 0 && a.questions_a_poser[0]) {
-            html += `<div style="margin-bottom:16px;">
-                <div class="section-title" style="color:#ec4899;">Questions a poser</div>
-                ${a.questions_a_poser.filter(q => q && q.length > 2).map(q => `<div class="point" style="border-left-color:#ec4899;">${q}</div>`).join('')}
             </div>`;
         }
 
@@ -519,197 +387,93 @@ async function analyze() {
         document.getElementById('btn-copy').disabled = false;
 
     } catch(e) {
-        document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);">Erreur: ${e.message}</div>`;
+        document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${e.message}</div>`;
     }
 
-    btn.textContent = 'Analyser IA';
+    btn.textContent = `Analyser TOUS (${currentEmailIds.length})`;
     btn.disabled = false;
 }
 
-async function sync() {
-    const status = document.getElementById('sync-status');
-    status.textContent = 'Sync...';
+// MARK ALL AS REPLIED
+async function markAllReplied() {
+    if (!currentClient) return;
+    if (!confirm('Marquer TOUS les emails comme repondus?')) return;
+
     try {
-        const res = await api('/coach/gmail/sync', 'POST');
-        status.textContent = `${res.synced} nouveaux`;
+        await api(`/coach/client/${encodeURIComponent(currentClient)}/mark-all-replied`, 'POST');
+        document.getElementById('main-content').innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div>Tous les emails ont ete marques comme repondus!</div></div>';
+        document.getElementById('main-actions').innerHTML = '';
         loadClients();
-        setTimeout(() => status.textContent = '', 3000);
-    } catch(e) { status.textContent = 'Erreur'; }
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+    }
 }
 
+// GENERATE DASHBOARD HTML
+async function generateDashboard() {
+    if (!currentClient) return;
+
+    try {
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/dashboard-html`);
+        if (res.success) {
+            // Show preview in modal
+            document.getElementById('dashboard-body').innerHTML = `
+                <div style="margin-bottom:20px;">
+                    <button class="btn btn-success" onclick="downloadDashboard()">Telecharger HTML</button>
+                    <span style="margin-left:12px;color:var(--muted);">${res.filename}</span>
+                </div>
+                <iframe id="dashboard-preview" srcdoc="${res.html.replace(/"/g, '&quot;')}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px;"></iframe>
+            `;
+            window.dashboardHtml = res.html;
+            window.dashboardFilename = res.filename;
+            document.getElementById('dashboard-modal').classList.remove('hidden');
+        }
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+    }
+}
+
+function downloadDashboard() {
+    const blob = new Blob([window.dashboardHtml], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = window.dashboardFilename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function closeDashboard() {
+    document.getElementById('dashboard-modal').classList.add('hidden');
+}
+
+// SYNC
+async function sync() {
+    const status = document.getElementById('sync-status');
+    status.textContent = 'Sync en cours...';
+    try {
+        const res = await api('/coach/gmail/sync', 'POST');
+        status.textContent = `${res.synced} nouveaux emails`;
+        loadClients();
+        setTimeout(() => status.textContent = '', 5000);
+    } catch(e) { status.textContent = 'Erreur sync'; }
+}
+
+// COPY
 function copyDraft() {
     const text = document.getElementById('draft-text').value;
     navigator.clipboard.writeText(text);
     const btn = document.getElementById('btn-copy');
     btn.textContent = 'Copie!';
-    setTimeout(() => btn.textContent = 'Copier', 1500);
+    setTimeout(() => btn.textContent = 'Copier', 2000);
 }
 
-function formatDate(d) {
-    if (!d) return '';
-    const date = new Date(d);
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-
+// LIGHTBOX
 function showLightbox(src) {
     document.getElementById('lightbox-img').src = src;
     document.getElementById('lightbox').classList.remove('hidden');
 }
 function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
-
-// EVOLUTION MODAL
-async function showEvolution() {
-    if (!currentClient) return;
-    document.getElementById('evolution-modal').classList.remove('hidden');
-    document.getElementById('evo-modal-title').textContent = `Evolution - ${currentClient}`;
-    document.getElementById('evo-modal-body').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:10px">Chargement des donnees...</div></div>';
-
-    try {
-        const data = await api(`/coach/client/${encodeURIComponent(currentClient)}/metrics`);
-        const metrics = data.metrics || [];
-        const evolution = data.evolution || {};
-
-        if (metrics.length === 0) {
-            document.getElementById('evo-modal-body').innerHTML = `
-                <div class="empty">
-                    <div class="empty-icon">📊</div>
-                    <div>Aucune donnee d'evolution pour ce client</div>
-                    <div style="margin-top:12px;font-size:0.85rem;color:var(--muted);">
-                        Les KPIs sont automatiquement enregistres a chaque analyse IA.<br>
-                        Analyse quelques bilans pour voir l'evolution!
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        // Parse full KPIs from notes field
-        const kpiHistory = metrics.map(m => {
-            let kpis = {};
-            try { kpis = JSON.parse(m.notes) || {}; } catch(e) {}
-            return {
-                date: m.date_recorded,
-                ...kpis,
-                energie: m.energie || kpis.energie,
-                sommeil: m.sommeil || kpis.sommeil,
-                adherence: m.adherence || kpis.adherence_training
-            };
-        });
-
-        // Build evolution cards
-        let html = '<div class="evo-grid">';
-        const kpiLabels = {
-            adherence_training: 'Adherence Training',
-            adherence_nutrition: 'Adherence Nutrition',
-            sommeil: 'Sommeil',
-            energie: 'Energie',
-            sante: 'Sante',
-            mindset: 'Mindset',
-            progression: 'Progression'
-        };
-
-        // Show KPIs - with evolution if we have 2+ entries
-        const first = kpiHistory[0];
-        const last = kpiHistory[kpiHistory.length - 1];
-        const hasEvolution = kpiHistory.length >= 2;
-
-        for (const [key, label] of Object.entries(kpiLabels)) {
-            const lastVal = last[key] || 0;
-            let diffHtml = '';
-            let cardClass = '';
-
-            if (hasEvolution) {
-                const firstVal = first[key] || 0;
-                const diff = lastVal - firstVal;
-                const isPositive = diff >= 0;
-                cardClass = isPositive ? 'positive' : 'negative';
-                diffHtml = `<div class="evo-diff">${isPositive ? '+' : ''}${diff} depuis debut</div>`;
-            } else {
-                cardClass = lastVal >= 7 ? 'positive' : lastVal >= 5 ? '' : 'negative';
-                diffHtml = `<div class="evo-diff">1 analyse</div>`;
-            }
-
-            html += `
-                <div class="evo-card ${cardClass}">
-                    <div class="evo-label">${label}</div>
-                    <div class="evo-value ${lastVal >= 7 ? 'up' : lastVal < 5 ? 'down' : ''}">${lastVal}/10</div>
-                    ${diffHtml}
-                </div>
-            `;
-        }
-        html += '</div>';
-
-        // Build chart for main KPIs
-        html += '<div class="chart-container"><div class="chart-title">Evolution des KPIs dans le temps</div><div class="chart">';
-
-        // Show last 10 entries
-        const chartData = kpiHistory.slice(-10);
-        const maxVal = 10;
-
-        chartData.forEach((entry, i) => {
-            const avg = Math.round(((entry.adherence_training || 7) + (entry.energie || 7) + (entry.sommeil || 7) + (entry.progression || 7)) / 4);
-            const height = (avg / maxVal) * 160;
-            const dateStr = new Date(entry.date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
-
-            html += `
-                <div class="chart-bar">
-                    <div class="bar-value">${avg}</div>
-                    <div class="bar" style="height:${height}px;"></div>
-                    <div class="bar-label">${dateStr}</div>
-                </div>
-            `;
-        });
-
-        html += '</div></div>';
-
-        // History table
-        html += `
-            <div style="margin-top:24px;">
-                <h3 style="margin-bottom:12px;">Historique des analyses</h3>
-                <table class="history-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Training</th>
-                            <th>Nutrition</th>
-                            <th>Energie</th>
-                            <th>Sommeil</th>
-                            <th>Mindset</th>
-                            <th>Progression</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        // Reverse to show newest first
-        [...kpiHistory].reverse().forEach(entry => {
-            const dateStr = new Date(entry.date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit', year: '2-digit'});
-            html += `
-                <tr>
-                    <td>${dateStr}</td>
-                    <td>${entry.adherence_training || '-'}</td>
-                    <td>${entry.adherence_nutrition || '-'}</td>
-                    <td>${entry.energie || '-'}</td>
-                    <td>${entry.sommeil || '-'}</td>
-                    <td>${entry.mindset || '-'}</td>
-                    <td>${entry.progression || '-'}</td>
-                </tr>
-            `;
-        });
-
-        html += '</tbody></table></div>';
-
-        document.getElementById('evo-modal-body').innerHTML = html;
-
-    } catch(e) {
-        console.error(e);
-        document.getElementById('evo-modal-body').innerHTML = `<div class="empty"><div class="empty-icon">❌</div><div>Erreur: ${e.message}</div></div>`;
-    }
-}
-
-function closeEvolution() {
-    document.getElementById('evolution-modal').classList.add('hidden');
-}
 
 // INIT
 checkAuth();

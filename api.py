@@ -696,9 +696,109 @@ async def send_magic_link(client_email: str, user: Dict = Depends(get_current_co
 
     return {"success": True, "magic_link": link, "token": token}
 
+@app.post("/api/coach/client/{client_email:path}/analyze-all")
+async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_current_coach)):
+    """Analyze ALL unreplied emails from a client at once"""
+    conn = get_db()
+    c = conn.cursor()
+
+    # Get ALL unreplied emails for this client
+    c.execute('''
+        SELECT * FROM gmail_emails
+        WHERE sender_email = ? AND direction = 'received' AND status != 'replied'
+        ORDER BY date_sent ASC
+    ''', (client_email.lower(),))
+    unreplied_emails = [dict(r) for r in c.fetchall()]
+
+    if not unreplied_emails:
+        conn.close()
+        return {"success": False, "error": "Aucun email non repondu", "analysis": {}, "draft": ""}
+
+    # Get full history for context
+    c.execute('''
+        SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent DESC LIMIT 30
+    ''', (client_email.lower(),))
+    history = [{"date": datetime.fromisoformat(r['date_sent']) if r['date_sent'] else datetime.now(),
+                "direction": r['direction'], "body": r['body']}
+               for r in c.fetchall()]
+
+    # Combine all unreplied emails into one analysis
+    combined_body = ""
+    all_attachments = []
+    email_ids = []
+
+    for email in unreplied_emails:
+        email_ids.append(email['id'])
+        date_str = datetime.fromisoformat(email['date_sent']).strftime("%d/%m/%Y %H:%M") if email.get('date_sent') else "?"
+        combined_body += f"\n\n=== EMAIL DU {date_str} ===\nSujet: {email.get('subject', '(sans sujet)')}\n\n{email.get('body', '')}"
+
+        # Get attachments for each email
+        c.execute('SELECT * FROM email_attachments WHERE email_id = ?', (email['id'],))
+        for att in c.fetchall():
+            att_dict = dict(att)
+            all_attachments.append({
+                "filename": att_dict.get('filename', 'file'),
+                "content_type": att_dict.get('content_type', 'application/octet-stream'),
+                "data": att_dict.get('data', ''),
+                "is_image": att_dict.get('is_image', 0)
+            })
+
+    conn.close()
+
+    # Format combined email for analyzer
+    email_for_analysis = {
+        "date": datetime.fromisoformat(unreplied_emails[-1]['date_sent']) if unreplied_emails[-1].get('date_sent') else datetime.now(),
+        "subject": f"{len(unreplied_emails)} emails a analyser",
+        "body": combined_body,
+        "attachments": all_attachments
+    }
+
+    try:
+        result = analyze_coaching_bilan(email_for_analysis, history, client_email)
+        analysis = result.get('analysis') or {}
+
+        # AUTO-SAVE KPIs
+        if result.get('success') and analysis.get('kpis'):
+            try:
+                conn2 = get_db()
+                c2 = conn2.cursor()
+                kpis = analysis['kpis']
+                c2.execute('''
+                    INSERT INTO client_metrics
+                    (client_email, date_recorded, energie, sommeil, stress, adherence, notes, source, email_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'ai_analysis', ?)
+                ''', (
+                    client_email.lower(),
+                    datetime.now().isoformat(),
+                    kpis.get('energie'),
+                    kpis.get('sommeil'),
+                    10 - kpis.get('mindset', 7),
+                    kpis.get('adherence_training'),
+                    json.dumps(kpis),
+                    email_ids[-1]  # Last email ID
+                ))
+                conn2.commit()
+                conn2.close()
+            except Exception as kpi_err:
+                print(f"[KPI] Error: {kpi_err}")
+
+        return {
+            "success": result.get('success', False),
+            "analysis": analysis,
+            "draft": analysis.get('draft_email', '') if analysis else '',
+            "email_ids": email_ids,
+            "emails_count": len(unreplied_emails),
+            "error": result.get('error', '')
+        }
+    except Exception as e:
+        import traceback
+        print(f"[ANALYZE ERROR] {traceback.format_exc()}")
+        return {"success": False, "analysis": {}, "draft": "", "error": str(e)}
+
+
 @app.post("/api/coach/email/{email_id}/analyze")
 async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach)):
-    """Analyze email with AI"""
+    """Analyze single email with AI (legacy)"""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT * FROM gmail_emails WHERE id = ?', (email_id,))
@@ -710,7 +810,7 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
 
     email_data = dict(row)
 
-    # Get history - charger plus d'emails pour contexte complet
+    # Get history
     c.execute('''
         SELECT * FROM gmail_emails WHERE sender_email = ? ORDER BY date_sent DESC LIMIT 20
     ''', (email_data['sender_email'],))
@@ -718,23 +818,20 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
                 "direction": r['direction'], "body": r['body']}
                for r in c.fetchall() if r['id'] != email_id]
 
-    # Get REAL attachments with data from database
     c.execute('SELECT * FROM email_attachments WHERE email_id = ?', (email_id,))
     attachments_rows = c.fetchall()
     conn.close()
 
-    # Build attachments list with actual data for analyzer
     attachments = []
     for att in attachments_rows:
         att_dict = dict(att)
         attachments.append({
             "filename": att_dict.get('filename', 'file'),
             "content_type": att_dict.get('content_type', 'application/octet-stream'),
-            "data": att_dict.get('data', ''),  # base64 data
+            "data": att_dict.get('data', ''),
             "is_image": att_dict.get('is_image', 0)
         })
 
-    # Format for analyzer
     email_for_analysis = {
         "date": datetime.fromisoformat(email_data['date_sent']) if email_data.get('date_sent') else datetime.now(),
         "subject": email_data.get('subject', ''),
@@ -744,9 +841,8 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
 
     try:
         result = analyze_coaching_bilan(email_for_analysis, history, email_data['sender_email'])
-        analysis = result.get('analysis') or {}  # Handle None case
+        analysis = result.get('analysis') or {}
 
-        # AUTO-SAVE KPIs to client_metrics for evolution tracking
         if result.get('success') and analysis.get('kpis'):
             try:
                 conn2 = get_db()
@@ -761,16 +857,15 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
                     email_data.get('date_sent') or datetime.now().isoformat(),
                     kpis.get('energie'),
                     kpis.get('sommeil'),
-                    10 - kpis.get('mindset', 7),  # Convert mindset to stress (inverse)
+                    10 - kpis.get('mindset', 7),
                     kpis.get('adherence_training'),
-                    json.dumps(kpis),  # Store full KPIs in notes
+                    json.dumps(kpis),
                     email_id
                 ))
                 conn2.commit()
                 conn2.close()
-                print(f"[KPI] Saved KPIs for {email_data['sender_email']}")
             except Exception as kpi_err:
-                print(f"[KPI] Error saving: {kpi_err}")
+                print(f"[KPI] Error: {kpi_err}")
 
         return {
             "success": result.get('success', False),
@@ -780,14 +875,8 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
         }
     except Exception as e:
         import traceback
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"[ANALYZE ERROR] {error_detail}")
-        return {
-            "success": False,
-            "analysis": {},
-            "draft": "",
-            "error": f"Erreur analyse: {str(e)}"
-        }
+        print(f"[ANALYZE ERROR] {traceback.format_exc()}")
+        return {"success": False, "analysis": {}, "draft": "", "error": str(e)}
 
 @app.post("/api/coach/email/{email_id}/mark-replied")
 async def mark_email_replied(email_id: int, user: Dict = Depends(get_current_coach)):
@@ -799,6 +888,168 @@ async def mark_email_replied(email_id: int, user: Dict = Depends(get_current_coa
     conn.commit()
     conn.close()
     return {"success": True}
+
+@app.post("/api/coach/client/{client_email:path}/mark-all-replied")
+async def mark_all_replied(client_email: str, user: Dict = Depends(get_current_coach)):
+    """Mark ALL unreplied emails from client as replied"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE gmail_emails SET status = 'replied', replied_at = ?
+        WHERE sender_email = ? AND direction = 'received' AND status != 'replied'
+    """, (datetime.now().isoformat(), client_email.lower()))
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "marked": updated}
+
+@app.get("/api/coach/client/{client_email:path}/dashboard-html")
+async def generate_client_dashboard_html(client_email: str, user: Dict = Depends(get_current_coach)):
+    """Generate beautiful HTML dashboard for client to send as attachment"""
+    conn = get_db()
+    c = conn.cursor()
+
+    # Get client info
+    c.execute('SELECT * FROM clients WHERE email = ?', (client_email.lower(),))
+    client_row = c.fetchone()
+    client = dict(client_row) if client_row else {"email": client_email, "name": client_email.split('@')[0]}
+
+    # Get all KPI history
+    c.execute('''
+        SELECT * FROM client_metrics WHERE client_email = ? ORDER BY date_recorded ASC
+    ''', (client_email.lower(),))
+    metrics = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    client_name = client.get('name') or client_email.split('@')[0]
+    start_date = client.get('date_debut', datetime.now().isoformat())[:10] if client.get('date_debut') else "N/A"
+
+    # Parse KPIs from metrics
+    kpi_data = []
+    for m in metrics:
+        try:
+            kpis = json.loads(m.get('notes', '{}')) if m.get('notes') else {}
+            kpi_data.append({
+                "date": m['date_recorded'][:10] if m.get('date_recorded') else "?",
+                **kpis
+            })
+        except:
+            pass
+
+    # Calculate evolution
+    evolution_html = ""
+    if len(kpi_data) >= 2:
+        first = kpi_data[0]
+        last = kpi_data[-1]
+        kpi_names = ['adherence_training', 'adherence_nutrition', 'energie', 'sommeil', 'mindset', 'progression']
+        kpi_labels = {'adherence_training': 'Training', 'adherence_nutrition': 'Nutrition', 'energie': 'Energie', 'sommeil': 'Sommeil', 'mindset': 'Mindset', 'progression': 'Progression'}
+
+        cards = []
+        for kpi in kpi_names:
+            first_val = first.get(kpi, 0) or 0
+            last_val = last.get(kpi, 0) or 0
+            diff = last_val - first_val
+            color = "#22c55e" if diff >= 0 else "#ef4444"
+            arrow = "↑" if diff >= 0 else "↓"
+            cards.append(f'''
+                <div style="background:linear-gradient(135deg,{color}22,{color}11);border:2px solid {color};border-radius:16px;padding:20px;text-align:center;">
+                    <div style="font-size:0.9rem;color:#666;margin-bottom:8px;">{kpi_labels.get(kpi, kpi)}</div>
+                    <div style="font-size:2.5rem;font-weight:800;color:{color};">{last_val}/10</div>
+                    <div style="font-size:1rem;color:{color};margin-top:8px;">{arrow} {'+' if diff >= 0 else ''}{diff} pts</div>
+                </div>
+            ''')
+        evolution_html = f'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0;">{"".join(cards)}</div>'
+
+    # Build chart data
+    chart_bars = ""
+    if kpi_data:
+        for entry in kpi_data[-12:]:  # Last 12 entries
+            avg = sum([entry.get(k, 7) or 7 for k in ['adherence_training', 'energie', 'sommeil', 'progression']]) / 4
+            height = int((avg / 10) * 150)
+            chart_bars += f'''
+                <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                    <div style="font-size:0.8rem;font-weight:600;margin-bottom:4px;">{avg:.1f}</div>
+                    <div style="width:30px;height:{height}px;background:linear-gradient(to top,#7c3aed,#a78bfa);border-radius:6px 6px 0 0;"></div>
+                    <div style="font-size:0.7rem;color:#888;margin-top:6px;">{entry['date'][5:10]}</div>
+                </div>
+            '''
+
+    # Generate HTML
+    html = f'''<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Evolution - {client_name}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; padding: 40px 20px; }}
+        .container {{ max-width: 900px; margin: 0 auto; }}
+        .header {{ text-align: center; margin-bottom: 40px; }}
+        .logo {{ font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #7c3aed, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }}
+        .subtitle {{ color: #94a3b8; font-size: 1.1rem; }}
+        .card {{ background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-radius: 20px; padding: 30px; margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.1); }}
+        .card-title {{ font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }}
+        .card-title span {{ font-size: 1.5rem; }}
+        .stats-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }}
+        .stat {{ background: rgba(124,58,237,0.2); border-radius: 12px; padding: 16px; text-align: center; }}
+        .stat-value {{ font-size: 1.8rem; font-weight: 800; color: #a78bfa; }}
+        .stat-label {{ font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }}
+        .chart {{ display: flex; align-items: flex-end; justify-content: space-around; height: 180px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px; }}
+        .footer {{ text-align: center; margin-top: 40px; color: #64748b; font-size: 0.9rem; }}
+        .badge {{ display: inline-block; background: linear-gradient(135deg, #7c3aed, #ec4899); padding: 8px 20px; border-radius: 50px; font-weight: 600; font-size: 0.9rem; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">ACHZOD COACHING</div>
+            <div class="subtitle">Dashboard Evolution Personnel</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span>👤</span> {client_name}</div>
+            <div class="stats-grid">
+                <div class="stat">
+                    <div class="stat-value">{len(kpi_data)}</div>
+                    <div class="stat-label">Bilans analyses</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{start_date}</div>
+                    <div class="stat-label">Debut coaching</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{kpi_data[-1].get('progression', 7) if kpi_data else '-'}/10</div>
+                    <div class="stat-label">Progression actuelle</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{kpi_data[-1].get('adherence_training', 7) if kpi_data else '-'}/10</div>
+                    <div class="stat-label">Adherence</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span>📈</span> Evolution des KPIs</div>
+            {evolution_html if evolution_html else '<p style="color:#94a3b8;">Pas assez de donnees pour afficher l\'evolution</p>'}
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span>📊</span> Progression dans le temps</div>
+            <div class="chart">
+                {chart_bars if chart_bars else '<p style="color:#94a3b8;text-align:center;width:100%;">Analyse des bilans pour voir la progression</p>'}
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="badge">Keep pushing! 💪</div>
+            <p style="margin-top:16px;">Genere le {datetime.now().strftime("%d/%m/%Y")} • achzodcoaching.com</p>
+        </div>
+    </div>
+</body>
+</html>'''
+
+    return {"success": True, "html": html, "filename": f"dashboard_{client_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.html"}
 
 class RegenerateRequest(BaseModel):
     analysis: Dict = {}
