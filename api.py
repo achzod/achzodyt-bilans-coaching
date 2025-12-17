@@ -719,14 +719,29 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
     history = [{"date": datetime.fromisoformat(r['date_sent']) if r['date_sent'] else datetime.now(),
                 "direction": r['direction'], "body": r['body']}
                for r in c.fetchall() if r['id'] != email_id]
+
+    # Get REAL attachments with data from database
+    c.execute('SELECT * FROM email_attachments WHERE email_id = ?', (email_id,))
+    attachments_rows = c.fetchall()
     conn.close()
+
+    # Build attachments list with actual data for analyzer
+    attachments = []
+    for att in attachments_rows:
+        att_dict = dict(att)
+        attachments.append({
+            "filename": att_dict.get('filename', 'file'),
+            "content_type": att_dict.get('content_type', 'application/octet-stream'),
+            "data": att_dict.get('data', ''),  # base64 data
+            "is_image": att_dict.get('is_image', 0)
+        })
 
     # Format for analyzer
     email_for_analysis = {
         "date": datetime.fromisoformat(email_data['date_sent']) if email_data.get('date_sent') else datetime.now(),
         "subject": email_data.get('subject', ''),
         "body": email_data.get('body', ''),
-        "attachments": json.loads(email_data.get('attachments_json', '[]'))
+        "attachments": attachments
     }
 
     result = analyze_coaching_bilan(email_for_analysis, history, email_data['sender_email'])
@@ -734,7 +749,8 @@ async def analyze_email_ai(email_id: int, user: Dict = Depends(get_current_coach
     return {
         "success": result.get('success', False),
         "analysis": result.get('analysis', {}),
-        "draft": result.get('analysis', {}).get('draft_email', '')
+        "draft": result.get('analysis', {}).get('draft_email', ''),
+        "error": result.get('error', '')
     }
 
 @app.post("/api/coach/email/{email_id}/mark-replied")

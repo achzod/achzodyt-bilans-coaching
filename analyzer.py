@@ -12,6 +12,14 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 from PIL import Image
 
+# Excel support
+try:
+    import openpyxl
+    EXCEL_SUPPORT = True
+except ImportError:
+    EXCEL_SUPPORT = False
+    print("Warning: openpyxl not installed, Excel parsing disabled")
+
 load_dotenv()
 
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -71,15 +79,67 @@ def detect_image_type(b64_data: str) -> Optional[str]:
     return None
 
 
+def parse_excel_content(b64_data: str, filename: str = "file.xlsx") -> str:
+    """Parse Excel file and return text content for AI analysis"""
+    if not EXCEL_SUPPORT:
+        return f"[Fichier Excel: {filename} - openpyxl non installe]"
+
+    try:
+        # Decode base64 to bytes
+        excel_bytes = base64.b64decode(b64_data)
+        excel_file = io.BytesIO(excel_bytes)
+
+        # Load workbook
+        wb = openpyxl.load_workbook(excel_file, data_only=True)
+
+        result_parts = [f"=== CONTENU FICHIER EXCEL: {filename} ==="]
+
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            result_parts.append(f"\n--- Feuille: {sheet_name} ---")
+
+            rows_content = []
+            for row in sheet.iter_rows(values_only=True):
+                # Filter out completely empty rows
+                if any(cell is not None for cell in row):
+                    # Convert cells to strings, handle None
+                    row_str = " | ".join(str(cell) if cell is not None else "" for cell in row)
+                    rows_content.append(row_str)
+
+            if rows_content:
+                result_parts.extend(rows_content[:100])  # Limit rows per sheet
+                if len(rows_content) > 100:
+                    result_parts.append(f"... ({len(rows_content) - 100} lignes supplementaires)")
+            else:
+                result_parts.append("(Feuille vide)")
+
+        wb.close()
+        return "\n".join(result_parts)
+
+    except Exception as e:
+        print(f"Erreur parsing Excel {filename}: {e}")
+        return f"[Erreur lecture Excel {filename}: {str(e)}]"
+
+
 def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     history_text = _build_history_context(conversation_history)
-    photos = [att for att in current_email.get("attachments", []) if att["content_type"].startswith("image/")]
-    pdfs = [att for att in current_email.get("attachments", []) if "pdf" in att["content_type"].lower()]
+    attachments = current_email.get("attachments", [])
+    photos = [att for att in attachments if att.get("content_type", "").startswith("image/")]
+    pdfs = [att for att in attachments if "pdf" in att.get("content_type", "").lower()]
+    excels = [att for att in attachments if any(ext in att.get("filename", "").lower() for ext in ['.xlsx', '.xls']) or
+              any(x in att.get("content_type", "").lower() for x in ['spreadsheet', 'excel'])]
 
     content = []
 
+    # Parse Excel files first to include in prompt
+    excel_content = ""
+    for excel_att in excels:
+        if excel_att.get("data"):
+            parsed = parse_excel_content(excel_att["data"], excel_att.get("filename", "fichier.xlsx"))
+            excel_content += "\n\n" + parsed
+
     date_str = current_email["date"].strftime("%d/%m/%Y %H:%M") if current_email.get("date") else "N/A"
-    
+
     prompt = f"""Tu es Achzod, coach de HAUT NIVEAU avec 10+ ans en transformation physique et optimisation hormonale.
 
 REGLES STRICTES:
@@ -100,7 +160,8 @@ Sujet: {current_email.get("subject", "Sans sujet")}
 Message du client:
 {current_email.get("body", "")}
 
-Pieces jointes: {len(photos)} photo(s), {len(pdfs)} PDF(s)
+Pieces jointes: {len(photos)} photo(s), {len(pdfs)} PDF(s), {len(excels)} Excel(s)
+{excel_content if excel_content else ""}
 
 CE QUE TU DOIS FAIRE:
 
