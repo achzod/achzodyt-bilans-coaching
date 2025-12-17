@@ -14,6 +14,30 @@ load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
+def generate_improve_list(items):
+    """Helper pour generer la liste des points a ameliorer"""
+    html = ""
+    for item in items[:5]:
+        if isinstance(item, dict):
+            priority = item.get("priority", "medium")
+            priority_class = priority.replace("haute", "high").replace("moyenne", "medium").replace("basse", "low")
+            area = item.get("area", str(item))
+            html += f'<li><span class="badge badge-{priority_class}">{priority}</span><span>{area}</span></li>'
+        else:
+            html += f'<li><span>{item}</span></li>'
+    return html if html else '<li>Aucun point a ameliorer</li>'
+
+
+def generate_list_items(items, icon="✓", default="Aucune donnee", limit=5):
+    """Helper generique pour generer des items de liste HTML"""
+    if not items:
+        return f'<li><span class="list-icon">{icon}</span><span>{default}</span></li>'
+    html = ""
+    for item in items[:limit]:
+        html += f'<li><span class="list-icon">{icon}</span><span>{item}</span></li>'
+    return html
+
+
 def generate_client_dashboard(client_email: str, conversation_history: List[Dict], analyses: List[Dict] = None) -> str:
     """
     Genere un dashboard HTML complet d'evolution du client
@@ -543,7 +567,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Victoires</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">✅</span><span>{achievement}</span></li>' for achievement in data.get("key_achievements", ["Aucune donnee"])[:5]])}
+                    {generate_list_items(data.get("key_achievements", []), "✅", "Aucune victoire", 5)}
                 </ul>
             </div>
 
@@ -554,7 +578,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Points Forts</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">💪</span><span>{strength}</span></li>' for strength in data.get("current_strengths", ["Aucune donnee"])[:5]])}
+                    {generate_list_items(data.get("current_strengths", []), "💪", "Aucun point fort", 5)}
                 </ul>
             </div>
 
@@ -575,7 +599,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     </div>
                 </div>
                 <ul class="list" style="margin-top: 15px;">
-                    {"".join([f'<li><span class="list-icon">✓</span><span>{s}</span></li>' for s in data.get("nutrition_habits", {}).get("strengths", [])[:3]])}
+                    {generate_list_items(data.get("nutrition_habits", {}).get("strengths", []), "✓", "Aucune donnee", 3)}
                 </ul>
             </div>
 
@@ -623,7 +647,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                 </div>
                 <p style="font-weight: 600; margin-bottom: 10px;">Changements visibles:</p>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">👁️</span><span>{change}</span></li>' for change in data.get("photos_analysis", {}).get("visible_changes", ["Aucune donnee"])[:4]])}
+                    {generate_list_items(data.get("photos_analysis", {}).get("visible_changes", []), "👁️", "Aucun changement", 4)}
                 </ul>
             </div>
 
@@ -648,10 +672,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Points a Ameliorer</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'''<li>
-                        <span class="badge badge-{item.get("priority", "medium").replace("haute", "high").replace("moyenne", "medium").replace("basse", "low")}">{item.get("priority", "")}</span>
-                        <span>{item.get("area", item) if isinstance(item, dict) else item}</span>
-                    </li>''' for item in data.get("areas_to_improve", [])[:5]])}
+                    {generate_improve_list(data.get("areas_to_improve", []))}
                 </ul>
             </div>
 
@@ -678,7 +699,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Recommandations du Coach</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">➡️</span><span style="font-weight: 500;">{rec}</span></li>' for rec in data.get("coach_recommendations", ["Aucune recommandation"])[:6]])}
+                    {generate_list_items(data.get("coach_recommendations", []), "➡️", "Aucune recommandation", 6)}
                 </ul>
             </div>
         </div>
