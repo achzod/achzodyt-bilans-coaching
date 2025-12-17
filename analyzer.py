@@ -200,10 +200,10 @@ def call_gpt4(prompt: str, images: list) -> Dict:
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
-    """Appel Gemini 2.0 Flash via REST API"""
+    """Appel Gemini 3.0 Flash via REST API"""
     try:
-        # Gemini 2.0 Flash Experimental - dernier modele dispo via API key
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={GOOGLE_API_KEY}"
+        # Gemini 3.0 Flash - Dec 2025
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key={GOOGLE_API_KEY}"
 
         # Build parts
         parts = [{"text": prompt}]
@@ -222,12 +222,12 @@ def call_gemini(prompt: str, images: list) -> Dict:
 
         if "candidates" in data and data["candidates"]:
             text = data["candidates"][0]["content"]["parts"][0]["text"]
-            return {"success": True, "text": text, "model": "Gemini-2.0-Flash"}
+            return {"success": True, "text": text, "model": "Gemini-3.0-Flash"}
         else:
             error = data.get("error", {}).get("message", "Unknown error")
-            return {"success": False, "error": error, "model": "Gemini-2.0-Flash"}
+            return {"success": False, "error": error, "model": "Gemini-3.0-Flash"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "Gemini-2.0-Flash"}
+        return {"success": False, "error": str(e), "model": "Gemini-3.0-Flash"}
 
 
 def parse_json_response(response_text: str) -> Dict:
