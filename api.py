@@ -735,6 +735,12 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
     combined_body = f"=== DEBUT COACHING: {first_date} ===\n"
     combined_body += f"=== NOMBRE TOTAL D'EMAILS DEPUIS JOUR 1: {len(all_emails)} ===\n"
 
+    # CRUCIAL: Inclure le PREMIER EMAIL pour avoir le poids de depart!
+    if first_email and first_email.get('body'):
+        combined_body += f"\n\n=== PREMIER EMAIL (JOUR 1 - {first_date}) - DONNEES DE DEPART ===\n"
+        combined_body += first_email.get('body', '')[:2000]
+        combined_body += "\n=== FIN PREMIER EMAIL ===\n"
+
     all_attachments = []
     email_ids = []
 

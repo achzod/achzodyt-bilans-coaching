@@ -170,9 +170,15 @@ CONSEILS ADAPTES AU PROFIL (TRES IMPORTANT):
 DONNEES: {len(photos)} photos actuelles, {len(excels)} Excel
 {excel_content[:2000] if excel_content else ""}
 
+EXTRACTION DES DONNEES (TRES IMPORTANT - LIS BIEN L'HISTORIQUE):
+1. Trouve le POIDS DE DEPART dans le PREMIER email (cherche "Xkg", "X kg", "poids X")
+2. Trouve le POIDS ACTUEL dans le bilan actuel
+3. Calcule la VRAIE difference (poids actuel - poids depart)
+4. NE JAMAIS INVENTER de donnees! Si tu ne trouves pas le poids de depart, dis-le.
+
 ANALYSE OBLIGATOIRE:
 1. PHYSIQUE ACTUEL: masse grasse % HONNETE (voir guide), description zones
-2. EVOLUTION DEPUIS JOUR 1: Compare avec le DEBUT du coaching! Quels progres? Perte gras? Gain muscle?
+2. EVOLUTION DEPUIS JOUR 1: Compare avec le DEBUT du coaching! UTILISE LE VRAI POIDS DE DEPART!
 3. Ce qui reste pour l'objectif
 
 EMAIL HTML (format OBLIGATOIRE):
