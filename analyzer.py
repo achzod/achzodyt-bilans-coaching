@@ -7,10 +7,10 @@ import base64
 import json
 import io
 import re
+import requests
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
-import google.generativeai as genai
 from dotenv import load_dotenv
 from PIL import Image
 
@@ -26,7 +26,7 @@ load_dotenv()
 
 # Clients IA
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=55.0)
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 MAX_IMAGE_SIZE = 4 * 1024 * 1024
 
@@ -200,20 +200,34 @@ def call_gpt4(prompt: str, images: list) -> Dict:
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
-    """Appel Gemini 3 Pro Preview (dernier modele Google - Dec 2025)"""
+    """Appel Gemini via REST API (bypass SDK issues)"""
     try:
-        model = genai.GenerativeModel('gemini-3-pro-preview')  # Gemini 3 Pro Preview - Top tier Google (Dec 2025)
+        # Use gemini-1.5-flash for reliability
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GOOGLE_API_KEY}"
 
-        # Construire le contenu
-        parts = [prompt]
+        # Build parts
+        parts = [{"text": prompt}]
         for img_data, img_type in images:
-            img_bytes = base64.b64decode(img_data)
-            parts.append({"mime_type": img_type, "data": img_bytes})
+            parts.append({
+                "inline_data": {
+                    "mime_type": img_type,
+                    "data": img_data
+                }
+            })
 
-        response = model.generate_content(parts)
-        return {"success": True, "text": response.text, "model": "Gemini-3-Pro"}
+        payload = {"contents": [{"parts": parts}]}
+
+        response = requests.post(url, json=payload, timeout=120)
+        data = response.json()
+
+        if "candidates" in data and data["candidates"]:
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            return {"success": True, "text": text, "model": "Gemini-1.5-Flash"}
+        else:
+            error = data.get("error", {}).get("message", "Unknown error")
+            return {"success": False, "error": error, "model": "Gemini-1.5-Flash"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "Gemini-3-Pro"}
+        return {"success": False, "error": str(e), "model": "Gemini-1.5-Flash"}
 
 
 def parse_json_response(response_text: str) -> Dict:
