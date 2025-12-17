@@ -29,8 +29,127 @@ from models import (
 # Import AI analyzer
 from analyzer import analyze_coaching_bilan
 
+# Import Email Reader for Gmail sync
+from email_reader import EmailReader
+
 # Init DB
 init_platform_db()
+
+# Init Gmail emails table
+def init_gmail_emails_table():
+    """Create table for storing synced Gmail emails"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS gmail_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_email TEXT NOT NULL,
+            client_id INTEGER,
+            message_id TEXT UNIQUE,
+            direction TEXT NOT NULL,
+            from_address TEXT,
+            to_address TEXT,
+            subject TEXT,
+            body TEXT,
+            date_sent TIMESTAMP,
+            has_attachments INTEGER DEFAULT 0,
+            attachments_json TEXT,
+            is_bilan INTEGER DEFAULT 0,
+            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES users(id)
+        )
+    ''')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_gmail_client ON gmail_emails(client_email)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_gmail_date ON gmail_emails(date_sent)')
+    conn.commit()
+    conn.close()
+
+init_gmail_emails_table()
+
+def save_gmail_email(client_email: str, client_id: int, email_data: Dict) -> bool:
+    """Save a Gmail email to database"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # Check if already exists
+        c.execute('SELECT id FROM gmail_emails WHERE message_id = ?', (email_data.get('message_id', ''),))
+        if c.fetchone():
+            conn.close()
+            return False  # Already exists
+
+        attachments = email_data.get('attachments', [])
+        c.execute('''
+            INSERT INTO gmail_emails
+            (client_email, client_id, message_id, direction, from_address, to_address,
+             subject, body, date_sent, has_attachments, attachments_json, is_bilan)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            client_email,
+            client_id,
+            email_data.get('message_id', f"gen_{datetime.now().timestamp()}"),
+            email_data.get('direction', 'received'),
+            email_data.get('from', ''),
+            email_data.get('to', ''),
+            email_data.get('subject', ''),
+            email_data.get('body', ''),
+            email_data.get('date').isoformat() if email_data.get('date') else datetime.now().isoformat(),
+            1 if attachments else 0,
+            json.dumps(attachments) if attachments else '[]',
+            1 if email_data.get('is_potential_bilan') else 0
+        ))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error saving email: {e}")
+        conn.close()
+        return False
+
+def get_client_gmail_emails(client_email: str = None, client_id: int = None, limit: int = 100) -> List[Dict]:
+    """Get Gmail emails for a client"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    if client_id:
+        c.execute('''
+            SELECT * FROM gmail_emails
+            WHERE client_id = ?
+            ORDER BY date_sent DESC
+            LIMIT ?
+        ''', (client_id, limit))
+    elif client_email:
+        c.execute('''
+            SELECT * FROM gmail_emails
+            WHERE client_email = ?
+            ORDER BY date_sent DESC
+            LIMIT ?
+        ''', (client_email.lower(), limit))
+    else:
+        c.execute('SELECT * FROM gmail_emails ORDER BY date_sent DESC LIMIT ?', (limit,))
+
+    rows = c.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+def get_all_gmail_emails_grouped() -> Dict[str, List[Dict]]:
+    """Get all emails grouped by client"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM gmail_emails ORDER BY client_email, date_sent DESC')
+    rows = c.fetchall()
+    conn.close()
+
+    grouped = {}
+    for row in rows:
+        email = row['client_email']
+        if email not in grouped:
+            grouped[email] = []
+        grouped[email].append(dict(row))
+
+    return grouped
 
 # FastAPI App
 app = FastAPI(
@@ -516,6 +635,168 @@ def _format_bilan_as_text(bilan: Dict) -> str:
         parts.append(f"Notes: {bilan['notes_libres']}")
 
     return "\n".join(parts)
+
+
+# ============ GMAIL SYNC ROUTES ============
+
+@app.post("/api/coach/gmail/sync")
+async def sync_gmail_emails(user: Dict = Depends(get_current_coach), days: int = 90):
+    """
+    Sync all emails from Gmail for all registered clients.
+    Fetches emails from achzodyt@gmail.com and coaching@achzodcoaching.com
+    """
+    clients = get_all_clients()
+    if not clients:
+        return {"success": True, "message": "Aucun client enregistre", "synced": 0}
+
+    reader = EmailReader()
+    total_synced = 0
+    results = []
+
+    for client in clients:
+        client_email = client['email'].lower()
+        client_id = client['id']
+
+        try:
+            # Get conversation history for this client
+            emails = reader.get_conversation_history(client_email, days)
+
+            synced_count = 0
+            for email_data in emails:
+                if save_gmail_email(client_email, client_id, email_data):
+                    synced_count += 1
+
+            total_synced += synced_count
+            results.append({
+                "client": client['name'],
+                "email": client_email,
+                "found": len(emails),
+                "synced": synced_count
+            })
+        except Exception as e:
+            results.append({
+                "client": client['name'],
+                "email": client_email,
+                "error": str(e)
+            })
+
+    reader.disconnect()
+
+    return {
+        "success": True,
+        "total_synced": total_synced,
+        "clients": results
+    }
+
+
+@app.post("/api/coach/gmail/sync/{client_id}")
+async def sync_client_gmail(client_id: int, user: Dict = Depends(get_current_coach), days: int = 90):
+    """Sync Gmail emails for a specific client"""
+    client = get_user_by_id(client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client non trouve")
+
+    client_email = client['email'].lower()
+
+    reader = EmailReader()
+    try:
+        emails = reader.get_conversation_history(client_email, days)
+
+        synced_count = 0
+        for email_data in emails:
+            if save_gmail_email(client_email, client_id, email_data):
+                synced_count += 1
+
+        reader.disconnect()
+
+        return {
+            "success": True,
+            "client": client['name'],
+            "email": client_email,
+            "found": len(emails),
+            "synced": synced_count
+        }
+    except Exception as e:
+        reader.disconnect()
+        raise HTTPException(status_code=500, detail=f"Erreur sync: {str(e)}")
+
+
+@app.get("/api/coach/gmail/emails")
+async def get_all_emails(user: Dict = Depends(get_current_coach), limit: int = 200):
+    """Get all synced Gmail emails for coach view"""
+    emails = get_client_gmail_emails(limit=limit)
+    grouped = get_all_gmail_emails_grouped()
+
+    return {
+        "emails": emails,
+        "by_client": grouped,
+        "total": len(emails)
+    }
+
+
+@app.get("/api/coach/gmail/client/{client_id}")
+async def get_client_emails(client_id: int, user: Dict = Depends(get_current_coach), limit: int = 100):
+    """Get Gmail emails for a specific client"""
+    client = get_user_by_id(client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client non trouve")
+
+    emails = get_client_gmail_emails(client_id=client_id, limit=limit)
+
+    # Separate sent vs received
+    received = [e for e in emails if e['direction'] == 'received']
+    sent = [e for e in emails if e['direction'] == 'sent']
+
+    return {
+        "client": client,
+        "emails": emails,
+        "received": received,
+        "sent": sent,
+        "total": len(emails)
+    }
+
+
+@app.post("/api/coach/gmail/email/{email_id}/analyze")
+async def analyze_email(email_id: int, user: Dict = Depends(get_current_coach)):
+    """Analyze a Gmail email with AI"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM gmail_emails WHERE id = ?', (email_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Email non trouve")
+
+    email_data = dict(row)
+
+    # Get client history
+    client_emails = get_client_gmail_emails(client_email=email_data['client_email'], limit=20)
+    history = [
+        {
+            "date": datetime.fromisoformat(e['date_sent']) if e.get('date_sent') else datetime.now(),
+            "direction": e['direction'],
+            "body": e['body']
+        }
+        for e in client_emails if e['id'] != email_id
+    ]
+
+    # Format for analyzer
+    email_for_analysis = {
+        "date": datetime.fromisoformat(email_data['date_sent']) if email_data.get('date_sent') else datetime.now(),
+        "subject": email_data.get('subject', ''),
+        "body": email_data.get('body', ''),
+        "attachments": json.loads(email_data.get('attachments_json', '[]'))
+    }
+
+    result = analyze_coaching_bilan(email_for_analysis, history, email_data['client_email'])
+
+    return {
+        "success": result.get('success', False),
+        "analysis": result.get('analysis', {}),
+        "draft": result.get('analysis', {}).get('draft_email', '')
+    }
 
 
 # ============ FILE UPLOAD ============

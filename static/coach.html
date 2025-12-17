@@ -6,12 +6,7 @@
     <title>Achzod - Dashboard Coach</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --primary: #9990EA;
             --primary-dark: #7B71D9;
@@ -26,15 +21,12 @@
             --danger: #FF6B6B;
             --border: rgba(255,255,255,0.1);
         }
-
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-card) 50%, var(--bg-dark) 100%);
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark), var(--bg-card), var(--bg-dark));
             color: var(--text);
             min-height: 100vh;
         }
-
-        /* Navbar */
         .navbar {
             background: var(--bg-card);
             border-bottom: 1px solid var(--border);
@@ -46,7 +38,6 @@
             justify-content: space-between;
             align-items: center;
         }
-
         .navbar-brand {
             font-size: 1.4rem;
             font-weight: 700;
@@ -54,46 +45,27 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
-        .navbar-right {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        /* Main Layout */
+        .navbar-right { display: flex; gap: 15px; align-items: center; }
         .main-container {
             display: grid;
-            grid-template-columns: 280px 1fr;
+            grid-template-columns: 300px 1fr;
             min-height: calc(100vh - 60px);
         }
-
-        /* Sidebar */
         .sidebar {
             background: var(--bg-card);
             border-right: 1px solid var(--border);
             padding: 20px;
             overflow-y: auto;
         }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
+        .sidebar-section { margin-bottom: 25px; }
         .sidebar-title {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
             color: var(--text-muted);
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             letter-spacing: 1px;
         }
-
-        .client-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
+        .client-list { display: flex; flex-direction: column; gap: 8px; }
         .client-item {
             padding: 12px 15px;
             background: var(--bg-input);
@@ -102,54 +74,22 @@
             transition: all 0.2s;
             border: 1px solid transparent;
         }
-
-        .client-item:hover {
-            border-color: var(--primary);
-        }
-
-        .client-item.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .client-name {
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .client-meta {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .client-item.active .client-meta {
-            color: rgba(255,255,255,0.8);
-        }
-
-        .badge-pending {
-            display: inline-block;
-            background: var(--warning);
-            color: #000;
-            font-size: 0.7rem;
-            padding: 2px 8px;
-            border-radius: 10px;
-            margin-left: 5px;
-        }
-
-        /* Content Area */
-        .content {
-            padding: 30px;
-            overflow-y: auto;
-        }
-
-        /* Stats */
+        .client-item:hover { border-color: var(--primary); }
+        .client-item.active { background: var(--primary); color: white; }
+        .client-name { font-weight: 600; margin-bottom: 4px; }
+        .client-meta { font-size: 0.8rem; color: var(--text-muted); }
+        .client-item.active .client-meta { color: rgba(255,255,255,0.8); }
+        .badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 5px; }
+        .badge-warning { background: var(--warning); color: #000; }
+        .badge-success { background: var(--success); color: white; }
+        .badge-info { background: var(--primary); color: white; }
+        .content { padding: 30px; overflow-y: auto; }
         .stats-row {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
-
         .stat-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -157,7 +97,6 @@
             padding: 24px;
             text-align: center;
         }
-
         .stat-value {
             font-size: 2.5rem;
             font-weight: 700;
@@ -165,19 +104,12 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
         .stat-card.warning .stat-value {
             background: linear-gradient(135deg, var(--warning), #FFB800);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
-        .stat-label {
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        /* Cards */
+        .stat-label { color: var(--text-muted); margin-top: 5px; }
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -185,46 +117,13 @@
             padding: 24px;
             margin-bottom: 20px;
         }
-
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
-
-        .card-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        /* Bilans List */
-        .bilan-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: var(--bg-input);
-            border-radius: 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-
-        .bilan-item:hover {
-            border-color: var(--primary);
-        }
-
-        .bilan-info h4 {
-            margin-bottom: 5px;
-        }
-
-        .bilan-info span {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
+        .card-title { font-size: 1.2rem; font-weight: 600; }
         .btn {
             display: inline-flex;
             align-items: center;
@@ -237,64 +136,34 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, var(--success), #45a049);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: var(--bg-input);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-
-        /* Bilan Detail */
-        .bilan-detail {
-            display: none;
-        }
-
-        .bilan-detail.active {
-            display: block;
-        }
-
-        .bilan-metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .metric-box {
-            background: var(--bg-input);
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
+        .btn-success { background: linear-gradient(135deg, var(--success), #45a049); color: white; }
+        .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: linear-gradient(135deg, var(--danger), #e55353); color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .email-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
             padding: 15px;
+            background: var(--bg-input);
             border-radius: 10px;
-            text-align: center;
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
         }
-
-        .metric-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .metric-label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        /* Textarea */
+        .email-item:hover { border-color: var(--primary); }
+        .email-item.sent { border-left: 3px solid var(--success); }
+        .email-item.received { border-left: 3px solid var(--primary); }
+        .email-info { flex: 1; }
+        .email-subject { font-weight: 600; margin-bottom: 5px; }
+        .email-preview { color: var(--text-muted); font-size: 0.9rem; max-height: 40px; overflow: hidden; }
+        .email-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; }
+        .email-direction { font-size: 0.7rem; padding: 3px 8px; border-radius: 5px; }
+        .email-direction.sent { background: var(--success); color: white; }
+        .email-direction.received { background: var(--primary); color: white; }
         textarea {
             width: 100%;
             padding: 15px;
@@ -306,24 +175,9 @@
             resize: vertical;
             min-height: 200px;
         }
-
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* Form Group */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-
-        /* AI Section */
+        textarea:focus { outline: none; border-color: var(--primary); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
         .ai-section {
             background: linear-gradient(135deg, rgba(153, 144, 234, 0.1), rgba(141, 255, 224, 0.05));
             border: 1px solid var(--primary);
@@ -331,53 +185,9 @@
             padding: 20px;
             margin-bottom: 20px;
         }
-
-        .ai-section h3 {
-            color: var(--primary);
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
-        }
-
-        .tab {
-            padding: 10px 20px;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-            border-radius: 8px;
-            transition: all 0.2s;
-        }
-
-        .tab:hover {
-            background: var(--bg-input);
-        }
-
-        .tab.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        /* Loading */
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-        }
-
+        .ai-section h3 { color: var(--primary); margin-bottom: 15px; }
+        .hidden { display: none !important; }
+        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; }
         .spinner {
             width: 40px;
             height: 40px;
@@ -386,90 +196,26 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* KPIs */
-        .kpis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .kpi-item {
-            background: var(--bg-input);
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .kpi-score {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        .kpi-score.good { color: var(--success); }
-        .kpi-score.medium { color: var(--warning); }
-        .kpi-score.bad { color: var(--danger); }
-
-        .kpi-name {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        /* Section */
-        .section {
-            margin-bottom: 25px;
-        }
-
-        .section-title {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: var(--primary);
-        }
-
-        .section-content {
-            background: var(--bg-input);
-            padding: 15px;
-            border-radius: 10px;
-            white-space: pre-wrap;
-        }
-
-        /* Response Actions */
-        .response-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        /* Hidden */
-        .hidden {
-            display: none !important;
-        }
-
-        /* Mobile */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .section { margin-bottom: 20px; }
+        .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 10px; color: var(--primary); }
+        .section-content { background: var(--bg-input); padding: 15px; border-radius: 10px; white-space: pre-wrap; }
+        .sync-status { font-size: 0.85rem; color: var(--text-muted); margin-left: 10px; }
+        .sync-status.syncing { color: var(--warning); }
+        .sync-status.success { color: var(--success); }
+        .email-full { background: var(--bg-input); padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        .email-full-header { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
+        .email-full-body { line-height: 1.6; white-space: pre-wrap; }
+        .attachments { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); }
+        .attachment { display: inline-block; background: var(--bg-card); padding: 8px 15px; border-radius: 8px; margin: 5px; font-size: 0.9rem; }
         @media (max-width: 1024px) {
-            .main-container {
-                grid-template-columns: 1fr;
-            }
-
-            .sidebar {
-                display: none;
-            }
-
-            .stats-row {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .main-container { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
 <body>
-    <!-- Login Check -->
     <div id="login-required" class="hidden" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
         <div style="text-align: center;">
             <h2>Connexion Coach Requise</h2>
@@ -478,35 +224,29 @@
         </div>
     </div>
 
-    <!-- Main App -->
     <div id="coach-app">
         <nav class="navbar">
             <div class="navbar-brand">Achzod Coach Dashboard</div>
             <div class="navbar-right">
+                <button class="btn btn-primary" id="sync-gmail-btn" onclick="syncGmail()">
+                    Sync Gmail
+                </button>
+                <span id="sync-status" class="sync-status"></span>
                 <span id="coach-name">Coach</span>
-                <button class="btn btn-secondary" id="logout-btn">Deconnexion</button>
+                <button class="btn btn-secondary" onclick="logout()">Deconnexion</button>
             </div>
         </nav>
 
         <div class="main-container">
-            <!-- Sidebar -->
             <aside class="sidebar">
                 <div class="sidebar-section">
-                    <div class="sidebar-title">Bilans en attente</div>
-                    <div id="pending-bilans" class="client-list">
-                        <div class="loading"><div class="spinner"></div></div>
-                    </div>
-                </div>
-
-                <div class="sidebar-section">
-                    <div class="sidebar-title">Tous les clients</div>
+                    <div class="sidebar-title">Clients</div>
                     <div id="clients-list" class="client-list">
                         <div class="loading"><div class="spinner"></div></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Content -->
             <main class="content">
                 <!-- Dashboard View -->
                 <div id="dashboard-view">
@@ -515,135 +255,43 @@
                     <div class="stats-row">
                         <div class="stat-card">
                             <div class="stat-value" id="stat-clients">0</div>
-                            <div class="stat-label">Clients actifs</div>
+                            <div class="stat-label">Clients</div>
                         </div>
                         <div class="stat-card warning">
+                            <div class="stat-value" id="stat-emails">0</div>
+                            <div class="stat-label">Emails synces</div>
+                        </div>
+                        <div class="stat-card">
                             <div class="stat-value" id="stat-pending">0</div>
                             <div class="stat-label">Bilans en attente</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="stat-active">0</div>
-                            <div class="stat-label">Actifs cette semaine</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-messages">0</div>
-                            <div class="stat-label">Messages non lus</div>
+                            <div class="stat-value" id="stat-received">0</div>
+                            <div class="stat-label">Emails recus</div>
                         </div>
                     </div>
 
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">Bilans a traiter</div>
+                            <div class="card-title">Derniers emails</div>
+                            <button class="btn btn-secondary" onclick="syncGmail()">Actualiser</button>
                         </div>
-                        <div id="pending-list">
-                            <div class="loading"><div class="spinner"></div></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bilan Detail View -->
-                <div id="bilan-view" class="bilan-detail">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h1 id="bilan-title">Bilan</h1>
-                        <button class="btn btn-secondary" onclick="showDashboard()">Retour</button>
-                    </div>
-
-                    <div class="tabs">
-                        <button class="tab active" data-tab="overview">Vue d'ensemble</button>
-                        <button class="tab" data-tab="details">Details</button>
-                        <button class="tab" data-tab="response">Repondre</button>
-                    </div>
-
-                    <!-- Overview Tab -->
-                    <div id="tab-overview" class="tab-content">
-                        <div class="card">
-                            <h3 style="margin-bottom: 15px;">Metriques cles</h3>
-                            <div class="bilan-metrics" id="bilan-metrics">
-                                <!-- Filled by JS -->
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <h3 style="margin-bottom: 15px;">Feedback client</h3>
-                            <div class="section">
-                                <div class="section-title">Victoires</div>
-                                <div class="section-content" id="bilan-victoires">-</div>
-                            </div>
-                            <div class="section">
-                                <div class="section-title">Difficultes</div>
-                                <div class="section-content" id="bilan-difficultes">-</div>
-                            </div>
-                            <div class="section">
-                                <div class="section-title">Questions</div>
-                                <div class="section-content" id="bilan-questions">-</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Details Tab -->
-                    <div id="tab-details" class="tab-content hidden">
-                        <div class="card">
-                            <h3 style="margin-bottom: 15px;">Donnees completes</h3>
-                            <pre id="bilan-raw" style="background: var(--bg-input); padding: 15px; border-radius: 10px; overflow-x: auto;"></pre>
-                        </div>
-                    </div>
-
-                    <!-- Response Tab -->
-                    <div id="tab-response" class="tab-content hidden">
-                        <!-- AI Section -->
-                        <div class="ai-section">
-                            <h3>Assistance IA</h3>
-                            <p style="color: var(--text-muted); margin-bottom: 15px;">
-                                L'IA analyse le bilan et genere un draft de reponse personnalise.
+                        <div id="recent-emails">
+                            <p style="color: var(--text-muted); text-align: center; padding: 20px;">
+                                Clique sur "Sync Gmail" pour charger les emails de tes clients
                             </p>
-                            <div style="display: flex; gap: 10px;">
-                                <button class="btn btn-primary" id="analyze-btn" onclick="analyzeBilan()">
-                                    Analyser avec IA
-                                </button>
-                                <button class="btn btn-secondary" id="regenerate-btn" onclick="regenerateResponse()" disabled>
-                                    Regenerer
-                                </button>
-                            </div>
-
-                            <div id="ai-analysis" class="hidden" style="margin-top: 20px;">
-                                <div class="section-title">KPIs extraits</div>
-                                <div class="kpis-grid" id="ai-kpis"></div>
-
-                                <div class="section-title">Resume</div>
-                                <div class="section-content" id="ai-resume" style="margin-bottom: 15px;"></div>
-
-                                <div class="section-title">Points positifs</div>
-                                <div class="section-content" id="ai-positifs" style="margin-bottom: 15px;"></div>
-
-                                <div class="section-title">A ameliorer</div>
-                                <div class="section-content" id="ai-ameliorer" style="margin-bottom: 15px;"></div>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <h3 style="margin-bottom: 15px;">Reponse au client</h3>
-                            <div class="form-group">
-                                <label>Instructions supplementaires pour l'IA (optionnel)</label>
-                                <textarea id="ai-instructions" rows="2" placeholder="Ex: Insiste sur l'importance du sommeil, felicite-le pour sa regularite..."></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label>Email de reponse</label>
-                                <textarea id="response-draft" rows="12" placeholder="Le draft sera genere par l'IA ou tu peux ecrire directement..."></textarea>
-                            </div>
-                            <div class="response-actions">
-                                <button class="btn btn-success" onclick="sendResponse()">
-                                    Envoyer la reponse
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Client Detail View -->
-                <div id="client-view" class="bilan-detail">
+                <div id="client-view" class="hidden">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h1 id="client-title">Client</h1>
-                        <button class="btn btn-secondary" onclick="showDashboard()">Retour</button>
+                        <div>
+                            <button class="btn btn-secondary" onclick="syncClientGmail()">Sync ce client</button>
+                            <button class="btn btn-secondary" onclick="showDashboard()">Retour</button>
+                        </div>
                     </div>
 
                     <div class="card">
@@ -652,8 +300,58 @@
                     </div>
 
                     <div class="card">
-                        <h3 style="margin-bottom: 15px;">Historique des bilans</h3>
-                        <div id="client-bilans"></div>
+                        <div class="card-header">
+                            <div class="card-title">Historique des emails</div>
+                            <div>
+                                <span id="email-count" style="color: var(--text-muted); margin-right: 15px;"></span>
+                            </div>
+                        </div>
+                        <div id="client-emails">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Detail View -->
+                <div id="email-view" class="hidden">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h1>Email</h1>
+                        <button class="btn btn-secondary" onclick="backToClient()">Retour</button>
+                    </div>
+
+                    <div class="email-full">
+                        <div class="email-full-header">
+                            <h2 id="email-subject"></h2>
+                            <div style="margin-top: 10px; color: var(--text-muted);">
+                                <span id="email-direction-badge"></span>
+                                <span id="email-date" style="margin-left: 15px;"></span>
+                            </div>
+                        </div>
+                        <div class="email-full-body" id="email-body"></div>
+                        <div class="attachments" id="email-attachments"></div>
+                    </div>
+
+                    <div class="ai-section">
+                        <h3>Analyse IA & Reponse</h3>
+                        <p style="color: var(--text-muted); margin-bottom: 15px;">
+                            L'IA analyse cet email et genere un draft de reponse personnalise.
+                        </p>
+                        <button class="btn btn-primary" id="analyze-email-btn" onclick="analyzeEmail()">
+                            Analyser avec IA
+                        </button>
+
+                        <div id="email-analysis" class="hidden" style="margin-top: 20px;">
+                            <div class="section-title">Resume</div>
+                            <div class="section-content" id="analysis-resume"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin-bottom: 15px;">Reponse</h3>
+                        <div class="form-group">
+                            <textarea id="email-response" rows="10" placeholder="Ecris ta reponse ici ou utilise l'IA pour generer un draft..."></textarea>
+                        </div>
+                        <button class="btn btn-success" onclick="copyResponse()">Copier la reponse</button>
                     </div>
                 </div>
             </main>
@@ -664,39 +362,24 @@
         const API_URL = window.location.origin + '/api';
         let authToken = localStorage.getItem('token');
         let currentUser = null;
-        let currentBilan = null;
-        let currentAnalysis = null;
+        let currentClient = null;
+        let currentEmail = null;
 
-        // ============ API ============
         async function api(endpoint, method = 'GET', data = null) {
             const options = {
                 method,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             };
-
-            if (authToken) {
-                options.headers['Authorization'] = `Bearer ${authToken}`;
-            }
-
-            if (data) {
-                options.body = JSON.stringify(data);
-            }
+            if (authToken) options.headers['Authorization'] = `Bearer ${authToken}`;
+            if (data) options.body = JSON.stringify(data);
 
             const response = await fetch(`${API_URL}${endpoint}`, options);
-
             if (response.status === 401 || response.status === 403) {
                 showLoginRequired();
                 throw new Error('Non autorise');
             }
-
             const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.detail || 'Erreur');
-            }
-
+            if (!response.ok) throw new Error(result.detail || 'Erreur');
             return result;
         }
 
@@ -706,25 +389,14 @@
             document.getElementById('login-required').style.display = 'flex';
         }
 
-        // ============ AUTH ============
         async function checkAuth() {
-            if (!authToken) {
-                showLoginRequired();
-                return false;
-            }
-
+            if (!authToken) { showLoginRequired(); return false; }
             try {
                 currentUser = await api('/auth/me');
-                if (currentUser.role !== 'coach') {
-                    showLoginRequired();
-                    return false;
-                }
+                if (currentUser.role !== 'coach') { showLoginRequired(); return false; }
                 document.getElementById('coach-name').textContent = currentUser.name;
                 return true;
-            } catch (e) {
-                showLoginRequired();
-                return false;
-            }
+            } catch (e) { showLoginRequired(); return false; }
         }
 
         function logout() {
@@ -732,57 +404,57 @@
             window.location.href = '/';
         }
 
-        // ============ LOAD DATA ============
         async function loadDashboard() {
             try {
-                const data = await api('/coach/dashboard');
+                const [dashboard, emails] = await Promise.all([
+                    api('/coach/dashboard'),
+                    api('/coach/gmail/emails').catch(() => ({ emails: [], total: 0 }))
+                ]);
 
-                // Stats
-                document.getElementById('stat-clients').textContent = data.total_clients || 0;
-                document.getElementById('stat-pending').textContent = data.pending_bilans?.length || 0;
-                document.getElementById('stat-active').textContent = data.active_this_week || 0;
-                document.getElementById('stat-messages').textContent = data.unread_messages || 0;
+                document.getElementById('stat-clients').textContent = dashboard.total_clients || 0;
+                document.getElementById('stat-pending').textContent = dashboard.pending_bilans?.length || 0;
+                document.getElementById('stat-emails').textContent = emails.total || 0;
 
-                // Pending bilans in sidebar
-                const pendingContainer = document.getElementById('pending-bilans');
-                if (data.pending_bilans && data.pending_bilans.length > 0) {
-                    pendingContainer.innerHTML = data.pending_bilans.map(b => `
-                        <div class="client-item" onclick="loadBilan(${b.id})">
-                            <div class="client-name">${b.name || b.email}</div>
-                            <div class="client-meta">Semaine ${b.week_number} <span class="badge-pending">Nouveau</span></div>
-                        </div>
-                    `).join('');
-                } else {
-                    pendingContainer.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Aucun bilan en attente</p>';
-                }
+                const received = emails.emails?.filter(e => e.direction === 'received') || [];
+                document.getElementById('stat-received').textContent = received.length;
 
-                // Pending list in main
-                const pendingList = document.getElementById('pending-list');
-                if (data.pending_bilans && data.pending_bilans.length > 0) {
-                    pendingList.innerHTML = data.pending_bilans.map(b => `
-                        <div class="bilan-item" onclick="loadBilan(${b.id})">
-                            <div class="bilan-info">
-                                <h4>${b.name || b.email}</h4>
-                                <span>Semaine ${b.week_number} - ${formatDate(b.date_submitted)}</span>
-                            </div>
-                            <button class="btn btn-primary">Traiter</button>
-                        </div>
-                    `).join('');
-                } else {
-                    pendingList.innerHTML = '<p style="color: var(--text-muted); padding: 20px; text-align: center;">Tous les bilans ont ete traites !</p>';
-                }
-
-                // Clients list
+                // Clients sidebar
                 const clientsContainer = document.getElementById('clients-list');
-                if (data.clients && data.clients.length > 0) {
-                    clientsContainer.innerHTML = data.clients.map(c => `
-                        <div class="client-item" onclick="loadClient(${c.id})">
-                            <div class="client-name">${c.name || c.email}</div>
-                            <div class="client-meta">${c.total_bilans || 0} bilans</div>
+                if (dashboard.clients && dashboard.clients.length > 0) {
+                    clientsContainer.innerHTML = dashboard.clients.map(c => {
+                        const clientEmails = emails.by_client?.[c.email.toLowerCase()] || [];
+                        return `
+                            <div class="client-item" onclick="loadClient(${c.id}, '${c.email}')">
+                                <div class="client-name">${c.name || c.email}</div>
+                                <div class="client-meta">
+                                    ${clientEmails.length} emails
+                                    ${c.pending_bilans > 0 ? `<span class="badge badge-warning">${c.pending_bilans} bilan</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    clientsContainer.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Aucun client inscrit</p>';
+                }
+
+                // Recent emails
+                const recentContainer = document.getElementById('recent-emails');
+                if (emails.emails && emails.emails.length > 0) {
+                    const recent = emails.emails.slice(0, 10);
+                    recentContainer.innerHTML = recent.map(e => `
+                        <div class="email-item ${e.direction}" onclick="loadEmailById(${e.id})">
+                            <div class="email-info">
+                                <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
+                                <div class="email-preview">${(e.body || '').substring(0, 100)}...</div>
+                                <div class="email-meta">
+                                    <span class="email-direction ${e.direction}">${e.direction === 'sent' ? 'Envoye' : 'Recu'}</span>
+                                    ${e.client_email} - ${formatDate(e.date_sent)}
+                                </div>
+                            </div>
                         </div>
                     `).join('');
                 } else {
-                    clientsContainer.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Aucun client</p>';
+                    recentContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Aucun email synce. Clique sur "Sync Gmail" pour commencer.</p>';
                 }
 
             } catch (e) {
@@ -790,188 +462,65 @@
             }
         }
 
-        async function loadBilan(bilanId) {
-            try {
-                const data = await api(`/coach/bilans/${bilanId}`);
-                currentBilan = data.bilan;
-                currentAnalysis = null;
+        async function syncGmail() {
+            const btn = document.getElementById('sync-gmail-btn');
+            const status = document.getElementById('sync-status');
 
-                document.getElementById('bilan-title').textContent = `Bilan Semaine ${data.bilan.week_number} - ${data.client?.name || 'Client'}`;
-
-                // Metrics
-                const metricsHtml = `
-                    <div class="metric-box"><div class="metric-value">${data.bilan.poids || '-'}</div><div class="metric-label">Poids (kg)</div></div>
-                    <div class="metric-box"><div class="metric-value">${data.bilan.energie || '-'}</div><div class="metric-label">Energie /10</div></div>
-                    <div class="metric-box"><div class="metric-value">${data.bilan.sommeil_qualite || '-'}</div><div class="metric-label">Sommeil /10</div></div>
-                    <div class="metric-box"><div class="metric-value">${data.bilan.motivation || '-'}</div><div class="metric-label">Motivation /10</div></div>
-                    <div class="metric-box"><div class="metric-value">${data.bilan.seances_faites || '-'}/${data.bilan.seances_prevues || '-'}</div><div class="metric-label">Seances</div></div>
-                    <div class="metric-box"><div class="metric-value">${data.bilan.respect_calories || '-'}</div><div class="metric-label">Nutrition /10</div></div>
-                `;
-                document.getElementById('bilan-metrics').innerHTML = metricsHtml;
-
-                // Feedback
-                document.getElementById('bilan-victoires').textContent = data.bilan.victoires || '-';
-                document.getElementById('bilan-difficultes').textContent = data.bilan.difficultes || '-';
-                document.getElementById('bilan-questions').textContent = data.bilan.questions || '-';
-
-                // Raw data
-                document.getElementById('bilan-raw').textContent = JSON.stringify(data.bilan, null, 2);
-
-                // Clear response
-                document.getElementById('response-draft').value = data.bilan.coach_response || '';
-                document.getElementById('ai-analysis').classList.add('hidden');
-                document.getElementById('regenerate-btn').disabled = true;
-
-                // Show bilan view
-                showBilanView();
-
-            } catch (e) {
-                console.error('Load bilan error:', e);
-                alert('Erreur: ' + e.message);
-            }
-        }
-
-        async function analyzeBilan() {
-            if (!currentBilan) return;
-
-            const btn = document.getElementById('analyze-btn');
             btn.disabled = true;
-            btn.textContent = 'Analyse en cours...';
+            btn.textContent = 'Synchronisation...';
+            status.textContent = 'En cours...';
+            status.className = 'sync-status syncing';
 
             try {
-                const result = await api(`/coach/bilans/${currentBilan.id}/analyze`, 'POST');
-
-                if (result.success) {
-                    currentAnalysis = result.analysis;
-                    displayAnalysis(result.analysis);
-                    document.getElementById('response-draft').value = result.draft || '';
-                    document.getElementById('regenerate-btn').disabled = false;
-                }
+                const result = await api('/coach/gmail/sync', 'POST');
+                status.textContent = `${result.total_synced} nouveaux emails`;
+                status.className = 'sync-status success';
+                loadDashboard();
             } catch (e) {
-                alert('Erreur analyse: ' + e.message);
+                status.textContent = 'Erreur: ' + e.message;
+                status.className = 'sync-status';
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Analyser avec IA';
+                btn.textContent = 'Sync Gmail';
             }
         }
 
-        function displayAnalysis(analysis) {
-            document.getElementById('ai-analysis').classList.remove('hidden');
-
-            // KPIs
-            const kpis = analysis.kpis || {};
-            let kpisHtml = '';
-            for (const [key, value] of Object.entries(kpis)) {
-                const score = typeof value === 'object' ? value.score : value;
-                const colorClass = score >= 7 ? 'good' : score >= 5 ? 'medium' : 'bad';
-                kpisHtml += `
-                    <div class="kpi-item">
-                        <div class="kpi-score ${colorClass}">${score}/10</div>
-                        <div class="kpi-name">${key.replace('_', ' ')}</div>
-                    </div>
-                `;
-            }
-            document.getElementById('ai-kpis').innerHTML = kpisHtml;
-
-            // Resume
-            document.getElementById('ai-resume').textContent = analysis.resume || '-';
-
-            // Points positifs
-            const positifs = analysis.points_positifs || [];
-            document.getElementById('ai-positifs').textContent = positifs.join('\n') || '-';
-
-            // A ameliorer
-            const ameliorer = analysis.points_ameliorer || [];
-            document.getElementById('ai-ameliorer').textContent = ameliorer.map(p =>
-                typeof p === 'object' ? `${p.probleme}: ${p.solution}` : p
-            ).join('\n') || '-';
-        }
-
-        async function regenerateResponse() {
-            if (!currentBilan || !currentAnalysis) return;
-
-            const instructions = document.getElementById('ai-instructions').value;
-            const btn = document.getElementById('regenerate-btn');
-            btn.disabled = true;
-            btn.textContent = 'Generation...';
+        async function loadClient(clientId, clientEmail) {
+            currentClient = { id: clientId, email: clientEmail };
 
             try {
-                // Call regenerate endpoint (would need to add to API)
-                // For now, just re-analyze with instructions
-                const result = await api(`/coach/bilans/${currentBilan.id}/analyze`, 'POST');
-                if (result.draft) {
-                    document.getElementById('response-draft').value = result.draft;
-                }
-            } catch (e) {
-                alert('Erreur: ' + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Regenerer';
-            }
-        }
+                const [clientData, emailsData] = await Promise.all([
+                    api(`/coach/clients/${clientId}`),
+                    api(`/coach/gmail/client/${clientId}`)
+                ]);
 
-        async function sendResponse() {
-            if (!currentBilan) return;
+                document.getElementById('client-title').textContent = clientData.client.name || clientData.client.email;
 
-            const response = document.getElementById('response-draft').value.trim();
-            if (!response) {
-                alert('Ecris une reponse avant d\'envoyer');
-                return;
-            }
-
-            try {
-                const formData = new FormData();
-                formData.append('response', response);
-
-                const result = await fetch(`${API_URL}/coach/bilans/${currentBilan.id}/respond`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: formData
-                });
-
-                if (result.ok) {
-                    alert('Reponse envoyee !');
-                    showDashboard();
-                    loadDashboard();
-                } else {
-                    throw new Error('Erreur envoi');
-                }
-            } catch (e) {
-                alert('Erreur: ' + e.message);
-            }
-        }
-
-        async function loadClient(clientId) {
-            try {
-                const data = await api(`/coach/clients/${clientId}`);
-
-                document.getElementById('client-title').textContent = data.client.name || data.client.email;
-
-                // Info
                 document.getElementById('client-info').innerHTML = `
-                    <p><strong>Email:</strong> ${data.client.email}</p>
-                    <p><strong>Objectif:</strong> ${data.client.objectif || '-'}</p>
-                    <p><strong>Debut:</strong> ${data.client.date_debut || '-'}</p>
-                    <p><strong>Duree:</strong> ${data.client.duree_semaines || 12} semaines</p>
+                    <p><strong>Email:</strong> ${clientData.client.email}</p>
+                    <p><strong>Objectif:</strong> ${clientData.client.objectif || '-'}</p>
+                    <p><strong>Debut:</strong> ${clientData.client.date_debut || '-'}</p>
                 `;
 
-                // Bilans
-                if (data.bilans && data.bilans.length > 0) {
-                    document.getElementById('client-bilans').innerHTML = data.bilans.map(b => `
-                        <div class="bilan-item" onclick="loadBilan(${b.id})">
-                            <div class="bilan-info">
-                                <h4>Semaine ${b.week_number}</h4>
-                                <span>${formatDate(b.date_submitted)}</span>
+                const emailsContainer = document.getElementById('client-emails');
+                document.getElementById('email-count').textContent = `${emailsData.total} emails (${emailsData.received?.length || 0} recus, ${emailsData.sent?.length || 0} envoyes)`;
+
+                if (emailsData.emails && emailsData.emails.length > 0) {
+                    emailsContainer.innerHTML = emailsData.emails.map(e => `
+                        <div class="email-item ${e.direction}" onclick="loadEmail(${JSON.stringify(e).replace(/"/g, '&quot;')})">
+                            <div class="email-info">
+                                <div class="email-subject">${e.subject || '(Sans sujet)'}</div>
+                                <div class="email-preview">${(e.body || '').substring(0, 150)}...</div>
+                                <div class="email-meta">
+                                    <span class="email-direction ${e.direction}">${e.direction === 'sent' ? 'Envoye' : 'Recu'}</span>
+                                    ${formatDate(e.date_sent)}
+                                    ${e.has_attachments ? '<span class="badge badge-info">PJ</span>' : ''}
+                                </div>
                             </div>
-                            <span class="badge-pending" style="background: ${b.coach_response ? 'var(--success)' : 'var(--warning)'}">
-                                ${b.coach_response ? 'Repondu' : 'En attente'}
-                            </span>
                         </div>
                     `).join('');
                 } else {
-                    document.getElementById('client-bilans').innerHTML = '<p style="color: var(--text-muted);">Aucun bilan</p>';
+                    emailsContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Aucun email trouve pour ce client. Clique sur "Sync ce client" pour charger ses emails.</p>';
                 }
 
                 showClientView();
@@ -981,53 +530,127 @@
             }
         }
 
-        // ============ NAVIGATION ============
-        function showDashboard() {
-            document.getElementById('dashboard-view').style.display = 'block';
-            document.getElementById('bilan-view').classList.remove('active');
-            document.getElementById('client-view').classList.remove('active');
+        async function syncClientGmail() {
+            if (!currentClient) return;
+
+            try {
+                const result = await api(`/coach/gmail/sync/${currentClient.id}`, 'POST');
+                alert(`${result.synced} nouveaux emails synchronises`);
+                loadClient(currentClient.id, currentClient.email);
+            } catch (e) {
+                alert('Erreur sync: ' + e.message);
+            }
         }
 
-        function showBilanView() {
-            document.getElementById('dashboard-view').style.display = 'none';
-            document.getElementById('client-view').classList.remove('active');
-            document.getElementById('bilan-view').classList.add('active');
-            switchTab('overview');
+        function loadEmail(emailData) {
+            currentEmail = emailData;
+
+            document.getElementById('email-subject').textContent = emailData.subject || '(Sans sujet)';
+            document.getElementById('email-direction-badge').innerHTML = `<span class="email-direction ${emailData.direction}">${emailData.direction === 'sent' ? 'Envoye' : 'Recu'}</span>`;
+            document.getElementById('email-date').textContent = formatDate(emailData.date_sent);
+            document.getElementById('email-body').textContent = emailData.body || '';
+
+            // Attachments
+            const attachments = JSON.parse(emailData.attachments_json || '[]');
+            if (attachments.length > 0) {
+                document.getElementById('email-attachments').innerHTML = `
+                    <strong>Pieces jointes:</strong>
+                    ${attachments.map(a => `<span class="attachment">${a.filename || a.name || 'Fichier'}</span>`).join('')}
+                `;
+                document.getElementById('email-attachments').classList.remove('hidden');
+            } else {
+                document.getElementById('email-attachments').classList.add('hidden');
+            }
+
+            document.getElementById('email-response').value = '';
+            document.getElementById('email-analysis').classList.add('hidden');
+
+            showEmailView();
+        }
+
+        async function loadEmailById(emailId) {
+            try {
+                // Get email from the list
+                const emails = await api('/coach/gmail/emails');
+                const email = emails.emails.find(e => e.id === emailId);
+                if (email) {
+                    currentClient = { email: email.client_email };
+                    loadEmail(email);
+                }
+            } catch (e) {
+                alert('Erreur: ' + e.message);
+            }
+        }
+
+        async function analyzeEmail() {
+            if (!currentEmail) return;
+
+            const btn = document.getElementById('analyze-email-btn');
+            btn.disabled = true;
+            btn.textContent = 'Analyse en cours...';
+
+            try {
+                const result = await api(`/coach/gmail/email/${currentEmail.id}/analyze`, 'POST');
+
+                if (result.success) {
+                    document.getElementById('email-analysis').classList.remove('hidden');
+                    document.getElementById('analysis-resume').textContent = result.analysis?.resume || result.draft || 'Analyse terminee';
+
+                    if (result.draft) {
+                        document.getElementById('email-response').value = result.draft;
+                    }
+                }
+            } catch (e) {
+                alert('Erreur analyse: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyser avec IA';
+            }
+        }
+
+        function copyResponse() {
+            const response = document.getElementById('email-response').value;
+            navigator.clipboard.writeText(response).then(() => {
+                alert('Reponse copiee dans le presse-papier !');
+            });
+        }
+
+        function showDashboard() {
+            document.getElementById('dashboard-view').classList.remove('hidden');
+            document.getElementById('client-view').classList.add('hidden');
+            document.getElementById('email-view').classList.add('hidden');
         }
 
         function showClientView() {
-            document.getElementById('dashboard-view').style.display = 'none';
-            document.getElementById('bilan-view').classList.remove('active');
-            document.getElementById('client-view').classList.add('active');
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('client-view').classList.remove('hidden');
+            document.getElementById('email-view').classList.add('hidden');
         }
 
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-
-            document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+        function showEmailView() {
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('client-view').classList.add('hidden');
+            document.getElementById('email-view').classList.remove('hidden');
         }
 
-        // ============ UTILS ============
+        function backToClient() {
+            if (currentClient) {
+                showClientView();
+            } else {
+                showDashboard();
+            }
+        }
+
         function formatDate(dateStr) {
             if (!dateStr) return '';
             const d = new Date(dateStr);
-            return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
-        // ============ INIT ============
         document.addEventListener('DOMContentLoaded', async () => {
             if (await checkAuth()) {
                 loadDashboard();
             }
-
-            document.getElementById('logout-btn').addEventListener('click', logout);
-
-            // Tab switching
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-            });
         });
     </script>
 </body>
