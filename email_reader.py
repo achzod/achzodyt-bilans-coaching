@@ -686,6 +686,128 @@ class EmailReader:
         print(f"[EMAILS] {len(emails)} emails prets")
         return emails
 
+    def get_sent_emails(self, days: int = 180) -> List[Dict[str, Any]]:
+        """
+        Recupere les emails ENVOYES (reponses du coach) depuis le dossier Sent
+        CRITICAL pour avoir l'historique complet des conversations!
+        """
+        print(f"[SENT] Chargement emails envoyes ({days} jours)...")
+
+        conn = create_connection()
+        if not conn:
+            print("[SENT] Echec connexion")
+            return []
+
+        emails = []
+        since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+
+        # Essayer differents noms de dossier Sent
+        sent_folders = ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent", "INBOX.Sent"]
+
+        try:
+            for sent_folder in sent_folders:
+                try:
+                    status, _ = conn.select(f'"{sent_folder}"')
+                    if status != "OK":
+                        continue
+
+                    print(f"[SENT] Dossier trouve: {sent_folder}")
+
+                    # Chercher tous les emails envoyes depuis X jours
+                    status, data = conn.search(None, f'(SINCE "{since_date}")')
+
+                    if status != "OK" or not data[0]:
+                        print(f"[SENT] Aucun email dans {sent_folder}")
+                        continue
+
+                    email_ids = data[0].split()
+                    print(f"[SENT] {len(email_ids)} emails envoyes trouves")
+
+                    # Limiter a 300 max
+                    if len(email_ids) > 300:
+                        email_ids = email_ids[-300:]
+
+                    # Batch fetch
+                    batch_size = 10
+                    for i in range(0, len(email_ids), batch_size):
+                        batch_ids = email_ids[i:i + batch_size]
+                        clean_ids = [id.decode() if isinstance(id, bytes) else str(id) for id in batch_ids]
+                        id_range = ",".join(clean_ids)
+
+                        try:
+                            status, data = conn.fetch(id_range, "(BODY.PEEK[HEADER] UID)")
+                            if status != "OK":
+                                continue
+
+                            for response_part in data:
+                                if isinstance(response_part, tuple):
+                                    msg = email.message_from_bytes(response_part[1])
+
+                                    # Extraire les infos
+                                    from_addr = msg.get("From", "")
+                                    to_addr = msg.get("To", "")
+                                    subject = self._decode_header(msg.get("Subject", "(sans sujet)"))
+                                    date_str = msg.get("Date", "")
+                                    message_id = msg.get("Message-ID", "")
+
+                                    # Parser la date
+                                    date_obj = datetime.now()
+                                    if date_str:
+                                        try:
+                                            parsed = parsedate_to_datetime(date_str)
+                                            date_obj = parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+                                        except:
+                                            pass
+
+                                    # Extraire l'email du destinataire (c'est le client)
+                                    to_email = ""
+                                    if "<" in to_addr and ">" in to_addr:
+                                        to_email = to_addr.split("<")[1].split(">")[0].lower()
+                                    else:
+                                        to_email = to_addr.strip().lower()
+
+                                    # Extraire IMAP ID
+                                    imap_id = clean_ids[0] if clean_ids else ""
+                                    uid_match = re.search(r'UID (\d+)', str(response_part))
+                                    if uid_match:
+                                        imap_id = uid_match.group(1)
+
+                                    emails.append({
+                                        "from": from_addr,
+                                        "sender_email": to_email,  # Pour les sent, le "sender" est le destinataire (client)
+                                        "to": to_addr,
+                                        "subject": subject,
+                                        "date": date_obj,
+                                        "message_id": message_id,
+                                        "imap_id": imap_id,
+                                        "body": "",  # Charge a la demande
+                                        "body_loaded": False,
+                                        "attachments": [],
+                                        "has_attachments": False,
+                                        "direction": "sent"
+                                    })
+                        except Exception as e:
+                            print(f"[SENT] Erreur batch: {e}")
+                            continue
+
+                    break  # On a trouve le dossier Sent, pas besoin de continuer
+
+                except Exception as e:
+                    print(f"[SENT] Erreur dossier {sent_folder}: {e}")
+                    continue
+
+            conn.logout()
+
+        except Exception as e:
+            print(f"[SENT] Erreur: {e}")
+            try:
+                conn.logout()
+            except:
+                pass
+
+        print(f"[SENT] {len(emails)} emails envoyes prets")
+        return emails
+
     # Alias pour compatibilite
     def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False) -> List[Dict[str, Any]]:
         if unanswered_only:

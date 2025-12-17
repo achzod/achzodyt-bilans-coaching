@@ -489,13 +489,16 @@ GMAIL_PASS = os.getenv("MAIL_PASS", "")
 async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 180):
     """
     FAST Sync - Headers only, body loaded on demand when viewing
+    Includes BOTH received (INBOX) AND sent emails (for full conversation history)
     """
     reader = EmailReader()
 
     try:
         print(f"[SYNC] Starting FAST sync for last {days} days (headers only)...")
+
+        # 1. Sync received emails (INBOX)
         emails = reader.get_all_emails(days=days, unread_only=False)
-        print(f"[SYNC] Found {len(emails)} emails total")
+        print(f"[SYNC] Found {len(emails)} received emails")
 
         synced = 0
         filtered = 0
@@ -511,6 +514,20 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 18
 
             if save_email(email_data):
                 synced += 1
+
+        # 2. Sync SENT emails (coach responses) - CRITICAL for full history!
+        print(f"[SYNC] Now syncing sent emails...")
+        sent_emails = reader.get_sent_emails(days=days)
+        print(f"[SYNC] Found {len(sent_emails)} sent emails")
+
+        sent_synced = 0
+        for email_data in sent_emails:
+            email_data['direction'] = 'sent'
+            if save_email(email_data):
+                sent_synced += 1
+
+        print(f"[SYNC] Synced {sent_synced} sent emails")
+        synced += sent_synced
 
         reader.disconnect()
 
@@ -717,12 +734,18 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
         return {"success": False, "error": "Aucun email non repondu", "analysis": {}, "draft": ""}
 
     # Get FULL history - ALL emails since day 1 (CLIENT + COACH responses!)
+    # sender_email = client pour les received ET pour les sent (car on stocke le destinataire)
     c.execute('''
         SELECT * FROM gmail_emails
-        WHERE sender_email = ? OR (direction = 'sent' AND body LIKE ?)
+        WHERE sender_email = ?
         ORDER BY date_sent ASC
-    ''', (client_email.lower(), f'%{client_email}%'))
+    ''', (client_email.lower(),))
     all_emails = [dict(r) for r in c.fetchall()]
+
+    print(f"[ANALYZE] Found {len(all_emails)} total emails for {client_email}")
+    received = sum(1 for e in all_emails if e.get('direction') == 'received')
+    sent = sum(1 for e in all_emails if e.get('direction') == 'sent')
+    print(f"[ANALYZE] Breakdown: {received} received (client), {sent} sent (coach)")
 
     # Build history with ALL emails
     history = [{"date": datetime.fromisoformat(r['date_sent']) if r['date_sent'] else datetime.now(),
