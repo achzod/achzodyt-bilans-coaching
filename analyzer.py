@@ -282,33 +282,69 @@ OBLIGATOIRE:
 - MACROS EXACTES: "200P / 180G / 60L = 2060kcal"
 - DUREE/FREQUENCE: "35min LISS, 4x/semaine"
 
-EMAIL HTML OBLIGATOIRE avec:
-1. Bloc "Ton Evolution depuis le Jour 1" (gradient violet, boxes blanches)
-2. Poids jour1→actuel, Masse grasse, Pas/jour, Energie
-3. Ce qui a change (progres concrets)
-4. Plan d'action PRECIS
-5. Signe "Achzod"
+EMAIL HTML OBLIGATOIRE - Style ACHZOD Premium:
+Utilise ce template EXACT avec les vraies donnees:
 
-TEMPLATE HTML:
-<div style='font-family:Arial,sans-serif;max-width:600px;'>
-  <p>Salut [prenom],</p>
-  <p>[Intro]</p>
-  <div style='background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:24px;margin:24px 0;color:white;'>
-    <h3 style='margin:0 0 20px 0;text-align:center;'>📈 Ton Evolution depuis le Jour 1</h3>
-    <div style='display:flex;flex-wrap:wrap;gap:12px;justify-content:center;'>
-      <div style='background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;'>
-        <div style='font-size:14px;opacity:0.9;'>Poids</div>
-        <div style='font-size:20px;font-weight:bold;margin:8px 0;'>XXkg → XXkg</div>
-        <div style='color:#4ade80;'>-Xkg</div>
+<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f0f1e;padding:0;">
+  <!-- HEADER ACHZOD -->
+  <div style="background:linear-gradient(135deg,#7c3aed 0%,#a855f7 50%,#ec4899 100%);padding:32px 24px;text-align:center;border-radius:0 0 24px 24px;">
+    <h1 style="color:white;margin:0;font-size:28px;font-weight:800;letter-spacing:-0.5px;">ACHZOD COACHING</h1>
+    <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;">Ton analyse personnalisee</p>
+  </div>
+
+  <!-- SALUTATION -->
+  <div style="padding:32px 24px 16px;color:#e0e0e0;">
+    <p style="font-size:18px;margin:0;">Salut <strong style="color:#a855f7;">[PRENOM]</strong> 💪</p>
+    <p style="color:#9ca3af;margin:12px 0 0;line-height:1.6;">[INTRO PERSONNALISEE]</p>
+  </div>
+
+  <!-- BLOC EVOLUTION - GRADIENT -->
+  <div style="margin:24px;background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);border-radius:20px;padding:24px;border:1px solid rgba(139,92,246,0.3);">
+    <h2 style="color:white;margin:0 0 20px;font-size:18px;text-align:center;">📈 Ton Evolution depuis le Jour 1</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
+      <div style="background:rgba(255,255,255,0.1);border-radius:16px;padding:20px;text-align:center;min-width:130px;flex:1;">
+        <div style="color:#a78bfa;font-size:13px;text-transform:uppercase;letter-spacing:1px;">Poids</div>
+        <div style="color:white;font-size:22px;font-weight:700;margin:8px 0;">[XX]kg → [XX]kg</div>
+        <div style="color:#4ade80;font-size:18px;font-weight:600;">[+/-X]kg</div>
       </div>
-      <!-- Ajouter Masse Grasse, Pas/jour, Energie -->
+      <div style="background:rgba(255,255,255,0.1);border-radius:16px;padding:20px;text-align:center;min-width:130px;flex:1;">
+        <div style="color:#a78bfa;font-size:13px;text-transform:uppercase;letter-spacing:1px;">Masse Grasse</div>
+        <div style="color:white;font-size:22px;font-weight:700;margin:8px 0;">[XX]%</div>
+        <div style="color:#fbbf24;font-size:14px;">[Evolution]</div>
+      </div>
     </div>
   </div>
-  <h3 style='color:#22c55e;'>✅ Progres</h3>
-  <p>[Details]</p>
-  <h3 style='color:#f59e0b;'>🎯 Plan d'action</h3>
-  <p>[Actions PRECISES]</p>
-  <p style='margin-top:30px;'>Achzod</p>
+
+  <!-- ANALYSE PHOTOS si applicable -->
+  <div style="margin:24px;background:#1a1a2e;border-radius:16px;padding:24px;border-left:4px solid #a855f7;">
+    <h3 style="color:#a855f7;margin:0 0 16px;font-size:16px;">📸 Analyse Visuelle</h3>
+    <p style="color:#d1d5db;margin:0;line-height:1.7;">[ANALYSE DES PHOTOS - evolution visible, zones ameliorees, zones a travailler]</p>
+  </div>
+
+  <!-- CE QUI VA BIEN -->
+  <div style="margin:24px;background:linear-gradient(135deg,rgba(34,197,94,0.1),rgba(34,197,94,0.05));border-radius:16px;padding:24px;border-left:4px solid #22c55e;">
+    <h3 style="color:#22c55e;margin:0 0 16px;font-size:16px;">✅ Ce qui cartonne</h3>
+    <ul style="color:#d1d5db;margin:0;padding-left:20px;line-height:1.8;">
+      <li>[Point positif 1]</li>
+      <li>[Point positif 2]</li>
+    </ul>
+  </div>
+
+  <!-- PLAN D'ACTION -->
+  <div style="margin:24px;background:linear-gradient(135deg,rgba(251,191,36,0.1),rgba(251,191,36,0.05));border-radius:16px;padding:24px;border-left:4px solid #fbbf24;">
+    <h3 style="color:#fbbf24;margin:0 0 16px;font-size:16px;">🎯 Plan d'Action Cette Semaine</h3>
+    <div style="color:#d1d5db;line-height:1.8;">
+      <p style="margin:0 0 12px;"><strong style="color:#a855f7;">Training:</strong> [EXERCICES PRECIS avec series/reps]</p>
+      <p style="margin:0 0 12px;"><strong style="color:#a855f7;">Nutrition:</strong> [MACROS EXACTES ou ajustements]</p>
+      <p style="margin:0;"><strong style="color:#a855f7;">Cardio:</strong> [DUREE et FREQUENCE precise]</p>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="padding:32px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.1);">
+    <p style="color:#9ca3af;margin:0 0 8px;font-size:14px;">On lache rien! 🔥</p>
+    <p style="color:#a855f7;margin:0;font-size:20px;font-weight:700;">Achzod</p>
+  </div>
 </div>
 
 JSON:

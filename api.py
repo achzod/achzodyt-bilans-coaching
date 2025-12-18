@@ -521,9 +521,10 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
     def do_sync():
         reader = EmailReader()
         try:
-            print(f"[SYNC] Starting sync for last {days} days (ALL emails)...")
-            emails = reader.get_all_emails(days=days, unread_only=False)
-            print(f"[SYNC] Found {len(emails)} emails")
+            print(f"[SYNC] Starting sync for last {days} days (UNSEEN emails)...")
+            # Get UNSEEN (unread) emails specifically
+            emails = reader.get_all_emails(days=days, unread_only=True, max_emails=200)
+            print(f"[SYNC] Found {len(emails)} UNSEEN emails")
             reader.disconnect()
             return emails
         except Exception as e:

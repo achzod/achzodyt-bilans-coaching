@@ -262,11 +262,12 @@ async function selectClient(email) {
 
     // Actions buttons
     document.getElementById('main-actions').innerHTML = `
-        <button class="btn btn-primary" onclick="analyzeAll()">Analyser TOUS (${unreplied.length})</button>
-        <button class="btn btn-success" id="btn-copy" onclick="copyDraft()" disabled>Copier</button>
+        <button class="btn btn-primary" onclick="analyzeAll()">🤖 Analyser (${unreplied.length})</button>
+        <button class="btn" style="background:#8b5cf6;color:white;" id="btn-edit" onclick="togglePreview()" disabled>✏️ Modifier</button>
+        <button class="btn btn-success" id="btn-copy" onclick="copyDraft()" disabled>📋 Copier</button>
         <button class="btn" style="background:#0ea5e9;color:white;" id="btn-send" onclick="sendEmail()" disabled>📤 Envoyer</button>
-        <button class="btn btn-blue" id="btn-dashboard" onclick="generateDashboard()">Dashboard HTML</button>
-        <button class="btn btn-pink" onclick="markAllReplied()">Repondu</button>
+        <button class="btn" style="background:#f59e0b;color:white;" onclick="showKPIEvolution()">📊 KPI Evolution</button>
+        <button class="btn btn-pink" onclick="markAllReplied()">✓ Repondu</button>
     `;
 
     // Load all email bodies
@@ -418,6 +419,7 @@ async function analyzeAll() {
 
         document.getElementById('btn-copy').disabled = false;
         document.getElementById('btn-send').disabled = false;
+        document.getElementById('btn-edit').disabled = false;
 
         // AUTO-SHOW PREVIEW (rendered HTML)
         previewMode = false; // Reset then toggle
@@ -688,6 +690,89 @@ function downloadDashboard() {
 
 function closeDashboard() {
     document.getElementById('dashboard-modal').classList.add('hidden');
+}
+
+// KPI EVOLUTION - Show metrics evolution since day 1
+async function showKPIEvolution() {
+    if (!currentClient) {
+        alert('Selectionne un client d\'abord');
+        return;
+    }
+
+    try {
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/metrics`);
+
+        let html = `
+            <div style="padding:24px;">
+                <h2 style="color:#a855f7;margin:0 0 24px;font-size:24px;font-weight:700;">📊 Evolution KPI - ${currentClient.split('@')[0]}</h2>
+        `;
+
+        if (res.metrics && res.metrics.length > 0) {
+            // Evolution summary
+            if (res.evolution && Object.keys(res.evolution).length > 0) {
+                html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px;">`;
+                for (const [key, val] of Object.entries(res.evolution)) {
+                    const color = val.diff < 0 ? '#22c55e' : val.diff > 0 ? '#ef4444' : '#94a3b8';
+                    const label = key.replace('_', ' ').replace('poids', 'Poids').replace('tour', 'Tour');
+                    html += `
+                        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:16px;padding:20px;text-align:center;">
+                            <div style="color:#a78bfa;font-size:12px;text-transform:uppercase;">${label}</div>
+                            <div style="color:${color};font-size:28px;font-weight:700;margin:8px 0;">${val.diff > 0 ? '+' : ''}${val.diff}</div>
+                            <div style="color:#9ca3af;font-size:12px;">${val.pct > 0 ? '+' : ''}${val.pct}%</div>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+
+            // Metrics table
+            html += `
+                <div style="background:#1a1a2e;border-radius:12px;overflow:hidden;">
+                    <table style="width:100%;border-collapse:collapse;color:#e0e0e0;">
+                        <thead>
+                            <tr style="background:#312e81;">
+                                <th style="padding:12px;text-align:left;font-size:12px;text-transform:uppercase;color:#a78bfa;">Date</th>
+                                <th style="padding:12px;text-align:center;">Energie</th>
+                                <th style="padding:12px;text-align:center;">Sommeil</th>
+                                <th style="padding:12px;text-align:center;">Adherence</th>
+                                <th style="padding:12px;text-align:left;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            for (const m of res.metrics.slice(-10)) {
+                const date = new Date(m.date_recorded).toLocaleDateString('fr-FR');
+                html += `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:12px;">${date}</td>
+                        <td style="padding:12px;text-align:center;">${m.energie || '-'}/10</td>
+                        <td style="padding:12px;text-align:center;">${m.sommeil || '-'}/10</td>
+                        <td style="padding:12px;text-align:center;">${m.adherence || '-'}%</td>
+                        <td style="padding:12px;font-size:12px;color:#9ca3af;">${m.notes ? JSON.parse(m.notes).mindset || '-' : '-'}</td>
+                    </tr>
+                `;
+            }
+            html += `</tbody></table></div>`;
+        } else {
+            html += `
+                <div style="text-align:center;padding:40px;color:#9ca3af;">
+                    <div style="font-size:48px;margin-bottom:16px;">📉</div>
+                    <p>Aucune donnee KPI pour ce client.</p>
+                    <p style="font-size:14px;">Les KPIs sont extraits automatiquement lors de l'analyse IA.</p>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+
+        // Show in modal
+        document.getElementById('dashboard-body').innerHTML = html;
+        document.getElementById('dashboard-modal').classList.remove('hidden');
+
+    } catch(e) {
+        console.error('[KPI] Error:', e);
+        alert('Erreur chargement KPI: ' + e.message);
+    }
 }
 
 // SYNC
