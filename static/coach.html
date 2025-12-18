@@ -138,7 +138,8 @@
             <div class="panel-header">
                 <div class="logo">Achzod Coach</div>
                 <div class="sync-row">
-                    <button class="btn btn-primary btn-sm" onclick="sync()">Sync Gmail</button>
+                    <button class="btn btn-primary btn-sm" onclick="sync()">📧 Sync Gmail</button>
+                    <button class="btn btn-sm" style="background:#dc2626;color:white;" onclick="resetAndSync()">🔄 Reset</button>
                     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
                 </div>
                 <div id="sync-status" style="font-size:0.75rem;color:var(--muted);margin-top:8px;"></div>
@@ -709,6 +710,32 @@ async function sync() {
         setTimeout(() => { status.textContent = ''; status.style.color = '#6b7280'; }, 8000);
     } catch(e) {
         console.error('[SYNC] Error:', e);
+        status.textContent = `Erreur: ${e.message}`;
+        status.style.color = '#dc2626';
+    }
+}
+
+// RESET & SYNC - Clear database and resync all
+async function resetAndSync() {
+    if (!confirm('Effacer TOUS les emails et re-synchroniser depuis Gmail?\nCette action est irreversible.')) return;
+    const status = document.getElementById('sync-status');
+    status.textContent = 'Reset en cours...';
+    status.style.color = '#dc2626';
+    try {
+        await api('/coach/gmail/reset', 'POST');
+        status.textContent = 'Reset OK, sync en cours...';
+        status.style.color = '#6b7280';
+        const res = await api('/coach/gmail/sync', 'POST');
+        if (res.error) {
+            status.textContent = `Erreur: ${res.error}`;
+            status.style.color = '#dc2626';
+        } else {
+            status.textContent = `✓ Reset + ${res.synced || 0} emails synced`;
+            status.style.color = '#16a34a';
+            loadClients();
+        }
+        setTimeout(() => { status.textContent = ''; }, 10000);
+    } catch(e) {
         status.textContent = `Erreur: ${e.message}`;
         status.style.color = '#dc2626';
     }

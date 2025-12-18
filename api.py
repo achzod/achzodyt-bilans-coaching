@@ -189,19 +189,16 @@ SPAM_DOMAINS = [
 ]
 
 SPAM_SUBJECTS = [
-    # Orders/payments
+    # Orders/payments - SPECIFIC patterns only
     'confirmation de commande', 'order confirmation', 'votre commande',
-    'your order', 'receipt', 'reçu', 'facture', 'invoice', 'payment',
-    'paiement', 'subscription', 'abonnement', 'your money', 'bank account',
-    'transaction', 'purchase', 'achat', 'vente klarna', 'nouvelle vente',
+    'your order', 'vente klarna', 'nouvelle vente', 'your invoice',
     # Account stuff
-    'verify your email', 'vérifiez votre', 'confirm your', 'confirmez votre',
-    'password reset', 'réinitialisation', 'security alert', 'alerte sécurité',
-    'welcome to', 'bienvenue', 'thank you for signing', 'merci de vous être',
-    'your account', 'votre compte', 'account update', 'mise à jour',
-    # Notifications
-    'notification', 'reminder', 'rappel', 'newsletter', 'unsubscribe',
-    'automatic reply', 'réponse automatique', 'out of office', 'absence',
+    'verify your email', 'vérifiez votre email', 'confirm your account',
+    'password reset', 'réinitialisation mot de passe', 'security alert',
+    'welcome to our', 'thank you for signing up',
+    # Marketing only
+    'newsletter', 'unsubscribe from',
+    'automatic reply', 'réponse automatique', 'out of office',
     # Marketing
     'cadeaux', 'promo', 'offre', 'soldes', 'réduction', 'discount',
     'fêtes', 'holidays', 'black friday', 'cyber monday', 'special offer',
@@ -590,6 +587,19 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
     except Exception as e:
         print(f"[SYNC] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur sync: {str(e)}")
+
+@app.post("/api/coach/gmail/reset")
+async def reset_all_emails(user: Dict = Depends(get_current_coach)):
+    """Clear ALL emails from database for fresh resync"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM gmail_emails')
+    c.execute('DELETE FROM clients')
+    c.execute('DELETE FROM email_attachments')
+    deleted = c.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": f"Database cleared. Click Sync to reload all emails."}
 
 @app.post("/api/coach/gmail/clean-spam")
 async def clean_spam_emails(user: Dict = Depends(get_current_coach)):
