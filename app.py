@@ -943,7 +943,7 @@ def main():
                 st.info("Aucun historique trouvé pour ce client.")
         
         with tab3:
-            st.subheader("🤖 Analyse par Claude 3.5 Sonnet")
+            st.subheader("🤖 Analyse par Claude Sonnet 4.5")
             
             # Si déjà analysé, afficher
             if st.session_state.analysis:
@@ -967,7 +967,7 @@ def main():
             
             # Bouton Lancer Analyse
             if st.button("✨ Lancer l'Analyse IA (Historique + Photos)", type="primary", use_container_width=True):
-                with st.status("🧠 Analyse en cours par Claude 3.5...", expanded=True) as status:
+                with st.status("🧠 Analyse en cours par Claude Sonnet 4.5...", expanded=True) as status:
                     st.write("Déchiffrage du bilan et analyse de l'historique...")
                     result = analyze_coaching_bilan(email, st.session_state.history, client_email)
                     
