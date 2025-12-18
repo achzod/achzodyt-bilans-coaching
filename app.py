@@ -856,81 +856,146 @@ def main():
         except Exception as e:
              pass
 
-    # --- MAIN CONTENT: DASHBOARD EMAILS ---
+    # --- NAVIGATION PRINCIPALE ---
     
-    st.subheader("📬 Boîte de Réception (Non Lus & Récents)")
-    
-    col_kpi1, col_kpi2 = st.columns(2)
-    with col_kpi1:
-        st.metric("Emails affichés", len(st.session_state.emails))
+    # ÉTAT A: AUCUN EMAIL SÉLECTIONNÉ -> TABLEAU DE BORD (LISTE)
+    if not st.session_state.selected_email:
+        st.subheader("📬 Boîte de Réception (Non Lus & Récents)")
         
-    # Tableau des emails
-    if st.session_state.emails:
-        for i, email in enumerate(st.session_state.emails):
-            with st.container():
-                # Card style
-                st.markdown(f"""
-                <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="font-weight: bold; font-size: 1.1rem; color: #333;">{email.get('subject', 'Sans sujet')}</div>
-                    <div style="color: #666; font-size: 0.9rem; margin-bottom: 5px;">
-                        👤 <b>{email.get('client_email', 'Inconnu')}</b> | 📅 {email.get('date').strftime('%d/%m/%Y %H:%M') if isinstance(email.get('date'), datetime) else str(email.get('date'))}
+        # KPI rapide
+        st.metric("Emails en attente", len(st.session_state.emails))
+        
+        # Liste des emails
+        if st.session_state.emails:
+            for i, email in enumerate(st.session_state.emails):
+                with st.container():
+                    # Style Card
+                    st.markdown(f"""
+                    <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-weight: bold; font-size: 1.1rem; color: #333;">{email.get('subject', 'Sans sujet')}</div>
+                        <div style="color: #666; font-size: 0.9rem; margin-bottom: 5px;">
+                            👤 <b>{email.get('client_email', 'Inconnu')}</b> | 📅 {email.get('date').strftime('%d/%m/%Y %H:%M') if isinstance(email.get('date'), datetime) else str(email.get('date'))}
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Actions
-                c1, c2, c3 = st.columns([1, 1, 4])
-                with c1:
-                    if st.button("🔍 Analyser", key=f"analyze_{i}_{email.get('message_id')}", use_container_width=True):
-                        st.session_state.selected_email = email
-                        st.session_state.analysis = None
-                        # Hack pour scroller ou changer de vue si besoin
-                        # Mais pour l'instant on reste simple : ça recharge la page et affichera l'analyse en dessous ou dans une modale
-                        
-                with c2:
-                     if st.button("🗑️ Ignorer", key=f"ignore_{i}_{email.get('message_id')}", use_container_width=True):
-                        # TODO: Marquer comme lu ou supprimer de la liste locale
-                        pass
-                
+                    """, unsafe_allow_html=True)
+                    
+                    # Actions
+                    c1, c2, c3 = st.columns([1, 1, 4])
+                    with c1:
+                        if st.button("🔍 Ouvrir & Analyser", key=f"btn_open_{i}_{email.get('message_id')}", use_container_width=True):
+                            st.session_state.selected_email = email
+                            st.session_state.analysis = None
+                            st.session_state.history = [] # Forcer le rechargement de l'historique
+                            st.rerun()
+                    with c2:
+                         if st.button("🗑️ Ignorer", key=f"btn_ignore_{i}_{email.get('message_id')}", use_container_width=True):
+                            # TODO: Marquer comme lu en DB
+                            st.info("Email ignoré (visuellement)")
+        else:
+            st.info("📭 Aucun email à afficher. Lance une synchronisation dans la barre latérale !")
+
+    # ÉTAT B: EMAIL SÉLECTIONNÉ -> VUE DÉTAILLÉE AVEC ONGLETS
     else:
-        st.info("📭 Aucun email à afficher. Lance une synchronisation !")
-
-    
-    # --- SECTION ANALYSE (si email sélectionné) ---
-    if st.session_state.selected_email:
-        st.divider()
-        st.header(f"🤖 Analyse: {st.session_state.selected_email.get('subject')}")
-        
-        # ... Reste du code d'analyse existant ou adaptation ...
-        # Pour l'instant on affiche juste le détail pour confirmer que ça marche
-        email = st.session_state.selected_email
-        
-        # Tenter de charger le body complet si pas chargé
-        if not email.get('body') and email.get('email_id'):
-            with st.spinner("Chargement complet..."):
-                 full_data = st.session_state.reader.load_email_content(email['email_id'])
-                 if full_data.get('loaded'):
-                     email['body'] = full_data['body']
-                     email['attachments'] = full_data['attachments']
-                     # Update DB
-                     # st.session_state.db.save_email(email) # Optionnel
-        
-        st.write(email.get('body', 'Contenu vide ou non chargé'))
-        
-        if email.get('attachments'):
-            st.write(f"📎 {len(email['attachments'])} pièces jointes")
-            display_attachments(email['attachments'])
+        if st.button("⬅️ Retour à la liste", use_container_width=True):
+            st.session_state.selected_email = None
+            st.session_state.analysis = None
+            st.session_state.history = []
+            st.rerun()
             
-        # Bouton Generer Bilan Coaching (Appel IA)
-        if st.button("✨ Générer Bilan Coaching", type="primary", use_container_width=True):
-             with st.spinner("Analyse IA en cours..."):
-                 # Simulation ou appel réel
-                 pass
-
-    # --- FIN DU DASHBOARD ---
-    
-    # On cache l'ancienne interface 'Recherche Client' qui était ici
-    return 
+        email = st.session_state.selected_email
+        client_email = email.get('client_email', '')
+        
+        st.header(f"📧 {email.get('subject', 'Sans sujet')}")
+        st.caption(f"De: **{client_email}** | Date: {email.get('date')}")
+        
+        # 1. Charger le contenu complet SI manquant
+        if not email.get('body') and email.get('email_id'):
+            with st.spinner("🔌 Chargement du contenu Gmail..."):
+                full_data = st.session_state.reader.load_email_content(email['email_id'])
+                if full_data.get('loaded'):
+                    email['body'] = full_data['body']
+                    email['attachments'] = full_data['attachments']
+                    # Garder en session
+                    st.session_state.selected_email = email
+        
+        # 2. Charger l'historique complet pour l'IA
+        if not st.session_state.history:
+            with st.spinner("📜 Récupération de l'historique client..."):
+                st.session_state.history = st.session_state.db.get_client_history(client_email, load_attachments=True)
+        
+        # 3. ONGLETS
+        tab1, tab2, tab3, tab4 = st.tabs(["📨 Email Actuel", "📜 Historique Complet", "🤖 Analyse IA", "✉️ Email de Réponse"])
+        
+        with tab1:
+            st.markdown(f'<div class="bilan-card">{html.escape(email.get("body", ""))}</div>', unsafe_allow_html=True)
+            if email.get('attachments'):
+                st.subheader(f"📎 Pièces jointes ({len(email['attachments'])})")
+                display_attachments(email['attachments'])
+        
+        with tab2:
+            st.subheader(f"Historique de {client_email}")
+            if st.session_state.history:
+                for h_email in reversed(st.session_state.history): # Plus récent en haut
+                    direction = "📥" if h_email.get('direction') == 'received' else "📤"
+                    with st.expander(f"{direction} {h_email.get('date').strftime('%d/%m/%Y')} - {h_email.get('subject')}"):
+                        st.write(h_email.get('body', '')[:1000])
+            else:
+                st.info("Aucun historique trouvé pour ce client.")
+        
+        with tab3:
+            st.subheader("🤖 Analyse par Claude 3.5 Sonnet")
+            
+            # Si déjà analysé, afficher
+            if st.session_state.analysis:
+                res = st.session_state.analysis
+                st.info(res.get("resume", ""))
+                
+                # KPIs
+                if res.get("kpis"):
+                    display_kpis(res["kpis"])
+                
+                # Points positifs / améliorations
+                c_pos, c_neg = st.columns(2)
+                with c_pos:
+                    st.success("✅ Points Positifs")
+                    for p in res.get("points_positifs", []): st.write(f"- {p}")
+                with c_neg:
+                    st.error("⚠️ À Améliorer")
+                    for p in res.get("points_ameliorer", []): 
+                        if isinstance(p, dict): st.write(f"- **{p.get('probleme')}**: {p.get('solution')}")
+                        else: st.write(f"- {p}")
+            
+            # Bouton Lancer Analyse
+            if st.button("✨ Lancer l'Analyse IA (Historique + Photos)", type="primary", use_container_width=True):
+                with st.status("🧠 Analyse en cours par Claude 3.5...", expanded=True) as status:
+                    st.write("Déchiffrage du bilan et analyse de l'historique...")
+                    result = analyze_coaching_bilan(email, st.session_state.history, client_email)
+                    
+                    if result.get("success"):
+                        st.session_state.analysis = result["analysis"]
+                        st.session_state.draft = result["analysis"].get("draft_email", "")
+                        status.update(label="✅ Analyse terminée !", state="complete")
+                        st.rerun()
+                    else:
+                        st.error(f"Erreur IA: {result.get('error')}")
+                        status.update(label="❌ Erreur IA", state="error")
+        
+        with tab4:
+            st.subheader("✉️ Brouillon de Réponse")
+            if st.session_state.draft:
+                draft = st.text_area("Modifier l'email :", value=st.session_state.draft, height=400)
+                st.session_state.draft = draft
+                
+                col_send, col_regen = st.columns(2)
+                with col_send:
+                    if st.button("📤 Envoyer par Gmail", type="primary", use_container_width=True):
+                        st.warning("Fonction d'envoi à configurer (App Password requis)")
+                with col_regen:
+                    if st.button("🔄 Régénérer", use_container_width=True):
+                         # Logique de régénération...
+                         pass
+            else:
+                st.info("Lance l'analyse IA d'abord pour générer un brouillon.")
 
 if __name__ == "__main__":
     main()
