@@ -176,8 +176,9 @@ SPAM_DOMAINS = [
     # Dev/hosting
     'render.com', 'github.com', 'gitlab.com', 'vercel.com', 'netlify.com',
     'heroku', 'digitalocean', 'cloudflare',
-    # Ecommerce
+    # Ecommerce / Payments
     'amazon.', 'aws.amazon', 'ebay', 'aliexpress', 'wish.com',
+    'klarna', 'stripe.com', 'paypal.com', 'mollie', 'adyen',
     # Big tech
     'apple.com', 'microsoft.com', 'outlook.com', 'googlemail', 'icloud',
     'account-security', 'security@', 'alerts@', 'updates@',
@@ -192,7 +193,7 @@ SPAM_SUBJECTS = [
     'confirmation de commande', 'order confirmation', 'votre commande',
     'your order', 'receipt', 'reçu', 'facture', 'invoice', 'payment',
     'paiement', 'subscription', 'abonnement', 'your money', 'bank account',
-    'transaction', 'purchase', 'achat',
+    'transaction', 'purchase', 'achat', 'vente klarna', 'nouvelle vente',
     # Account stuff
     'verify your email', 'vérifiez votre', 'confirm your', 'confirmez votre',
     'password reset', 'réinitialisation', 'security alert', 'alerte sécurité',
@@ -512,7 +513,7 @@ async def test_gmail_connection():
         return {"success": False, "error": str(e), "user": mail_user}
 
 @app.post("/api/coach/gmail/sync")
-async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5):
+async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30):
     """
     ULTRA FAST Sync - Headers only, 15s timeout, NO sent emails
     Sent emails loaded on-demand during analysis
@@ -556,7 +557,7 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 5)
         synced = 0
         filtered = 0
 
-        for email_data in emails[:100]:  # Max 100 emails
+        for email_data in emails[:200]:  # Max 200 emails
             if is_spam_email(email_data):
                 filtered += 1
                 continue
