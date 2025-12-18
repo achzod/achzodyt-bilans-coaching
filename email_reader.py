@@ -24,15 +24,31 @@ MAIL_PASS = os.getenv("MAIL_PASS")
 
 
 def create_connection():
-    """Cree une nouvelle connexion IMAP"""
+    """Cree une nouvelle connexion IMAP avec debugging intense"""
+    # imaplib.Debug = 4 # Trop verbeux pour prod, mais utile ici - Activé via env si besoin
     try:
         import socket
-        socket.setdefaulttimeout(15)
+        timeout = 30
+        socket.setdefaulttimeout(timeout)
+        
+        print(f"[IMAP] Tentative de connexion vers {IMAP_SERVER}:{IMAP_PORT} (timeout={timeout})...")
+        
+        # 1. Connexion SSL
+        start_time = time.time()
         conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        print(f"[IMAP] SSL Connect OK en {time.time() - start_time:.2f}s")
+        
+        # 2. Login
+        print(f"[IMAP] Tentative login pour {MAIL_USER}...")
+        start_time = time.time()
         conn.login(MAIL_USER, MAIL_PASS)
+        print(f"[IMAP] Login OK en {time.time() - start_time:.2f}s")
+        
         return conn
     except Exception as e:
-        print(f"[IMAP] Erreur connexion: {e}")
+        print(f"[IMAP] ECHEC CRITIQUE: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
