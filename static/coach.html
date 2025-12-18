@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achzod Coach</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #f8f9fa; --bg-card: #ffffff; --bg-hover: #f1f3f4;
+            --border: #e0e0e0; --primary: #7c3aed; --primary-glow: rgba(124,58,237,0.2);
+            --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+            --text: #1f2937; --muted: #6b7280;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: auto; }
+
+        /* LAYOUT - 2 panels now */
+        .app { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+        .panel { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg); }
+        .panel:last-child { border-right: none; }
+        .panel-header { padding: 16px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+        .panel-content { flex: 1; overflow-y: auto; padding: 12px; }
+
+        /* SIDEBAR */
+        .logo { font-size: 1.3rem; font-weight: 700; background: linear-gradient(135deg, var(--primary), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .sync-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .client { padding: 14px; border-radius: 10px; cursor: pointer; border-left: 4px solid var(--warning); margin-bottom: 8px; background: var(--bg-card); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+        .client:hover { background: var(--bg-hover); transform: translateX(2px); }
+        .client.active { border-left-color: var(--primary); background: rgba(124,58,237,0.1); }
+        .client-name { font-weight: 600; font-size: 0.95rem; }
+        .client-email { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+        .client-meta { font-size: 0.7rem; color: var(--warning); margin-top: 4px; font-weight: 600; }
+        .badge { background: var(--warning); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; }
+
+        /* MAIN PANEL */
+        .main-panel { display: flex; flex-direction: column; }
+        .main-header { padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .main-title { font-size: 1.2rem; font-weight: 700; }
+        .main-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .main-content { flex: 1; overflow-y: auto; padding: 24px; }
+
+        /* BUTTONS */
+        .btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { box-shadow: 0 4px 15px var(--primary-glow); transform: translateY(-1px); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { box-shadow: 0 4px 15px rgba(22,163,74,0.3); }
+        .btn-blue { background: #3b82f6; color: white; }
+        .btn-pink { background: #ec4899; color: white; }
+        .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* SECTIONS */
+        .section { background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+        .section-title { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 16px; font-weight: 700; }
+
+        /* EMAILS LIST in main panel */
+        .emails-preview { background: var(--bg); border-radius: 10px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--border); }
+        .email-item { padding: 16px; background: #fff; border-radius: 10px; margin-bottom: 12px; border-left: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .email-item-date { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+        .email-item-subject { font-weight: 700; font-size: 1rem; color: var(--primary); margin-bottom: 8px; }
+
+        /* RESPONSE - MUCH BIGGER */
+        .response-section { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 3px solid var(--success); }
+        .response-section textarea {
+            background: #fff;
+            font-size: 1.1rem;
+            min-height: 350px;
+            line-height: 1.8;
+            padding: 20px;
+        }
+
+        /* TEXTAREA */
+        textarea { width: 100%; padding: 16px; background: #fff; border: 2px solid var(--border); border-radius: 10px; color: var(--text); resize: vertical; font-family: inherit; font-size: 1rem; line-height: 1.7; }
+        textarea:focus { outline: none; border-color: var(--primary); }
+
+        /* KPI GRID */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; }
+        .kpi { background: var(--bg); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
+        .kpi-value { font-size: 1.6rem; font-weight: 700; }
+        .kpi-value.good { color: var(--success); }
+        .kpi-value.ok { color: var(--warning); }
+        .kpi-value.bad { color: var(--danger); }
+        .kpi-label { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+        /* PHOTOS */
+        .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+        .photo { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; cursor: pointer; }
+
+        /* POINTS */
+        .point { padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; border: 1px solid var(--border); }
+        .point.positive { border-left: 4px solid var(--success); background: rgba(22,163,74,0.06); }
+        .point.negative { border-left: 4px solid var(--warning); background: rgba(217,119,6,0.06); }
+
+        /* LOGIN */
+        .login-page { height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+        .login-box { background: var(--bg-card); padding: 40px; border-radius: 16px; width: 360px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .login-box h2 { margin-bottom: 24px; text-align: center; }
+        .login-box input { width: 100%; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+        .login-box .btn { width: 100%; padding: 14px; }
+
+        .hidden { display: none !important; }
+        .loading { text-align: center; padding: 40px; color: var(--muted); }
+        .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+        .empty-icon { font-size: 3rem; margin-bottom: 10px; }
+
+        /* LIGHTBOX */
+        .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; cursor: pointer; }
+        .lightbox img { max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; }
+
+        /* MODAL */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: var(--bg-card); border-radius: 16px; width: 90%; max-width: 900px; max-height: 85vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+        .modal-body { padding: 24px; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--muted); }
+    </style>
+</head>
+<body>
+    <!-- LOGIN -->
+    <div id="login" class="login-page">
+        <div class="login-box">
+            <h2>Achzod Coach</h2>
+            <input type="email" id="login-email" placeholder="Email" value="coaching@achzodcoaching.com">
+            <input type="password" id="login-pass" placeholder="Mot de passe" value="achzod2024">
+            <button class="btn btn-primary" onclick="login()">Connexion</button>
+        </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="app hidden">
+        <!-- PANEL 1: CLIENTS -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="logo">Achzod Coach</div>
+                <div class="sync-row">
+                    <button class="btn btn-primary btn-sm" onclick="sync()">📧 Sync Gmail</button>
+                    <button class="btn btn-sm" style="background:#dc2626;color:white;" onclick="resetAndSync()">🔄 Reset</button>
+                    <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+                </div>
+                <div id="sync-status" style="font-size:0.75rem;color:var(--muted);margin-top:8px;"></div>
+            </div>
+            <div class="panel-content" id="clients-panel">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+
+        <!-- PANEL 2: MAIN -->
+        <div class="panel main-panel">
+            <div class="main-header">
+                <div class="main-title" id="main-title">Selectionne un client</div>
+                <div class="main-actions" id="main-actions"></div>
+            </div>
+            <div class="main-content" id="main-content">
+                <div class="empty">
+                    <div class="empty-icon">👈</div>
+                    <div>Selectionne un client a gauche pour voir ses emails non repondus</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIGHTBOX -->
+    <div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
+        <img id="lightbox-img" src="">
+    </div>
+
+    <!-- DASHBOARD MODAL -->
+    <div id="dashboard-modal" class="modal hidden" onclick="if(event.target===this)closeDashboard()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Dashboard Client</h2>
+                <button class="modal-close" onclick="closeDashboard()">&times;</button>
+            </div>
+            <div class="modal-body" id="dashboard-body"></div>
+        </div>
+    </div>
+
+<script>
+const API = '/api';
+let token = localStorage.getItem('coach_token');
+let currentClient = null;
+let currentEmailIds = [];
+let currentAnalysis = null;
+
+async function api(endpoint, method = 'GET', data = null) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+    if (data) opts.body = JSON.stringify(data);
+    const res = await fetch(API + endpoint, opts);
+    if (res.status === 401) { showLogin(); throw new Error('Auth'); }
+    return res.json();
+}
+
+function showLogin() {
+    document.getElementById('login').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+}
+function showApp() {
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+}
+
+async function login() {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+    try {
+        const res = await api('/auth/login', 'POST', { email, password: pass });
+        if (res.token) { token = res.token; localStorage.setItem('coach_token', token); showApp(); loadClients(); }
+    } catch(e) { alert('Erreur connexion'); }
+}
+
+function logout() { localStorage.removeItem('coach_token'); token = null; showLogin(); }
+
+async function checkAuth() {
+    if (!token) { showLogin(); return; }
+    try { await api('/auth/me'); showApp(); loadClients(); }
+    catch(e) { showLogin(); }
+}
+
+// CLIENTS
+async function loadClients() {
+    try {
+        const data = await api('/coach/dashboard');
+        const clientsWithUnreplied = data.clients.filter(c => (c.unreplied_count || 0) > 0);
+
+        const html = clientsWithUnreplied.map(c => `
+            <div class="client" onclick="selectClient('${c.email}')">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div class="client-name">${c.name || c.email.split('@')[0]}</div>
+                    <span class="badge">${c.unreplied_count} emails</span>
+                </div>
+                <div class="client-email">${c.email}</div>
+                <div class="client-meta">A repondre</div>
+            </div>
+        `).join('');
+        document.getElementById('clients-panel').innerHTML = html || '<div class="empty"><div class="empty-icon">🎉</div><div>Tous les clients ont ete repondus!</div></div>';
+    } catch(e) { console.error(e); }
+}
+
+// SELECT CLIENT - Load only NEW emails (non lus)
+async function selectClient(email) {
+    currentClient = email;
+    currentEmailIds = [];
+    currentAnalysis = null;
+
+    document.querySelectorAll('.client').forEach(el => el.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+
+    const data = await api(`/coach/client/${encodeURIComponent(email)}`);
+    const clientName = data.client.name || email.split('@')[0];
+    // SEULEMENT status='new' - pas les 'read' ou autres
+    const unreplied = data.emails.filter(e => e.direction === 'received' && e.status === 'new');
+
+    currentEmailIds = unreplied.map(e => e.id);
+
+    document.getElementById('main-title').textContent = `${clientName} - ${unreplied.length} email(s) a repondre`;
+
+    // Actions buttons
+    document.getElementById('main-actions').innerHTML = `
+        <button class="btn btn-primary" onclick="analyzeAll()">🤖 Analyser (${unreplied.length})</button>
+        <button class="btn" style="background:#8b5cf6;color:white;" id="btn-edit" onclick="togglePreview()" disabled>✏️ Modifier</button>
+        <button class="btn btn-success" id="btn-copy" onclick="copyDraft()" disabled>📋 Copier</button>
+        <button class="btn" style="background:#0ea5e9;color:white;" id="btn-send" onclick="sendEmail()" disabled>📤 Envoyer</button>
+        <button class="btn" style="background:#f59e0b;color:white;" onclick="showKPIEvolution()">📊 KPI Evolution</button>
+        <button class="btn btn-pink" onclick="markAllReplied()">✓ Repondu</button>
+    `;
+
+    // Load all email bodies
+    let emailsHtml = '';
+    let allPhotos = [];
+
+    for (const e of unreplied) {
+        const loadRes = await api(`/coach/email/${e.id}/load-body`, 'POST');
+        const dateStr = new Date(e.date_sent).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+
+        emailsHtml += `
+            <div class="email-item" style="border-left-color:var(--primary);">
+                <div class="email-item-date">${dateStr}</div>
+                <div class="email-item-subject">${e.subject || '(Sans sujet)'}</div>
+                <div style="margin-top:10px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:0.9rem;line-height:1.6;white-space:pre-wrap;max-height:300px;overflow-y:auto;">${loadRes.body || '(vide)'}</div>
+            </div>
+        `;
+
+        if (loadRes.attachments) {
+            allPhotos = allPhotos.concat(loadRes.attachments.filter(a => a.is_image));
+        }
+    }
+
+    let html = `
+        <div class="section">
+            <div class="section-title">📧 ${unreplied.length} Email(s) a analyser</div>
+            <div class="emails-preview">${emailsHtml}</div>
+        </div>
+    `;
+
+    if (allPhotos.length > 0) {
+        html += `
+            <div class="section">
+                <div class="section-title">📷 Photos (${allPhotos.length})</div>
+                <div class="photos-grid">
+                    ${allPhotos.map(a => `<img class="photo" src="data:${a.content_type};base64,${a.data}" onclick="showLightbox(this.src)">`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+        <div class="section">
+            <div class="section-title purple">🤖 Analyse IA</div>
+            <div id="ai-result">Clique sur "Analyser TOUS" pour generer l'analyse de tous les emails</div>
+        </div>
+        <div class="section response-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div class="section-title" style="color:var(--success);margin:0;">✉️ REPONSE A ENVOYER</div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="insertEvolution()">+ Evolution</button>
+                    <button class="btn btn-sm" id="btn-preview" onclick="togglePreview()">Preview HTML</button>
+                </div>
+            </div>
+            <div id="draft-container">
+                <textarea id="draft-text" placeholder="L'IA va generer ta reponse HTML ici..."></textarea>
+            </div>
+            <div id="draft-preview" style="display:none;background:#fff;border:2px solid var(--border);border-radius:10px;padding:20px;min-height:350px;"></div>
+        </div>
+    `;
+
+    document.getElementById('main-content').innerHTML = html;
+}
+
+// Store both analyses
+let gpt4Analysis = null;
+let geminiAnalysis = null;
+
+// ANALYZE ALL UNREPLIED EMAILS - 2 IA en parallele!
+async function analyzeAll() {
+    if (!currentClient) return;
+
+    const btn = document.querySelector('.main-actions .btn-primary');
+    btn.disabled = true;
+    btn.textContent = 'Analyse en cours...';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Claude Sonnet 4.5 + Gemini en parallele (30-90s max)...</div></div>';
+
+    try {
+        console.log('[ANALYZE] Starting analysis for', currentClient);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2min timeout
+
+        const response = await fetch(API + `/coach/client/${encodeURIComponent(currentClient)}/analyze-all`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const res = await response.json();
+        console.log('[ANALYZE] Result:', res);
+
+        if (!res.success) {
+            document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;">Erreur: ${res.error}</div>`;
+            btn.textContent = `Analyser TOUS (${currentEmailIds.length})`;
+            btn.disabled = false;
+            return;
+        }
+
+        // Store both
+        gpt4Analysis = res.gpt4;
+        geminiAnalysis = res.gemini;
+
+        let html = `<div style="background:var(--success);color:white;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-weight:600;">
+            ${res.emails_count || 1} email(s) - ${res.photos_analyzed || 0} photos - 2 IA utilisees
+        </div>`;
+
+        // Afficher les 2 analyses cote a cote
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+            <div style="border:2px solid #10b981;border-radius:12px;padding:16px;background:#10b98110;">
+                <div style="font-weight:bold;font-size:1.1rem;color:#10b981;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>🤖 Claude Sonnet 4.5</span>
+                    <button class="btn btn-sm btn-success" onclick="selectAI('gpt4')">Utiliser</button>
+                </div>
+                <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
+                    ${gpt4Analysis?.analysis?.resume || gpt4Analysis?.error || 'Analyse disponible'}
+                </div>
+            </div>
+            <div style="border:2px solid #8b5cf6;border-radius:12px;padding:16px;background:#8b5cf610;">
+                <div style="font-weight:bold;font-size:1.1rem;color:#8b5cf6;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>💎 Gemini 3 Pro</span>
+                    <button class="btn btn-sm" style="background:#8b5cf6;color:white;" onclick="selectAI('gemini')">Utiliser</button>
+                </div>
+                <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
+                    ${geminiAnalysis?.analysis?.resume || geminiAnalysis?.error || 'Analyse disponible'}
+                </div>
+            </div>
+        </div>`;
+
+        html += `<p style="text-align:center;color:var(--muted);font-size:0.9rem;">👆 Clique sur "Utiliser" pour choisir l'analyse</p>`;
+
+        document.getElementById('ai-result').innerHTML = html;
+
+        // Par defaut, afficher Claude
+        if (gpt4Analysis?.draft) {
+            document.getElementById('draft-text').value = gpt4Analysis.draft;
+            currentAnalysis = gpt4Analysis.analysis;
+        } else if (geminiAnalysis?.draft) {
+            document.getElementById('draft-text').value = geminiAnalysis.draft;
+            currentAnalysis = geminiAnalysis.analysis;
+        }
+
+        document.getElementById('btn-copy').disabled = false;
+        document.getElementById('btn-send').disabled = false;
+        document.getElementById('btn-edit').disabled = false;
+
+        // AUTO-SHOW PREVIEW (rendered HTML)
+        previewMode = false; // Reset then toggle
+        togglePreview();
+
+    } catch(e) {
+        console.error('[ANALYZE] Error:', e);
+        let errorMsg = e.message;
+        if (e.name === 'AbortError') {
+            errorMsg = 'Timeout (2min) - Réessaie, le serveur était peut-être occupé';
+        }
+        document.getElementById('ai-result').innerHTML = `<div style="color:var(--danger);padding:20px;background:#fee2e2;border-radius:8px;">
+            <strong>Erreur:</strong> ${errorMsg}<br>
+            <small style="color:#666;">Ouvre la console (F12) pour plus de détails</small>
+        </div>`;
+    }
+
+    btn.textContent = `Analyser TOUS (${currentEmailIds.length})`;
+    btn.disabled = false;
+}
+
+// SELECT AI - Choisir entre Claude Sonnet 4.5 et Gemini
+function selectAI(aiName) {
+    if (aiName === 'gpt4' && gpt4Analysis?.draft) {
+        document.getElementById('draft-text').value = gpt4Analysis.draft;
+        currentAnalysis = gpt4Analysis.analysis;
+        showNotification('Claude Sonnet 4.5 selectionne!', 'success');
+    } else if (aiName === 'gemini' && geminiAnalysis?.draft) {
+        document.getElementById('draft-text').value = geminiAnalysis.draft;
+        currentAnalysis = geminiAnalysis.analysis;
+        showNotification('Gemini 3 Pro selectionne!', 'info');
+    } else {
+        alert('Analyse non disponible pour cette IA');
+        return;
+    }
+
+    // Refresh preview
+    previewMode = false;
+    togglePreview();
+}
+
+// MARK ALL AS REPLIED
+async function markAllReplied() {
+    if (!currentClient) return;
+    if (!confirm('Marquer TOUS les emails comme repondus?')) return;
+
+    try {
+        await api(`/coach/client/${encodeURIComponent(currentClient)}/mark-all-replied`, 'POST');
+        document.getElementById('main-content').innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div>Tous les emails ont ete marques comme repondus!</div></div>';
+        document.getElementById('main-actions').innerHTML = '';
+        loadClients();
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+    }
+}
+
+// TOGGLE HTML PREVIEW
+let previewMode = false;
+function togglePreview() {
+    const textarea = document.getElementById('draft-container');
+    const preview = document.getElementById('draft-preview');
+    const btn = document.getElementById('btn-preview');
+
+    if (!previewMode) {
+        // Show preview
+        const html = document.getElementById('draft-text').value;
+        preview.innerHTML = html;
+        textarea.style.display = 'none';
+        preview.style.display = 'block';
+        btn.textContent = 'Editer';
+        btn.style.background = '#ef4444';
+        previewMode = true;
+    } else {
+        // Back to edit
+        textarea.style.display = 'block';
+        preview.style.display = 'none';
+        btn.textContent = 'Preview HTML';
+        btn.style.background = '';
+        previewMode = false;
+    }
+}
+
+// INSERT EVOLUTION METRIQUES
+function insertEvolution() {
+    if (!currentAnalysis || !currentAnalysis.evolution_metriques) {
+        alert('Analyse d\'abord les emails pour avoir les metriques d\'evolution!');
+        return;
+    }
+
+    const em = currentAnalysis.evolution_metriques;
+    let metricsHtml = '';
+
+    if (em.poids) {
+        const color = em.poids.diff?.startsWith('-') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Poids</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.poids.jour1} → ${em.poids.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.poids.diff}</div>
+        </div>`;
+    }
+    if (em.masse_grasse) {
+        const color = em.masse_grasse.diff?.startsWith('-') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Masse Grasse</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.masse_grasse.jour1} → ${em.masse_grasse.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.masse_grasse.diff}</div>
+        </div>`;
+    }
+    if (em.pas_jour) {
+        const color = em.pas_jour.diff?.startsWith('+') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Pas/jour</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.pas_jour.jour1} → ${em.pas_jour.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.pas_jour.diff}</div>
+        </div>`;
+    }
+    if (em.energie) {
+        const color = em.energie.diff?.startsWith('+') ? '#4ade80' : '#ef4444';
+        metricsHtml += `
+        <div style="background:rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;">
+            <div style="font-size:14px;opacity:0.9;">Energie</div>
+            <div style="font-size:18px;font-weight:bold;margin:8px 0;">${em.energie.jour1} → ${em.energie.actuel}</div>
+            <div style="font-size:20px;color:${color};font-weight:bold;">${em.energie.diff}</div>
+        </div>`;
+    }
+
+    const evolutionHtml = `
+<div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:24px;margin:24px 0;color:white;font-family:Arial,sans-serif;">
+    <h3 style="margin:0 0 20px 0;font-size:20px;text-align:center;">📈 Ton Evolution depuis le Jour 1</h3>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
+        ${metricsHtml}
+    </div>
+</div>`;
+
+    const textarea = document.getElementById('draft-text');
+    const cursorPos = textarea.selectionStart;
+    const textBefore = textarea.value.substring(0, cursorPos);
+    const textAfter = textarea.value.substring(cursorPos);
+    textarea.value = textBefore + evolutionHtml + textAfter;
+    textarea.focus();
+}
+
+// SEND EMAIL - Direct via API
+async function sendEmail() {
+    if (!currentClient) return;
+    const htmlBody = document.getElementById('draft-text').value;
+    if (!htmlBody) {
+        alert('Génère d\'abord une réponse!');
+        return;
+    }
+
+    // Confirm before sending
+    if (!confirm(`Envoyer cet email à ${currentClient}?`)) return;
+
+    const btn = document.getElementById('btn-send');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Envoi en cours...';
+
+    try {
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/send-email`, 'POST', {
+            subject: 'Re: Ton bilan',
+            html_body: htmlBody
+        });
+
+        if (res.success) {
+            btn.textContent = '✓ Envoyé!';
+            btn.style.background = '#22c55e';
+
+            // Show success notification
+            showNotification('Email envoyé avec succès!', 'success');
+
+            // Refresh client list after 2s
+            setTimeout(() => {
+                loadClients();
+                // Reset button
+                btn.textContent = originalText;
+                btn.style.background = '#0ea5e9';
+            }, 2000);
+        } else {
+            throw new Error(res.error || 'Erreur envoi');
+        }
+    } catch(e) {
+        console.error(e);
+        alert('Erreur: ' + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notif = document.createElement('div');
+    notif.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 16px 24px;
+        background: ${type === 'success' ? '#22c55e' : '#0ea5e9'};
+        color: white;
+        border-radius: 8px;
+        font-weight: 600;
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    `;
+    notif.textContent = message;
+    document.body.appendChild(notif);
+    setTimeout(() => notif.remove(), 3000);
+}
+
+// GENERATE DASHBOARD HTML
+async function generateDashboard() {
+    if (!currentClient) return;
+
+    const btn = document.getElementById('btn-dashboard');
+    btn.textContent = 'Chargement...';
+    btn.disabled = true;
+
+    try {
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/dashboard-html`);
+        if (res.success && res.html) {
+            // Store for download
+            window.dashboardHtml = res.html;
+            window.dashboardFilename = res.filename;
+
+            // Show preview in modal
+            document.getElementById('dashboard-body').innerHTML = `
+                <div style="margin-bottom:20px;display:flex;gap:12px;align-items:center;">
+                    <button class="btn btn-success" onclick="downloadDashboard()">Telecharger HTML</button>
+                    <span style="color:var(--muted);">${res.filename}</span>
+                </div>
+                <iframe id="dashboard-preview" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px;background:#1a1a2e;"></iframe>
+            `;
+            document.getElementById('dashboard-modal').classList.remove('hidden');
+
+            // Set iframe content after modal is visible
+            setTimeout(() => {
+                const iframe = document.getElementById('dashboard-preview');
+                if (iframe) {
+                    iframe.srcdoc = res.html;
+                }
+            }, 100);
+        } else {
+            alert('Erreur: ' + (res.error || 'Pas de donnees'));
+        }
+    } catch(e) {
+        console.error(e);
+        alert('Erreur: ' + e.message);
+    }
+
+    btn.textContent = 'Dashboard HTML';
+    btn.disabled = false;
+}
+
+function downloadDashboard() {
+    const blob = new Blob([window.dashboardHtml], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = window.dashboardFilename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function closeDashboard() {
+    document.getElementById('dashboard-modal').classList.add('hidden');
+}
+
+// KPI EVOLUTION - Show metrics evolution since day 1
+async function showKPIEvolution() {
+    if (!currentClient) {
+        alert('Selectionne un client d\'abord');
+        return;
+    }
+
+    try {
+        const res = await api(`/coach/client/${encodeURIComponent(currentClient)}/metrics`);
+
+        let html = `
+            <div style="padding:24px;">
+                <h2 style="color:#a855f7;margin:0 0 24px;font-size:24px;font-weight:700;">📊 Evolution KPI - ${currentClient.split('@')[0]}</h2>
+        `;
+
+        if (res.metrics && res.metrics.length > 0) {
+            // Evolution summary
+            if (res.evolution && Object.keys(res.evolution).length > 0) {
+                html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px;">`;
+                for (const [key, val] of Object.entries(res.evolution)) {
+                    const color = val.diff < 0 ? '#22c55e' : val.diff > 0 ? '#ef4444' : '#94a3b8';
+                    const label = key.replace('_', ' ').replace('poids', 'Poids').replace('tour', 'Tour');
+                    html += `
+                        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:16px;padding:20px;text-align:center;">
+                            <div style="color:#a78bfa;font-size:12px;text-transform:uppercase;">${label}</div>
+                            <div style="color:${color};font-size:28px;font-weight:700;margin:8px 0;">${val.diff > 0 ? '+' : ''}${val.diff}</div>
+                            <div style="color:#9ca3af;font-size:12px;">${val.pct > 0 ? '+' : ''}${val.pct}%</div>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+
+            // Metrics table
+            html += `
+                <div style="background:#1a1a2e;border-radius:12px;overflow:hidden;">
+                    <table style="width:100%;border-collapse:collapse;color:#e0e0e0;">
+                        <thead>
+                            <tr style="background:#312e81;">
+                                <th style="padding:12px;text-align:left;font-size:12px;text-transform:uppercase;color:#a78bfa;">Date</th>
+                                <th style="padding:12px;text-align:center;">Energie</th>
+                                <th style="padding:12px;text-align:center;">Sommeil</th>
+                                <th style="padding:12px;text-align:center;">Adherence</th>
+                                <th style="padding:12px;text-align:left;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            for (const m of res.metrics.slice(-10)) {
+                const date = new Date(m.date_recorded).toLocaleDateString('fr-FR');
+                html += `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:12px;">${date}</td>
+                        <td style="padding:12px;text-align:center;">${m.energie || '-'}/10</td>
+                        <td style="padding:12px;text-align:center;">${m.sommeil || '-'}/10</td>
+                        <td style="padding:12px;text-align:center;">${m.adherence || '-'}%</td>
+                        <td style="padding:12px;font-size:12px;color:#9ca3af;">${m.notes ? JSON.parse(m.notes).mindset || '-' : '-'}</td>
+                    </tr>
+                `;
+            }
+            html += `</tbody></table></div>`;
+        } else {
+            html += `
+                <div style="text-align:center;padding:40px;color:#9ca3af;">
+                    <div style="font-size:48px;margin-bottom:16px;">📉</div>
+                    <p>Aucune donnee KPI pour ce client.</p>
+                    <p style="font-size:14px;">Les KPIs sont extraits automatiquement lors de l'analyse IA.</p>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+
+        // Show in modal
+        document.getElementById('dashboard-body').innerHTML = html;
+        document.getElementById('dashboard-modal').classList.remove('hidden');
+
+    } catch(e) {
+        console.error('[KPI] Error:', e);
+        alert('Erreur chargement KPI: ' + e.message);
+    }
+}
+
+// SYNC
+async function sync() {
+    const status = document.getElementById('sync-status');
+    status.textContent = 'Sync en cours...';
+    status.style.color = '#6b7280';
+    try {
+        console.log('[SYNC] Starting...');
+        const res = await api('/coach/gmail/sync', 'POST');
+        console.log('[SYNC] Result:', res);
+        if (res.error) {
+            status.textContent = `Erreur: ${res.error}`;
+            status.style.color = '#dc2626';
+        } else {
+            status.textContent = `✓ ${res.synced || 0} emails synced`;
+            status.style.color = '#16a34a';
+            loadClients();
+        }
+        setTimeout(() => { status.textContent = ''; status.style.color = '#6b7280'; }, 8000);
+    } catch(e) {
+        console.error('[SYNC] Error:', e);
+        status.textContent = `Erreur: ${e.message}`;
+        status.style.color = '#dc2626';
+    }
+}
+
+// RESET & SYNC - Clear database and resync all
+async function resetAndSync() {
+    if (!confirm('Effacer TOUS les emails et re-synchroniser depuis Gmail?\nCette action est irreversible.')) return;
+    const status = document.getElementById('sync-status');
+    status.textContent = 'Reset en cours...';
+    status.style.color = '#dc2626';
+    try {
+        await api('/coach/gmail/reset', 'POST');
+        status.textContent = 'Reset OK, sync en cours...';
+        status.style.color = '#6b7280';
+        const res = await api('/coach/gmail/sync', 'POST');
+        if (res.error) {
+            status.textContent = `Erreur: ${res.error}`;
+            status.style.color = '#dc2626';
+        } else {
+            status.textContent = `✓ Reset + ${res.synced || 0} emails synced`;
+            status.style.color = '#16a34a';
+            loadClients();
+        }
+        setTimeout(() => { status.textContent = ''; }, 10000);
+    } catch(e) {
+        status.textContent = `Erreur: ${e.message}`;
+        status.style.color = '#dc2626';
+    }
+}
+
+// COPY
+function copyDraft() {
+    const text = document.getElementById('draft-text').value;
+    navigator.clipboard.writeText(text);
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = 'Copie!';
+    setTimeout(() => btn.textContent = 'Copier', 2000);
+}
+
+// LIGHTBOX
+function showLightbox(src) {
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+
+// INIT
+checkAuth();
+</script>
+</body>
+</html>

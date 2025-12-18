@@ -3,13 +3,19 @@ services:
     name: achzodyt-bilans-coaching
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: MAIL_USER
         sync: false
       - key: MAIL_PASS
         sync: false
       - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: COACH_EMAIL
+        sync: false
+      - key: COACH_PASSWORD
         sync: false
       - key: PYTHON_VERSION
         value: 3.11.0

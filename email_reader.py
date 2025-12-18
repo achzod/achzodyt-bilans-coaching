@@ -1,6 +1,6 @@
 """
 Module de lecture des emails Gmail via IMAP
-Version robuste avec support des UIDs (IDs persistants)
+Version simple et robuste
 """
 
 import imaplib
@@ -24,56 +24,15 @@ MAIL_PASS = os.getenv("MAIL_PASS")
 
 
 def create_connection():
-    """Cree une nouvelle connexion IMAP avec diagnostics"""
-    import sys
-    
-    # Validation env
-    if not MAIL_USER or not MAIL_PASS:
-        print("[IMAP] ERREUR: MAIL_USER ou MAIL_PASS non definis dans l'environnement!")
-        sys.stdout.flush()
-        return None
-
+    """Cree une nouvelle connexion IMAP"""
     try:
         import socket
-        timeout = 10
-        # socket.setdefaulttimeout(timeout) # Deactive pour eviter de bloquer d'autres threads
-        
-        print(f"[IMAP] 1. Test socket vers {IMAP_SERVER}:{IMAP_PORT}...")
-        sys.stdout.flush()
-        
-        # Test socket pur avant SSL
-        try:
-            sock = socket.create_connection((IMAP_SERVER, IMAP_PORT), timeout=5)
-            sock.close()
-            print("[IMAP] TCP Port OK")
-            sys.stdout.flush()
-        except Exception as se:
-            print(f"[IMAP] TCP Port ECHEC: {se}")
-            sys.stdout.flush()
-            return None
-
-        print(f"[IMAP] 2. Connexion SSL imaplib (timeout={timeout})...")
-        sys.stdout.flush()
-        
-        start_time = time.time()
+        socket.setdefaulttimeout(10)  # Timeout 10 secondes (plus rapide)
         conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
-        print(f"[IMAP] SSL Connect OK en {time.time() - start_time:.2f}s")
-        sys.stdout.flush()
-        
-        print(f"[IMAP] 3. Login pour {MAIL_USER}...")
-        sys.stdout.flush()
-        
-        start_time = time.time()
         conn.login(MAIL_USER, MAIL_PASS)
-        print(f"[IMAP] Login OK en {time.time() - start_time:.2f}s")
-        sys.stdout.flush()
-        
         return conn
     except Exception as e:
-        print(f"[IMAP] ECHEC CRITIQUE: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.stdout.flush()
+        print(f"[IMAP] Erreur connexion: {e}")
         return None
 
 
@@ -81,9 +40,31 @@ class EmailReader:
     def __init__(self):
         self.connection = None
 
+    def connect(self, force: bool = False) -> bool:
+        """Connexion au serveur IMAP"""
+        if force and self.connection:
+            try:
+                self.connection.logout()
+            except:
+                pass
+            self.connection = None
+
+        self.connection = create_connection()
+        return self.connection is not None
+
+    def disconnect(self):
+        """Deconnexion propre"""
+        if self.connection:
+            try:
+                self.connection.logout()
+            except:
+                pass
+            self.connection = None
+
     def _decode_header_value(self, value: str) -> str:
         """Decode les headers d'email"""
-        if value is None: return ""
+        if value is None:
+            return ""
         try:
             decoded_parts = decode_header(value)
             result = ""
@@ -98,48 +79,87 @@ class EmailReader:
 
     def _extract_email_address(self, from_header: str) -> str:
         """Extrait l'adresse email du header From"""
-        if not from_header: return ""
+        if not from_header:
+            return ""
         match = re.search(r'<(.+?)>', from_header)
-        if match: return match.group(1).lower()
-        if '@' in from_header: return from_header.strip().lower()
+        if match:
+            return match.group(1).lower()
+        if '@' in from_header:
+            return from_header.strip().lower()
         return from_header
 
     def _get_email_body(self, msg) -> str:
         """Extrait le corps de l'email"""
         text_body = ""
         html_body = ""
+
         try:
             if msg.is_multipart():
                 for part in msg.walk():
                     content_type = part.get_content_type()
                     content_disposition = str(part.get("Content-Disposition", ""))
-                    if "attachment" in content_disposition: continue
+
+                    if "attachment" in content_disposition:
+                        continue
+
                     try:
                         payload = part.get_payload(decode=True)
-                        if not payload: continue
+                        if not payload:
+                            continue
+
                         charset = part.get_content_charset() or 'utf-8'
                         text = payload.decode(charset, errors='ignore')
-                        if content_type == "text/plain": text_body = text
-                        elif content_type == "text/html": html_body = text
-                    except: continue
-            else:
-                payload = msg.get_payload(decode=True)
-                if payload:
-                    charset = msg.get_content_charset() or 'utf-8'
-                    text = payload.decode(charset, errors='ignore')
-                    if msg.get_content_type() == "text/html": html_body = text
-                    else: text_body = text
 
-            if text_body and len(text_body.strip()) > 10: return text_body.strip()
+                        if content_type == "text/plain" and not text_body:
+                            text_body = text
+                        elif content_type == "text/html" and not html_body:
+                            html_body = text
+                    except:
+                        continue
+            else:
+                try:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        charset = msg.get_content_charset() or 'utf-8'
+                        content_type = msg.get_content_type()
+                        text = payload.decode(charset, errors='ignore')
+
+                        if content_type == "text/html":
+                            html_body = text
+                        else:
+                            text_body = text
+                except:
+                    pass
+
+            # Priorite au texte plain
+            if text_body and len(text_body.strip()) > 10:
+                return text_body.strip()
+
+            # Convertir HTML en texte
             if html_body:
                 text = html_body
                 text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
                 text = re.sub(r'</p>', '\n', text, flags=re.IGNORECASE)
+                text = re.sub(r'</div>', '\n', text, flags=re.IGNORECASE)
+                text = re.sub(r'</tr>', '\n', text, flags=re.IGNORECASE)
+                text = re.sub(r'</li>', '\n', text, flags=re.IGNORECASE)
+                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.IGNORECASE | re.DOTALL)
+                text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
                 text = re.sub(r'<[^>]+>', ' ', text)
                 text = re.sub(r'&nbsp;', ' ', text)
+                text = re.sub(r'&amp;', '&', text)
+                text = re.sub(r'&lt;', '<', text)
+                text = re.sub(r'&gt;', '>', text)
+                text = re.sub(r'&quot;', '"', text)
+                text = re.sub(r'&#39;', "'", text)
+                text = re.sub(r'[ \t]+', ' ', text)
+                text = re.sub(r'\n\s*\n', '\n\n', text)
                 return text.strip()
+
             return text_body.strip() if text_body else ""
-        except: return ""
+        except Exception as e:
+            print(f"[BODY] Erreur: {e}")
+            return ""
 
     def _get_attachments(self, msg) -> List[Dict[str, Any]]:
         """Extrait les pieces jointes"""
@@ -148,93 +168,697 @@ class EmailReader:
             if msg.is_multipart():
                 for part in msg.walk():
                     content_disposition = str(part.get("Content-Disposition", ""))
-                    if "attachment" in content_disposition or part.get_content_type().startswith("image/"):
+                    content_type = part.get_content_type()
+
+                    is_attachment = "attachment" in content_disposition
+                    is_inline_image = content_type.startswith("image/")
+
+                    if is_attachment or is_inline_image:
                         filename = part.get_filename()
-                        if filename: filename = self._decode_header_value(filename)
-                        else: filename = f"attachment_{len(attachments)}"
+                        if filename:
+                            filename = self._decode_header_value(filename)
+                        else:
+                            ext = content_type.split("/")[-1]
+                            filename = f"image_{len(attachments)}.{ext}"
+
                         try:
                             data = part.get_payload(decode=True)
                             if data:
                                 attachments.append({
                                     "filename": filename,
-                                    "content_type": part.get_content_type(),
-                                    "data": base64.b64encode(data).decode('utf-8')
+                                    "content_type": content_type,
+                                    "data": base64.b64encode(data).decode('utf-8'),
+                                    "size": len(data)
                                 })
-                        except: pass
-        except: pass
+                        except:
+                            pass
+        except:
+            pass
         return attachments
 
-    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", max_emails: int = 50) -> List[Dict[str, Any]]:
-        """Recupere les emails sans reponse via UID"""
+    def mark_as_read(self, email_id: str, folder: str = "INBOX") -> bool:
+        """Marque un email comme lu"""
         conn = create_connection()
-        if not conn: return []
+        if not conn:
+            return False
+        try:
+            conn.select(folder)
+            conn.store(email_id.encode(), '+FLAGS', '\\Seen')
+            conn.logout()
+            return True
+        except Exception as e:
+            print(f"Erreur mark_as_read: {e}")
+            try:
+                conn.logout()
+            except:
+                pass
+            return False
+
+    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", max_emails: int = 200, progress_callback=None) -> List[Dict[str, Any]]:
+        """
+        Recupere les emails sans reponse - utilise le flag IMAP UNANSWERED
+        """
+        print(f"[EMAILS] Chargement emails sans reponse ({days} jours)...")
+
+        conn = create_connection()
+        if not conn:
+            print("[EMAILS] Echec connexion")
+            return []
+
         emails = []
         try:
             conn.select(folder)
             since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
-            status, data = conn.uid('search', None, f'(UNANSWERED SINCE "{since_date}")')
+
+            # Utiliser UNANSWERED - rapide!
+            status, data = conn.search(None, f'(UNANSWERED SINCE "{since_date}")')
+
             if status != "OK" or not data[0]:
+                print("[EMAILS] Aucun email trouve")
                 conn.logout()
                 return []
+
+            email_ids = data[0].split()
+            print(f"[EMAILS] {len(email_ids)} emails trouves, chargement...")
+
+            # Limiter selon max_emails
+            if len(email_ids) > max_emails:
+                email_ids = email_ids[-max_emails:]
+
+            # Charger par lots (Batch Fetching)
+            # On reduit a 10 pour economiser la RAM sur Render (512MB limit)
+            batch_size = 10
+            total_emails = len(email_ids)
             
-            uids = data[0].split()
-            if len(uids) > max_emails: uids = uids[-max_emails:]
+            print(f"[EMAILS] Debut chargement batch (Total: {total_emails}, Batch size: {batch_size})")
             
-            # Fetch headers in batch
-            if uids:
-                uids_str = ",".join([u.decode() for u in uids])
-                status, fetch_data = conn.uid('fetch', uids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-                if status == "OK":
-                    for part in fetch_data:
-                        if isinstance(part, tuple):
-                            msg = email.message_from_bytes(part[1])
-                            # Extraire UID de response_part[0]
-                            resp_str = part[0].decode('utf-8', errors='ignore')
-                            uid_match = re.search(r'UID\s+(\d+)', resp_str, re.IGNORECASE)
-                            uid = uid_match.group(1) if uid_match else ""
+            for i in range(0, total_emails, batch_size):
+                batch_ids = email_ids[i:i + batch_size]
+                
+                # Nettoyage des IDs
+                clean_batch_ids = []
+                for bid in batch_ids:
+                    if isinstance(bid, bytes):
+                        clean_batch_ids.append(bid.decode())
+                    else:
+                        clean_batch_ids.append(str(bid))
+                
+                # Commande IMAP standard: IDs separes par virgule
+                batch_ids_str = ",".join(clean_batch_ids)
+                
+                print(f"[EMAILS] Batch {i+1}-{min(i+batch_size, total_emails)}...")
+                
+                try:
+                    # FETCH headers essentiels uniquement
+                    status, data = conn.fetch(batch_ids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    
+                    if status != "OK":
+                        print(f"[EMAILS] Batch Failed Status: {status}")
+                        raise Exception("Batch status not OK")
+                        
+                    # Traitement reponse
+                    count_in_batch = 0
+                    for response_part in data:
+                        if isinstance(response_part, tuple):
+                            try:
+                                msg_data = response_part[1]
+                                msg = email.message_from_bytes(msg_data)
+                                
+                                # Recuperation ID un peu tricky en batch
+                                # Format: b'123 (BODY...)'
+                                raw_response = response_part[0]
+                                current_id = ""
+                                if isinstance(raw_response, bytes):
+                                    current_id = raw_response.split()[0].decode()
+                                
+                                # Si current_id vide, on prend celui de la liste batch (approximatif mais ca depanne)
+                                if not current_id and count_in_batch < len(clean_batch_ids):
+                                    # Attention: l'ordre n'est pas garanti a 100% en IMAP mais souvent respecte
+                                    pass 
+                                
+                                subject = self._decode_header_value(msg["Subject"])
+                                from_header = self._decode_header_value(msg["From"])
+                                from_email = self._extract_email_address(from_header)
+                                
+                                try:
+                                    date = parsedate_to_datetime(msg["Date"])
+                                except:
+                                    date = datetime.now()
+                                    
+                                is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+                                
+                                emails.append({
+                                    "id": current_id,
+                                    "from": from_header,
+                                    "from_email": from_email,
+                                    "subject": subject,
+                                    "date": date,
+                                    "body": "",
+                                    "attachments": [],
+                                    "is_potential_bilan": is_bilan,
+                                    "message_id": msg.get("Message-ID", ""),
+                                    "loaded": False
+                                })
+                                count_in_batch += 1
+                            except Exception as e:
+                                print(f"Error parsing in batch: {e}")
+                                continue
+                                
+                except Exception as e:
+                    print(f"[EMAILS] CRASH BATCH: {e}")
+                    # Fallback: chargement un par un pour ce lot en cas d'erreur
+                    for eid in clean_batch_ids:
+                        try:
+                            status, msg_data = conn.fetch(eid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                            if status != "OK" or not msg_data or not msg_data[0]:
+                                continue
+                            
+                            header_data = msg_data[0][1]
+                            msg = email.message_from_bytes(header_data)
                             
                             subject = self._decode_header_value(msg["Subject"])
-                            from_email = self._extract_email_address(self._decode_header_value(msg["From"]))
-                            try: date = parsedate_to_datetime(msg["Date"])
-                            except: date = datetime.now()
+                            from_header = self._decode_header_value(msg["From"])
+                            from_email = self._extract_email_address(from_header)
+                            
+                            try:
+                                date = parsedate_to_datetime(msg["Date"])
+                            except:
+                                date = datetime.now()
+                            
+                            is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
                             
                             emails.append({
-                                "id": uid, # Persistent UID
-                                "message_id": msg.get("Message-ID", f"no-id-{uid}"),
+                                "id": eid,
+                                "from": from_header,
                                 "from_email": from_email,
                                 "subject": subject,
                                 "date": date,
-                                "direction": "received",
                                 "body": "",
-                                "attachments": []
+                                "attachments": [],
+                                "is_potential_bilan": is_bilan,
+                                "message_id": msg.get("Message-ID", ""),
+                                "loaded": False
                             })
-            conn.logout()
-        except Exception as e:
-            print(f"Error sync: {e}")
-            try: conn.logout()
-            except: pass
-        return sorted(emails, key=lambda x: x["date"], reverse=True)
+                        except Exception as inner_e:
+                            continue
 
-    def load_email_content(self, uid: str, folder: str = "INBOX") -> Dict[str, Any]:
-        """Charge le contenu complet via UID"""
-        conn = create_connection()
-        if not conn: return {"loaded": False, "error": "Connexion impossible"}
-        try:
-            conn.select(folder)
-            status, data = conn.uid('fetch', uid.encode(), "(BODY.PEEK[])")
-            if status == "OK" and data and data[0]:
-                msg = email.message_from_bytes(data[0][1])
+            conn.logout()
+
+        except Exception as e:
+            print(f"[EMAILS] Erreur: {e}")
+            try:
+                conn.logout()
+            except:
+                pass
+
+        emails.sort(key=lambda x: x["date"], reverse=True)
+        print(f"[EMAILS] {len(emails)} emails prets")
+        return emails
+
+    def load_email_content(self, email_id: str, folder: str = "INBOX") -> Dict[str, Any]:
+        """
+        Charge le contenu complet d'un email
+        """
+        print(f"[LOAD] Chargement email {email_id}...")
+
+        for attempt in range(3):
+            conn = create_connection()
+            if not conn:
+                print(f"[LOAD] Echec connexion (tentative {attempt + 1})")
+                time.sleep(0.5)
+                continue
+
+            try:
+                conn.select(folder)
+                eid = email_id.encode() if isinstance(email_id, str) else email_id
+                status, msg_data = conn.fetch(eid, "(BODY.PEEK[])")
+
+                if status != "OK" or not msg_data or not msg_data[0]:
+                    print(f"[LOAD] Echec fetch (tentative {attempt + 1})")
+                    conn.logout()
+                    time.sleep(0.5)
+                    continue
+
+                raw_email = msg_data[0][1]
+                if not raw_email:
+                    print(f"[LOAD] Email vide")
+                    conn.logout()
+                    continue
+
+                msg = email.message_from_bytes(raw_email)
                 body = self._get_email_body(msg)
                 attachments = self._get_attachments(msg)
-                conn.logout()
-                return {"loaded": True, "body": body, "attachments": attachments}
-            conn.logout()
-        except Exception as e:
-            print(f"Error load: {e}")
-            try: conn.logout()
-            except: pass
-        return {"loaded": False, "error": "Fetch fail"}
 
-    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, max_emails: int = 50) -> List[Dict[str, Any]]:
-        # Version simplifiee UID
-        return self.get_unanswered_emails(days=days, folder=folder, max_emails=max_emails)
+                conn.logout()
+
+                print(f"[LOAD] OK: {len(body)} chars, {len(attachments)} PJ")
+                return {
+                    "body": body,
+                    "attachments": attachments,
+                    "loaded": True
+                }
+
+            except Exception as e:
+                print(f"[LOAD] Erreur (tentative {attempt + 1}): {e}")
+                try:
+                    conn.logout()
+                except:
+                    pass
+                time.sleep(0.5)
+
+        return {"error": "Echec apres 3 tentatives", "loaded": False, "body": "", "attachments": []}
+
+    def _batch_fetch_full_emails(self, conn, email_ids: List[str], max_fetch: int = 10000) -> List[Dict[str, Any]]:
+        """
+        Helper pour fetcher une liste d'emails COMPLETS en batch
+        Optimise pour l'historique
+        """
+        fetched_emails = []
+        if not email_ids:
+            return []
+            
+        # Limiter le nombre d'emails a fetcher pour eviter timeouts, mais large (500)
+        if len(email_ids) > max_fetch:
+            print(f"[HISTORY] Limite a {max_fetch} emails les plus recents (sur {len(email_ids)})")
+            # On prend les derniers (les plus recents generalement si tries)
+            email_ids = email_ids[-max_fetch:]
+            
+        batch_size = 10 # Petit batch car contenu complet (RFC822)
+        
+        for i in range(0, len(email_ids), batch_size):
+            batch_ids = email_ids[i:i + batch_size]
+            clean_batch_ids = []
+            for bid in batch_ids:
+                if isinstance(bid, bytes):
+                    clean_batch_ids.append(bid.decode())
+                else:
+                    clean_batch_ids.append(str(bid))
+            
+            batch_str = ",".join(clean_batch_ids)
+            print(f"[HISTORY] Fetching batch {i+1}...")
+            
+            try:
+                status, data = conn.fetch(batch_str, "(RFC822)")
+                if status != "OK":
+                    continue
+                    
+                for response_part in data:
+                    if isinstance(response_part, tuple):
+                        try:
+                            # response_part[0] contient l'ID
+                            raw_response = response_part[0]
+                            current_id = ""
+                            if isinstance(raw_response, bytes):
+                                current_id = raw_response.split()[0].decode()
+                            
+                            raw_email = response_part[1]
+                            msg = email.message_from_bytes(raw_email)
+                            
+                            subject = self._decode_header_value(msg["Subject"])
+                            from_header = self._decode_header_value(msg["From"])
+                            to_header = self._decode_header_value(msg["To"] or "")
+                            from_email = self._extract_email_address(from_header)
+                            
+                            try:
+                                date = parsedate_to_datetime(msg["Date"])
+                            except:
+                                date = datetime.now()
+                                
+                            body = self._get_email_body(msg)
+                            attachments = self._get_attachments(msg)
+                            
+                            fetched_emails.append({
+                                "id": current_id,
+                                "from": from_header,
+                                "from_email": from_email,
+                                "to": to_header,
+                                "subject": subject,
+                                "date": date,
+                                "body": body,
+                                "attachments": attachments,
+                                "message_id": msg.get("Message-ID", "")
+                            })
+                        except:
+                            continue
+            except Exception as e:
+                print(f"[HISTORY] Error batch: {e}")
+                # Fallback unitaire
+                for eid in clean_batch_ids:
+                    # Implementer un fetch unitaire simple si besoin
+                    pass
+                    
+        return fetched_emails
+
+    def get_conversation_history(self, email_address: str, days: int = 3650) -> List[Dict[str, Any]]:
+        """
+        Recupere l'historique de conversation avec un client
+        Optimise avec batch fetching
+        """
+        print(f"[HISTORY] Chargement historique avec {email_address}...")
+
+        conn = create_connection()
+        if not conn:
+                return []
+
+        all_emails = []
+        since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+
+        try:
+            # Emails recus
+            conn.select("INBOX")
+            status, messages = conn.search(None, f'(FROM "{email_address}" SINCE "{since_date}")')
+            if status == "OK" and messages[0]:
+                email_ids = messages[0].split()
+                print(f"[HISTORY] {len(email_ids)} emails recus trouves")
+                
+                # Utiliser le nouveau batch fetch
+                received_emails = self._batch_fetch_full_emails(conn, email_ids)
+                for email_data in received_emails:
+                    email_data["direction"] = "received"
+                    all_emails.append(email_data)
+
+            # Emails envoyes
+            for sent_folder in ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent"]:
+                try:
+                    status, _ = conn.select(f'"{sent_folder}"')
+                    if status == "OK":
+                        status, messages = conn.search(None, f'(TO "{email_address}" SINCE "{since_date}")')
+                        if status == "OK" and messages[0]:
+                            email_ids = messages[0].split()
+                            print(f"[HISTORY] {len(email_ids)} emails envoyes trouves dans {sent_folder}")
+                            
+                            sent_emails = self._batch_fetch_full_emails(conn, email_ids)
+                            for email_data in sent_emails:
+                                email_data["direction"] = "sent"
+                                all_emails.append(email_data)
+                        break
+                except:
+                    continue
+
+            conn.logout()
+
+        except Exception as e:
+            print(f"[HISTORY] Erreur: {e}")
+            try:
+                conn.logout()
+            except:
+                pass
+
+        all_emails.sort(key=lambda x: x["date"])
+        print(f"[HISTORY] Total {len(all_emails)} emails charges")
+        return all_emails
+
+    def _fetch_full_email(self, conn, email_id) -> Optional[Dict[str, Any]]:
+        """Deprecated: utiliser _batch_fetch_full_emails"""
+        return None
+
+    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, max_emails: int = 500) -> List[Dict[str, Any]]:
+        """
+        Recupere tous les emails (lus ou non)
+        """
+        print(f"[EMAILS] Chargement emails (unread_only={unread_only}, {days} jours, max={max_emails})...")
+
+        conn = create_connection()
+        if not conn:
+            print("[EMAILS] Echec connexion")
+            return []
+
+        emails = []
+        try:
+            conn.select(folder)
+            since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+
+            criteria = f'(SINCE "{since_date}")'
+            if unread_only:
+                criteria = f'(UNSEEN SINCE "{since_date}")'
+
+            status, data = conn.search(None, criteria)
+            print(f"[EMAILS] Recherche IMAP: status={status}, criteria={criteria}")
+
+            if status != "OK":
+                print(f"[EMAILS] Erreur recherche IMAP: {status}")
+                conn.logout()
+                return []
+            
+            if not data or not data[0]:
+                print("[EMAILS] Aucun email trouve")
+                conn.logout()
+                return []
+
+            email_ids = data[0].split()
+            print(f"[EMAILS] {len(email_ids)} emails trouves (IDs), chargement headers...")
+
+            # Limiter selon max_emails
+            if len(email_ids) > max_emails:
+                email_ids = email_ids[-max_emails:]
+
+            # Charger par lots (Batch Fetching)
+            # On reduit a 10 pour economiser la RAM sur Render (512MB limit)
+            batch_size = 10
+            total_emails = len(email_ids)
+            
+            print(f"[EMAILS] Debut chargement batch (Total: {total_emails}, Batch size: {batch_size})")
+            
+            for i in range(0, total_emails, batch_size):
+                batch_ids = email_ids[i:i + batch_size]
+                
+                # Nettoyage des IDs
+                clean_batch_ids = []
+                for bid in batch_ids:
+                    if isinstance(bid, bytes):
+                        clean_batch_ids.append(bid.decode())
+                    else:
+                        clean_batch_ids.append(str(bid))
+                
+                # Commande IMAP standard: IDs separes par virgule
+                batch_ids_str = ",".join(clean_batch_ids)
+                
+                try:
+                    # FETCH headers essentiels uniquement
+                    status, data = conn.fetch(batch_ids_str, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+                    
+                    if status != "OK":
+                        continue
+                        
+                    for response_part in data:
+                        if isinstance(response_part, tuple):
+                            try:
+                                msg_data = response_part[1]
+                                msg = email.message_from_bytes(msg_data)
+                                
+                                raw_response = response_part[0]
+                                current_id = ""
+                                if isinstance(raw_response, bytes):
+                                    current_id = raw_response.split()[0].decode()
+                                
+                                subject = self._decode_header_value(msg["Subject"])
+                                from_header = self._decode_header_value(msg["From"])
+                                from_email = self._extract_email_address(from_header)
+                                
+                                try:
+                                    date = parsedate_to_datetime(msg["Date"])
+                                except:
+                                    date = datetime.now()
+                                    
+                                is_bilan = any(kw in subject.lower() for kw in ["bilan", "semaine", "update", "suivi", "retour", "feedback", "progression", "photo", "poids"])
+                                
+                                emails.append({
+                                    "id": current_id,
+                                    "from": from_header,
+                                    "from_email": from_email,
+                                    "subject": subject,
+                                    "date": date,
+                                    "body": "",
+                                    "attachments": [],
+                                    "is_potential_bilan": is_bilan,
+                                    "message_id": msg.get("Message-ID", ""),
+                                    "loaded": False
+                                })
+                            except:
+                                continue
+                except:
+                    continue
+
+            conn.logout()
+
+        except Exception as e:
+            print(f"[EMAILS] Erreur: {e}")
+            try:
+                conn.logout()
+            except:
+                pass
+
+        emails.sort(key=lambda x: x["date"], reverse=True)
+        print(f"[EMAILS] {len(emails)} emails prets")
+        return emails
+
+    def get_sent_emails(self, days: int = 180) -> List[Dict[str, Any]]:
+        """
+        Recupere les emails ENVOYES (reponses du coach) depuis le dossier Sent
+        CRITICAL pour avoir l'historique complet des conversations!
+        """
+        print(f"[SENT] Chargement emails envoyes ({days} jours)...")
+
+        conn = create_connection()
+        if not conn:
+            print("[SENT] Echec connexion")
+            return []
+
+        emails = []
+        since_date = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+
+        # Essayer differents noms de dossier Sent
+        sent_folders = ["[Gmail]/Sent Mail", "[Gmail]/Messages envoy&AOk-s", "Sent", "INBOX.Sent"]
+
+        try:
+            for sent_folder in sent_folders:
+                try:
+                    status, _ = conn.select(f'"{sent_folder}"')
+                    if status != "OK":
+                        continue
+
+                    print(f"[SENT] Dossier trouve: {sent_folder}")
+
+                    # Chercher tous les emails envoyes depuis X jours
+                    status, data = conn.search(None, f'(SINCE "{since_date}")')
+
+                    if status != "OK" or not data[0]:
+                        print(f"[SENT] Aucun email dans {sent_folder}")
+                        continue
+
+                    email_ids = data[0].split()
+                    print(f"[SENT] {len(email_ids)} emails envoyes trouves")
+
+                    # Limiter a 300 max
+                    if len(email_ids) > 300:
+                        email_ids = email_ids[-300:]
+
+                    # Batch fetch - FULL BODY pour sent emails (contiennent le programme!)
+                    batch_size = 10
+                    for i in range(0, len(email_ids), batch_size):
+                        batch_ids = email_ids[i:i + batch_size]
+                        clean_ids = [id.decode() if isinstance(id, bytes) else str(id) for id in batch_ids]
+                        id_range = ",".join(clean_ids)
+
+                        try:
+                            # Fetch FULL email (not just header) - important for coach responses!
+                            status, data = conn.fetch(id_range, "(RFC822 UID)")
+                            if status != "OK":
+                                continue
+
+                            for response_part in data:
+                                if isinstance(response_part, tuple):
+                                    msg = email.message_from_bytes(response_part[1])
+
+                                    # Extraire les infos
+                                    from_addr = msg.get("From", "")
+                                    to_addr = msg.get("To", "")
+                                    subject = self._decode_header(msg.get("Subject", "(sans sujet)"))
+                                    date_str = msg.get("Date", "")
+                                    message_id = msg.get("Message-ID", "")
+
+                                    # Parser la date
+                                    date_obj = datetime.now()
+                                    if date_str:
+                                        try:
+                                            parsed = parsedate_to_datetime(date_str)
+                                            date_obj = parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+                                        except:
+                                            pass
+
+                                    # Extraire l'email du destinataire (c'est le client)
+                                    to_email = ""
+                                    if "<" in to_addr and ">" in to_addr:
+                                        to_email = to_addr.split("<")[1].split(">")[0].lower()
+                                    else:
+                                        to_email = to_addr.strip().lower()
+
+                                    # Extraire IMAP ID
+                                    imap_id = clean_ids[0] if clean_ids else ""
+                                    uid_match = re.search(r'UID (\d+)', str(response_part))
+                                    if uid_match:
+                                        imap_id = uid_match.group(1)
+
+                                    # Extraire le BODY (important pour les reponses coach!)
+                                    body = ""
+                                    if msg.is_multipart():
+                                        for part in msg.walk():
+                                            ctype = part.get_content_type()
+                                            if ctype == "text/plain":
+                                                try:
+                                                    payload = part.get_payload(decode=True)
+                                                    if payload:
+                                                        charset = part.get_content_charset() or 'utf-8'
+                                                        body = payload.decode(charset, errors='replace')
+                                                        break
+                                                except:
+                                                    pass
+                                    else:
+                                        try:
+                                            payload = msg.get_payload(decode=True)
+                                            if payload:
+                                                charset = msg.get_content_charset() or 'utf-8'
+                                                body = payload.decode(charset, errors='replace')
+                                        except:
+                                            pass
+
+                                    emails.append({
+                                        "from": from_addr,
+                                        "sender_email": to_email,  # Pour les sent, le "sender" est le destinataire (client)
+                                        "to": to_addr,
+                                        "subject": subject,
+                                        "date": date_obj,
+                                        "message_id": message_id,
+                                        "imap_id": imap_id,
+                                        "body": body,
+                                        "body_loaded": True,
+                                        "attachments": [],
+                                        "has_attachments": False,
+                                        "direction": "sent"
+                                    })
+                        except Exception as e:
+                            print(f"[SENT] Erreur batch: {e}")
+                            continue
+
+                    break  # On a trouve le dossier Sent, pas besoin de continuer
+
+                except Exception as e:
+                    print(f"[SENT] Erreur dossier {sent_folder}: {e}")
+                    continue
+
+            conn.logout()
+
+        except Exception as e:
+            print(f"[SENT] Erreur: {e}")
+            try:
+                conn.logout()
+            except:
+                pass
+
+        print(f"[SENT] {len(emails)} emails envoyes prets")
+        return emails
+
+    # Alias pour compatibilite
+    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False, max_emails: int = 200) -> List[Dict[str, Any]]:
+        if unanswered_only:
+            return self.get_unanswered_emails(days=days, folder=folder)
+        return self.get_all_emails(days=days, folder=folder, unread_only=unread_only, max_emails=max_emails)
+
+    def ensure_connected(self) -> bool:
+        return True  # Chaque operation cree sa propre connexion
+
+    def mark_as_unread(self, email_id: str, folder: str = "INBOX") -> bool:
+        conn = create_connection()
+        if not conn:
+            return False
+        try:
+            conn.select(folder)
+            conn.store(email_id.encode(), '-FLAGS', '\\Seen')
+            conn.logout()
+            return True
+        except:
+            try:
+                conn.logout()
+            except:
+                pass
+            return False
