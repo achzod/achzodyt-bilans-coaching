@@ -27,7 +27,7 @@ def create_connection():
     """Cree une nouvelle connexion IMAP"""
     try:
         import socket
-        socket.setdefaulttimeout(30)  # Timeout 30 secondes
+        socket.setdefaulttimeout(10)  # Timeout 10 secondes (plus rapide)
         conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
         conn.login(MAIL_USER, MAIL_PASS)
         return conn
@@ -214,7 +214,7 @@ class EmailReader:
                 pass
             return False
 
-    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", progress_callback=None) -> List[Dict[str, Any]]:
+    def get_unanswered_emails(self, days: int = 7, folder: str = "INBOX", max_emails: int = 200, progress_callback=None) -> List[Dict[str, Any]]:
         """
         Recupere les emails sans reponse - utilise le flag IMAP UNANSWERED
         """
@@ -241,9 +241,9 @@ class EmailReader:
             email_ids = data[0].split()
             print(f"[EMAILS] {len(email_ids)} emails trouves, chargement...")
 
-            # Limiter a 200 max
-            if len(email_ids) > 200:
-                email_ids = email_ids[-200:]
+            # Limiter selon max_emails
+            if len(email_ids) > max_emails:
+                email_ids = email_ids[-max_emails:]
 
             # Charger par lots (Batch Fetching)
             # On reduit a 10 pour economiser la RAM sur Render (512MB limit)
@@ -428,7 +428,7 @@ class EmailReader:
 
         return {"error": "Echec apres 3 tentatives", "loaded": False, "body": "", "attachments": []}
 
-    def _batch_fetch_full_emails(self, conn, email_ids: List[str], max_fetch: int = 500) -> List[Dict[str, Any]]:
+    def _batch_fetch_full_emails(self, conn, email_ids: List[str], max_fetch: int = 10000) -> List[Dict[str, Any]]:
         """
         Helper pour fetcher une liste d'emails COMPLETS en batch
         Optimise pour l'historique
@@ -509,7 +509,7 @@ class EmailReader:
                     
         return fetched_emails
 
-    def get_conversation_history(self, email_address: str, days: int = 90) -> List[Dict[str, Any]]:
+    def get_conversation_history(self, email_address: str, days: int = 3650) -> List[Dict[str, Any]]:
         """
         Recupere l'historique de conversation avec un client
         Optimise avec batch fetching
@@ -572,11 +572,11 @@ class EmailReader:
         """Deprecated: utiliser _batch_fetch_full_emails"""
         return None
 
-    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True) -> List[Dict[str, Any]]:
+    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, max_emails: int = 200) -> List[Dict[str, Any]]:
         """
         Recupere tous les emails (lus ou non)
         """
-        print(f"[EMAILS] Chargement emails (unread_only={unread_only}, {days} jours)...")
+        print(f"[EMAILS] Chargement emails (unread_only={unread_only}, {days} jours, max={max_emails})...")
 
         conn = create_connection()
         if not conn:
@@ -593,18 +593,24 @@ class EmailReader:
                 criteria = f'(UNSEEN SINCE "{since_date}")'
 
             status, data = conn.search(None, criteria)
+            print(f"[EMAILS] Recherche IMAP: status={status}, criteria={criteria}")
 
-            if status != "OK" or not data[0]:
+            if status != "OK":
+                print(f"[EMAILS] Erreur recherche IMAP: {status}")
+                conn.logout()
+                return []
+            
+            if not data or not data[0]:
                 print("[EMAILS] Aucun email trouve")
                 conn.logout()
                 return []
 
             email_ids = data[0].split()
-            print(f"[EMAILS] {len(email_ids)} emails trouves, chargement...")
+            print(f"[EMAILS] {len(email_ids)} emails trouves (IDs), chargement headers...")
 
-            # Limiter a 200 max
-            if len(email_ids) > 200:
-                email_ids = email_ids[-200:]
+            # Limiter selon max_emails
+            if len(email_ids) > max_emails:
+                email_ids = email_ids[-max_emails:]
 
             # Charger par lots (Batch Fetching)
             # On reduit a 10 pour economiser la RAM sur Render (512MB limit)
@@ -833,10 +839,10 @@ class EmailReader:
         return emails
 
     # Alias pour compatibilite
-    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False) -> List[Dict[str, Any]]:
+    def get_recent_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, unanswered_only: bool = False, max_emails: int = 200) -> List[Dict[str, Any]]:
         if unanswered_only:
             return self.get_unanswered_emails(days=days, folder=folder)
-        return self.get_all_emails(days=days, folder=folder, unread_only=unread_only)
+        return self.get_all_emails(days=days, folder=folder, unread_only=unread_only, max_emails=max_emails)
 
     def ensure_connected(self) -> bool:
         return True  # Chaque operation cree sa propre connexion

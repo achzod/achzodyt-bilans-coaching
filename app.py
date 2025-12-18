@@ -16,12 +16,14 @@ import json
 import sqlite3
 import os
 from typing import List, Dict, Any, Optional
+import threading
+import time
 
 # --- GESTION DATABASE (Intégré pour eviter erreurs d'import) ---
 
-# Chemin de la DB: sur disque persistant /data si dispo, sinon local
-DB_PATH = "/data/coaching.db" if os.path.exists("/data") else "coaching.db"
-ATTACHMENTS_DIR = "/data/attachments" if os.path.exists("/data") else "attachments"
+# Chemin de la DB: toujours local maintenant
+DB_PATH = "coaching.db"
+ATTACHMENTS_DIR = "attachments"
 
 class DatabaseManager:
     def __init__(self):
@@ -54,7 +56,19 @@ class DatabaseManager:
                         direction TEXT, -- 'received' ou 'sent'
                         is_bilan BOOLEAN,
                         analysis_json TEXT, -- Resultat analyse IA stocke
+                        body_loaded BOOLEAN DEFAULT 0, -- 1 si body/attachments sont charges
+                        email_id TEXT, -- ID IMAP pour charger le contenu a la demande
                         FOREIGN KEY(client_email) REFERENCES clients(email))''')
+            
+            # Migration: Ajouter les colonnes si elles n'existent pas
+            try:
+                c.execute("ALTER TABLE emails ADD COLUMN body_loaded BOOLEAN DEFAULT 0")
+            except:
+                pass  # Colonne existe deja
+            try:
+                c.execute("ALTER TABLE emails ADD COLUMN email_id TEXT")
+            except:
+                pass  # Colonne existe deja
                         
             # Table Attachments
             c.execute('''CREATE TABLE IF NOT EXISTS attachments
@@ -103,6 +117,19 @@ class DatabaseManager:
     def save_email(self, email_data: Dict) -> bool:
         """Sauvegarde un email et ses pieces jointes"""
         
+        # Validation: email_data doit etre un dict
+        if not isinstance(email_data, dict):
+            print(f"[DB] Erreur: email_data n'est pas un dict")
+            return False
+        
+        # Validation: message_id obligatoire
+        message_id = email_data.get('message_id') or email_data.get('id')
+        if not message_id:
+            print(f"[DB] Erreur: message_id manquant")
+            return False
+        
+        message_id = str(message_id)
+        
         # FILTRE: Ignorer les emails inutiles (spam coaching)
         EXCLUDE_PATTERNS = [
             'typeform', 'followup', 'newsletter', 'noreply', 'no-reply', 
@@ -117,126 +144,334 @@ class DatabaseManager:
         sender = email_data.get('from_email', '').lower()
         
         if any(p in subject for p in EXCLUDE_PATTERNS) or any(p in sender for p in EXCLUDE_PATTERNS):
-            # print(f"Email ignore (filtre): {subject}")
             return False
             
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
+        conn = None
         try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            
             # 1. Sauvegarder l'email
-            date_val = email_data['date']
+            date_val = email_data.get('date', datetime.now())
             if isinstance(date_val, datetime):
                 date_val = date_val.isoformat()
+            elif isinstance(date_val, str):
+                pass  # Deja string
+            else:
+                date_val = datetime.now().isoformat()
+            
+            # Determiner client_email
+            direction = email_data.get('direction', 'received')
+            if direction == 'received':
+                client_email = email_data.get('from_email', '')
+            else:
+                client_email = email_data.get('to_email', '')
+            
+            subject = email_data.get('subject', 'Sans sujet')
+            body = email_data.get('body', '')
+            is_bilan = email_data.get('is_potential_bilan', False)
+            
+            analysis_json = None
+            if email_data.get('analysis'):
+                try:
+                    analysis_json = json.dumps(email_data.get('analysis', {}))
+                except:
+                    pass
                 
-            c.execute("""INSERT OR IGNORE INTO emails 
-                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (email_data['message_id'], 
-                       email_data.get('from_email') if email_data.get('direction') == 'received' else email_data.get('to_email'),
-                       email_data['subject'], 
-                       date_val, 
-                       email_data.get('body', ''),
-                       email_data.get('direction', 'received'),
-                       email_data.get('is_potential_bilan', False),
-                       json.dumps(email_data.get('analysis', {})) if email_data.get('analysis') else None
-                      ))
+            # Determiner si le body est charge
+            body_loaded = 1 if body else 0
+            email_id_imap = email_data.get('id', '')  # ID IMAP pour charger a la demande
+            
+            c.execute("""INSERT OR REPLACE INTO emails 
+                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json, body_loaded, email_id)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json, body_loaded, email_id_imap))
+            
+            conn.commit()  # FORCER le commit immédiatement
+            
+            # Si body_loaded = 0, on ne sauvegarde pas les attachments (on les chargera a la demande)
+            if body_loaded == 0:
+                return True
             
             # 2. Sauvegarder les pieces jointes
             for att in email_data.get('attachments', []):
-                safe_filename = "".join([c for c in att['filename'] if c.isalpha() or c.isdigit() or c in '._- ']).strip()
-                file_path = os.path.join(ATTACHMENTS_DIR, f"{email_data['message_id']}_{safe_filename}")
+                if not isinstance(att, dict):
+                    continue
+                    
+                filename = att.get('filename', 'unknown')
+                if not filename:
+                    continue
+                    
+                safe_filename = "".join([c for c in filename if c.isalpha() or c.isdigit() or c in '._- ']).strip()
+                if not safe_filename:
+                    safe_filename = "attachment"
+                    
+                file_path = os.path.join(ATTACHMENTS_DIR, f"{message_id}_{safe_filename}")
                 
-                if 'data' in att:
+                if 'data' in att and att['data']:
                     if not os.path.exists(file_path):
                         try:
+                            decoded_data = base64.b64decode(att['data'])
                             with open(file_path, "wb") as f:
-                                f.write(base64.b64decode(att['data']))
-                        except:
-                            pass
+                                f.write(decoded_data)
+                        except Exception as e:
+                            print(f"[DB] Erreur sauvegarde PJ {filename}: {e}")
                     
-                    # CRITIQUE: Liberer la memoire tout de suite !
-                    # On supprime la donnee binaire lourde de l'objet en memoire
-                    att['data'] = None 
-                    del att['data']
+                    # Liberer memoire
+                    att['data'] = None
                 
-                c.execute("""INSERT OR IGNORE INTO attachments (message_id, filename, filepath, content_type)
-                             VALUES (?, ?, ?, ?)""",
-                          (email_data['message_id'], att['filename'], file_path, att['content_type']))
+                content_type = att.get('content_type', 'application/octet-stream')
+                try:
+                    c.execute("""INSERT OR IGNORE INTO attachments (message_id, filename, filepath, content_type)
+                                 VALUES (?, ?, ?, ?)""",
+                              (message_id, filename, file_path, content_type))
+                except Exception as e:
+                    print(f"[DB] Erreur insertion PJ: {e}")
+                    continue
             
             conn.commit()
             
-            # Encore plus de nettoyage
+            # Nettoyage memoire
             if 'attachments' in email_data:
                 for att in email_data['attachments']:
-                    if 'data' in att:
-                        del att['data']
+                    if isinstance(att, dict) and 'data' in att:
+                        att['data'] = None
                         
             return True
         except Exception as e:
-            print(f"Erreur save DB: {e}")
+            print(f"[DB] Erreur save_email: {e}")
+            import traceback
+            traceback.print_exc()
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
             return False
         finally:
-            conn.close()
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
 
-    def get_client_history(self, client_email: str) -> List[Dict]:
-        """Recupere tout l'historique d'un client depuis la DB"""
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        
-        # Recherche flexible (contient)
-        if client_email:
-            c.execute("""SELECT * FROM emails 
-                        WHERE client_email LIKE ? OR client_email LIKE ?
-                        ORDER BY date ASC""", (f"%{client_email}%", client_email))
-        else:
-            # Si vide, on ne renvoie rien ou les recents (limit 50)
-            c.execute("SELECT * FROM emails ORDER BY date DESC LIMIT 50")
+    def get_client_history(self, client_email: str, limit: int = None, load_attachments: bool = False) -> List[Dict]:
+        """Recupere TOUT l'historique d'un client depuis la DB avec toutes les pièces jointes"""
+        conn = None
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            
+            # Recherche flexible (contient) - SANS LIMITE pour avoir tout depuis le début
+            if client_email and client_email.strip():
+                if limit:
+                    c.execute(f"""SELECT * FROM emails 
+                                WHERE client_email LIKE ? OR client_email LIKE ?
+                                ORDER BY date DESC LIMIT ?""", (f"%{client_email}%", client_email, limit))
+                else:
+                    # PAS DE LIMITE - TOUT depuis le début
+                    c.execute(f"""SELECT * FROM emails 
+                                WHERE client_email LIKE ? OR client_email LIKE ?
+                                ORDER BY date DESC""", (f"%{client_email}%", client_email))
+            else:
+                if limit:
+                    c.execute(f"SELECT * FROM emails ORDER BY date DESC LIMIT ?", (limit,))
+                else:
+                    c.execute(f"SELECT * FROM emails ORDER BY date DESC")
 
-        rows = c.fetchall()
-        
-        history = []
-        for row in rows:
-            email_dict = dict(row)
+            rows = c.fetchall()
+            print(f"[DB] get_client_history: {len(rows)} emails trouvés (TOUT depuis le début)")
+            
+            history = []
+            for row in rows:
+                try:
+                    email_dict = dict(row)
+                    
+                    # Parse date
+                    try:
+                        if email_dict.get('date'):
+                            email_dict['date'] = datetime.fromisoformat(email_dict['date'])
+                        else:
+                            email_dict['date'] = datetime.now()
+                    except:
+                        email_dict['date'] = datetime.now()
+                    
+                    # CHARGER les attachments si demandé (pour l'analyse IA complète)
+                    email_dict['body_loaded'] = email_dict.get('body_loaded', 0)
+                    email_dict['email_id'] = email_dict.get('email_id', '')
+                    
+                    if load_attachments:
+                        # Charger les attachments depuis la DB
+                        message_id = email_dict.get('message_id')
+                        if message_id:
+                            c.execute("SELECT filename, filepath FROM attachments WHERE email_id = ?", (message_id,))
+                            attachments = []
+                            for att_row in c.fetchall():
+                                att_dict = dict(att_row)
+                                # Vérifier que le fichier existe
+                                if att_dict.get('filepath') and os.path.exists(att_dict['filepath']):
+                                    attachments.append({
+                                        'filename': att_dict.get('filename', ''),
+                                        'filepath': att_dict.get('filepath', ''),
+                                        'exists': True
+                                    })
+                            email_dict['attachments'] = attachments
+                        else:
+                            email_dict['attachments'] = []
+                    else:
+                        email_dict['attachments'] = []
+                    
+                    history.append(email_dict)
+                except Exception as e:
+                    print(f"[DB] Erreur parsing email: {e}")
+                    continue
+            
+            # Tri final par date (du plus ancien au plus récent pour le contexte)
             try:
-                email_dict['date'] = datetime.fromisoformat(email_dict['date'])
+                history.sort(key=lambda x: x.get('date', datetime.min) if isinstance(x.get('date'), datetime) else datetime.min)
             except:
                 pass
                 
-            c.execute("SELECT * FROM attachments WHERE message_id = ?", (email_dict['message_id'],))
-            att_rows = c.fetchall()
-            email_dict['attachments'] = [dict(att) for att in att_rows]
-            
-            history.append(email_dict)
-            
-        conn.close()
-        
-        # Tri final par date
-        history.sort(key=lambda x: x['date'] if isinstance(x['date'], datetime) else datetime.min)
-        return history
+            print(f"[DB] Historique complet chargé: {len(history)} emails avec {sum(len(e.get('attachments', [])) for e in history)} pièces jointes")
+            return history
+        except Exception as e:
+            print(f"[DB] Erreur get_client_history: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
 
     def email_exists(self, message_id: str) -> bool:
         """Verifie si un email est deja en base"""
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT 1 FROM emails WHERE message_id = ?", (message_id,))
-        exists = c.fetchone() is not None
-        conn.close()
-        return exists
+        if not message_id:
+            return False
+            
+        conn = None
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT 1 FROM emails WHERE message_id = ?", (str(message_id),))
+            exists = c.fetchone() is not None
+            return exists
+        except Exception as e:
+            print(f"[DB] Erreur email_exists: {e}")
+            return False
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
 
 # --- FIN GESTION DB ---
 
 # Liste des patterns a exclure (spam, notifs, etc)
 EXCLUDE_PATTERNS = [
-    'typeform', 'followup', 'newsletter', 'noreply', 'no-reply', 
-    'stripe', 'paypal', 'billing', 'invoice', 'facture', 'recu', 'receipt',
-    'confirmation', 'commande', 'order', 'shipping', 'livraison',
-    'publicite', 'promo', 'soldes', 'unsubscribe', 'desinscription',
-    'linkedin', 'instagram', 'facebook', 'twitter', 'youtube', 'pinterest',
-    'notification', 'alert', 'security', 'securite', 'connexion', 'login',
-    'calendly', 'google calendar', 'invitation', 'rappel'
+    "typeform", "confirmation", "paiement", "payment", "commande", "order",
+    "noreply", "no-reply", "notification", "newsletter", "unsubscribe"
 ]
+
+# --- CHARGEMENT EN ARRIÈRE-PLAN ---
+SYNC_STATS_FILE = "sync_stats.json"
+
+def load_sync_stats():
+    """Charge les stats depuis le fichier"""
+    try:
+        if os.path.exists(SYNC_STATS_FILE):
+            with open(SYNC_STATS_FILE, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return {
+        'total_processed': 0,
+        'saved': 0,
+        'ignored': 0,
+        'errors': 0,
+        'is_running': False,
+        'last_update': None
+    }
+
+def save_sync_stats(stats):
+    """Sauvegarde les stats dans le fichier"""
+    try:
+        with open(SYNC_STATS_FILE, 'w') as f:
+            json.dump(stats, f)
+    except:
+        pass
+
+def background_sync_worker(reader, db):
+    """Fonction pour charger les emails en arrière-plan (appelée dans un thread)
+    Charge UNIQUEMENT les headers des 50 derniers emails non lus (TRÈS RAPIDE)
+    L'historique complet sera chargé à la demande quand on clique sur un email
+    """
+    import gc
+    stats = load_sync_stats()
+    stats['is_running'] = True
+    save_sync_stats(stats)
+    
+    try:
+        # Charger UNIQUEMENT les headers des 50 derniers emails non lus (TRÈS RAPIDE)
+        unread_emails = reader.get_recent_emails(days=30, unread_only=True, max_emails=50)
+        
+        if not unread_emails or not isinstance(unread_emails, list):
+            stats['is_running'] = False
+            save_sync_stats(stats)
+            return
+        
+        print(f"[BG SYNC] {len(unread_emails)} emails non lus trouvés - chargement headers uniquement")
+        
+        # Traiter chaque email non lu (seulement headers)
+        for email in unread_emails:
+            try:
+                if not isinstance(email, dict):
+                    continue
+                
+                message_id = email.get('message_id') or email.get('id')
+                if not message_id:
+                    continue
+                
+                # Filtre anti-spam
+                subject = email.get('subject', '').lower()
+                sender = email.get('from_email', '').lower()
+                if any(p in subject for p in EXCLUDE_PATTERNS) or any(p in sender for p in EXCLUDE_PATTERNS):
+                    stats['ignored'] += 1
+                    continue
+                
+                # Sauvegarder UNIQUEMENT les headers (rapide, pas de body/attachments)
+                if not db.email_exists(str(message_id)):
+                    email['body'] = ''
+                    email['attachments'] = []
+                    if db.save_email(email):
+                        stats['saved'] += 1
+                
+                stats['total_processed'] += 1
+                stats['last_update'] = datetime.now().isoformat()
+            
+            except Exception as e:
+                stats['errors'] += 1
+                print(f"[BG SYNC] Erreur email: {e}")
+                continue
+        
+        # Sauvegarder les stats une seule fois à la fin
+        save_sync_stats(stats)
+        gc.collect()
+        
+        stats['is_running'] = False
+        save_sync_stats(stats)
+        print(f"[BG SYNC] ✅ Synchronisation terminée: {stats['saved']} emails sauvegardés (headers seulement)")
+    
+    except Exception as e:
+        print(f"[BG SYNC] Erreur cycle: {e}")
+        import traceback
+        traceback.print_exc()
+        stats['is_running'] = False
+        save_sync_stats(stats)
 
 # Config page
 st.set_page_config(
@@ -265,7 +500,7 @@ st.markdown("""
 
 # Init session state
 if 'reader' not in st.session_state:
-    st.session_state.reader = None
+    st.session_state.reader = EmailReader()  # Initialiser dès le début
 if 'db' not in st.session_state:
     st.session_state.db = DatabaseManager()
 if 'emails' not in st.session_state:
@@ -340,14 +575,14 @@ def display_attachments(attachments):
             # Support Base64 (nouveau) ou Path (DB)
             if "data" in att:
                 # Ancienne methode (memoire)
-                if att["content_type"].startswith("image/"):
+                if att.get("content_type", "").startswith("image/"):
                     try:
                         img_data = base64.b64decode(att["data"])
-                        st.image(img_data, caption=att["filename"], use_container_width=True)
+                        st.image(img_data, caption=att.get("filename", ""), use_container_width=True)
                     except:
-                        st.write(f"📷 {att['filename']}")
+                        st.write(f"📷 {att.get('filename', 'Image')}")
                 else:
-                    st.write(f"📎 {att['filename']}")
+                    st.write(f"📎 {att.get('filename', 'Fichier')}")
             elif "filepath" in att and att.get("filepath"):
                 # Nouvelle methode (DB/Fichier)
                 try:
@@ -386,230 +621,381 @@ def display_kpis(kpis):
 
 def main():
     import gc
-    st.markdown('<div class="main-header">💪 Bilans Coaching - CRM v3.1 (Low Ram)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🚀 Bilans Coaching - Tableau de Bord</div>', unsafe_allow_html=True)
+
+    # Initialiser session state
+    if 'reader' not in st.session_state:
+        st.session_state.reader = EmailReader()
+    if 'db' not in st.session_state:
+        st.session_state.db = DatabaseManager()
+    
+    # Charger les stats depuis le fichier
+    st.session_state.sync_stats = load_sync_stats()
+    
+    # CHARGEMENT AUTOMATIQUE DES EMAILS NON LUS AU DÉMARRAGE
+    if 'emails' not in st.session_state or not st.session_state.emails:
+        try:
+            # Charger depuis DB (très rapide)
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute("SELECT * FROM emails ORDER BY date DESC LIMIT 50")
+            rows = c.fetchall()
+            conn.close()
+            
+            if rows:
+                emails_from_db = []
+                for row in rows:
+                    try:
+                        email_dict = dict(row)
+                        if email_dict.get('date'):
+                            try:
+                                email_dict['date'] = datetime.fromisoformat(email_dict['date'])
+                            except:
+                                email_dict['date'] = datetime.now()
+                        emails_from_db.append(email_dict)
+                    except:
+                        continue
+                st.session_state.emails = emails_from_db
+            else:
+                # DB VIDE -> Synchro automatique !
+                st.session_state.emails = []
+                st.warning("⚠️ Base de données vide. Synchronisation automatique en cours...")
+                
+                # Lancer synchro légère (3 jours, 20 emails max)
+                try:
+                    if st.session_state.reader is None:
+                        st.session_state.reader = EmailReader()
+                    
+                    with st.spinner("🔄 Chargement initial des emails depuis Gmail..."):
+                        new_emails = st.session_state.reader.get_recent_emails(days=3, unread_only=True, max_emails=20)
+                        
+                        if new_emails and isinstance(new_emails, list):
+                            saved = 0
+                            for email in new_emails:
+                                if isinstance(email, dict):
+                                    message_id = email.get('message_id') or email.get('id')
+                                    if message_id and not st.session_state.db.email_exists(str(message_id)):
+                                        email['body'] = ''
+                                        email['attachments'] = []
+                                        if st.session_state.db.save_email(email):
+                                            saved += 1
+                            
+                            st.success(f"✅ {saved} emails chargés ! Rafraîchis la page.")
+                            st.rerun()
+                        else:
+                            st.error("❌ Impossible de charger les emails. Vérifie les variables d'environnement.")
+                except Exception as e:
+                    st.error(f"❌ Erreur synchro: {e}")
+        except Exception as e:
+            st.error(f"Erreur DB: {e}")
+
 
     # Sidebar - Synchro
     with st.sidebar:
         st.header("🔄 Synchronisation")
         
-        # Stats DB
-        try:
-            # Petite requete rapide pour savoir combien on a d'emails
-            pass
-        except:
-            pass
+        # Afficher les stats du chargement en arrière-plan (recharger depuis fichier)
+        stats = load_sync_stats()
+        if stats.get('is_running', False):
+            st.success("🟢 Chargement automatique actif")
+            st.caption(f"✅ {stats.get('saved', 0)} sauvegardés")
+            st.caption(f"⏭️ {stats.get('ignored', 0)} ignorés")
+            st.caption(f"❌ {stats.get('errors', 0)} erreurs")
+            if stats.get('last_update'):
+                try:
+                    last = datetime.fromisoformat(stats['last_update'])
+                    st.caption(f"🕐 Dernière mise à jour: {last.strftime('%H:%M:%S')}")
+                except:
+                    pass
+        else:
+            if stats.get('saved', 0) > 0:
+                st.info(f"✅ {stats.get('saved', 0)} emails chargés")
+            else:
+                st.info("⏳ Chargement en cours...")
 
-        days = st.selectbox("Jours a scanner", [1, 3, 7, 30], index=1)
+        days = st.selectbox("Jours a scanner", [1, 3, 7, 30], index=1) # Default 3 jours
         
         if st.button("📥 Synchroniser Gmail", use_container_width=True, type="primary"):
+            # S'assurer que reader est initialisé
             if st.session_state.reader is None:
                 st.session_state.reader = EmailReader()
                     
             with st.status("Synchronisation en cours...", expanded=True) as status:
                 st.write("🔌 Connexion Gmail...")
                 
-                # 1. Recuperer les emails recents
-                new_emails = st.session_state.reader.get_recent_emails(days=days, unread_only=False) # On scanne tout
-                st.write(f"📨 {len(new_emails)} emails trouves sur Gmail")
+                # 1. Recuperer les emails NON LUS uniquement (LIMITÉ à 20 pour performance)
+                try:
+                    new_emails = st.session_state.reader.get_recent_emails(days=7, unread_only=True, max_emails=20) # Seulement non lus, limité à 20
+                    if new_emails is None:
+                        new_emails = []
+                    if not isinstance(new_emails, list):
+                        new_emails = []
+                    st.write(f"📨 {len(new_emails)} emails NON LUS trouves")
+                except Exception as e:
+                    st.error(f"❌ Erreur connexion Gmail: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    new_emails = []
                 
                 # 2. Sauvegarder en DB (uniquement les nouveaux et pertinents)
                 saved_count = 0
                 ignored_count = 0
+                error_count = 0
                 
-                for email in new_emails:
-                    # Filtre anti-spam AVANT tout traitement lourd
-                    subject = email.get('subject', '').lower()
-                    sender = email.get('from_email', '').lower()
-                    
-                    if any(p in subject for p in EXCLUDE_PATTERNS) or any(p in sender for p in EXCLUDE_PATTERNS):
-                        # print(f"Ignored: {subject}")
-                        ignored_count += 1
-                        continue
+                # Progress bar pour le chargement
+                progress_bar = st.progress(0)
+                total_emails = len(new_emails)
+                
+                for idx, email in enumerate(new_emails):
+                    # Update progress bar
+                    if total_emails > 0:
+                        progress = (idx + 1) / total_emails
+                        progress_bar.progress(progress)
+                    try:
+                        # Validation: email doit etre un dict avec les champs essentiels
+                        if not isinstance(email, dict):
+                            error_count += 1
+                            continue
+                        
+                        # Validation: message_id obligatoire
+                        message_id = email.get('message_id') or email.get('id')
+                        if not message_id:
+                            error_count += 1
+                            continue
+                        
+                        # Filtre anti-spam AVANT tout traitement lourd
+                        subject = email.get('subject', '').lower()
+                        sender = email.get('from_email', '').lower()
+                        
+                        if any(p in subject for p in EXCLUDE_PATTERNS) or any(p in sender for p in EXCLUDE_PATTERNS):
+                            ignored_count += 1
+                            continue
 
-                    if not st.session_state.db.email_exists(email['message_id']):
-                        # Besoin de charger le contenu complet pour sauvegarder
-                        st.write(f"📥 Telechargement: {email['subject'][:40]}...")
-                        content = st.session_state.reader.load_email_content(email['id'])
-                        if content and content.get("loaded"):
-                            email['body'] = content.get('body', '')
-                            email['attachments'] = content.get('attachments', [])
+                        # Verifier si deja en DB
+                        if not st.session_state.db.email_exists(str(message_id)):
+                            # OPTIMISATION: Sauvegarder seulement les headers (sans body/attachments)
+                            # Le contenu complet sera charge a la demande quand on clique sur l'email
+                            email['body'] = ''  # Pas de body pour l'instant
+                            email['attachments'] = []  # Pas d'attachments pour l'instant
+                            
+                            # Sauvegarder en DB (headers seulement)
                             if st.session_state.db.save_email(email):
                                 saved_count += 1
                         
-                        # Nettoyage agressif memoire apres chaque mail
-                        del content
-                        email.clear() # Vide le dict
-                        gc.collect()
+                        # Nettoyage memoire (sans clear() qui casse la boucle)
+                        if 'attachments' in email:
+                            for att in email.get('attachments', []):
+                                if 'data' in att:
+                                    att['data'] = None
+                        
+                        # Force garbage collection tous les 10 emails
+                        if idx % 10 == 0:
+                            gc.collect()
+                            
+                    except Exception as e:
+                        print(f"[SYNC] Erreur traitement email: {e}")
+                        error_count += 1
+                        continue
                 
-                status.update(label=f"✅ {saved_count} nouveaux emails sauvegardes ({ignored_count} ignores)", state="complete", expanded=False)
-                st.success(f"Base de donnees a jour (+{saved_count} emails)")
-                st.rerun()
+                progress_bar.empty()
+                
+                final_msg = f"✅ {saved_count} nouveaux emails sauvegardes"
+                if ignored_count > 0:
+                    final_msg += f" ({ignored_count} ignores)"
+                if error_count > 0:
+                    final_msg += f" ({error_count} erreurs)"
+                    
+                status.update(label=final_msg, state="complete", expanded=False)
+                st.success(f"✅ {saved_count} nouveaux emails sauvegardes")
+                if error_count > 0:
+                    st.warning(f"⚠️ {error_count} erreur(s)")
+                # Pas de rerun automatique pour éviter le rechargement
+                # st.rerun()
 
         st.divider()
-        st.header("📂 Clients")
+        st.header("📧 Emails Non Lus")
         
-        # Vue Inbox / Recherche
-        st.subheader("Recherche Client")
+        # Bouton refresh
+        if st.button("🔄 Rafraichir", use_container_width=True):
+            st.session_state.emails = []
+            st.rerun()
         
-        client_search = st.text_input("🔍 Email client", placeholder="jean@example.com")
-        
-        if client_search:
-            st.session_state.emails = st.session_state.db.get_client_history(client_search)
-            if not st.session_state.emails:
-                st.warning("Aucun historique pour ce client")
-            else:
-                st.success(f"{len(st.session_state.emails)} emails trouves")
-        
-        # Si pas de recherche, afficher les derniers mails recus (Inbox locale)
-        elif not st.session_state.emails:
-             st.session_state.emails = st.session_state.db.get_client_history("") # Retourne les 50 derniers
-                
-        # Liste des emails trouves pour ce client
-        for email_data in st.session_state.emails:
-            date_str = email_data['date'].strftime('%d/%m %H:%M') if isinstance(email_data.get('date'), datetime) else str(email_data.get('date', ''))
+        # Charger depuis la DB uniquement (RAPIDE, pas de connexion Gmail)
+        try:
+            # Charger les 20 derniers emails depuis la DB (instantané)
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute("SELECT * FROM emails ORDER BY date DESC LIMIT 20")
+            rows = c.fetchall()
+            conn.close()
             
-            # Icone direction
-            icon = "📥" if email_data.get('direction') == 'received' else "📤"
-            
-            if st.button(f"{icon} {date_str} - {email_data['subject'][:30]}", key=f"sel_{email_data['message_id']}", use_container_width=True):
-                st.session_state.selected_email = email_data
-                # Pour l'historique, si on a cherche un client, on a deja tout
-                # Sinon on recharge l'historique specifique de ce client
-                if client_search:
-                    st.session_state.history = st.session_state.emails
-                else:
-                    client_email = email_data.get('client_email')
-                    st.session_state.history = st.session_state.db.get_client_history(client_email)
-                    
-                st.session_state.analysis = None
-                st.session_state.draft = ""
-                st.rerun()
-
-    # Contenu principal
-    if st.session_state.selected_email:
-        email_data = st.session_state.selected_email
-
-        # Header
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
-            st.subheader(f"📧 {email_data['subject']}")
-            client_email = email_data.get('client_email', email_data.get('from_email', ''))
-            st.caption(f"Client: {client_email}")
-            
-            # Infos client
-            client_info = get_client(client_email)
-            if client_info:
-                jours = get_jours_restants(client_info)
-                color = "green" if jours > 14 else "orange" if jours > 0 else "red"
-                st.markdown(f"**Commande:** {client_info.get('commande', 'N/A')} | **Jours restants:** :{color}[{jours}j]")
-            
-            with st.expander("Modifier infos client"):
-                c_commande = st.text_input("Commande", value=client_info.get('commande', '') if client_info else '', key="c_cmd")
-                c_date = st.date_input("Date debut", key="c_date")
-                c_duree = st.number_input("Duree (semaines)", min_value=1, max_value=52, value=client_info.get('duree_semaines', 12) if client_info else 12, key="c_dur")
-                if st.button("Sauvegarder client"):
-                    save_client(client_email, c_commande, c_date.strftime('%Y-%m-%d'), c_duree)
-                    st.success("Client sauvegarde!")
-                    st.rerun()
-
-        with col2:
-            st.metric("Historique", f"{len(st.session_state.history)} emails")
-
-        with col3:
-            # Si c'est un mail recu, on peut analyser
-            if email_data.get('direction', 'received') == 'received':
-                if st.button("🤖 Analyser", type="primary", use_container_width=True):
-                    with st.status("Analyse IA en cours...", expanded=True) as status:
-                        st.write(f"🧠 Analyse avec {len(st.session_state.history)} emails de contexte...")
-
-                        result = analyze_coaching_bilan(
-                            email_data,
-                            st.session_state.history # On envoie tout l'historique local !
-                        )
-
-                        if result["success"]:
-                            analysis = result["analysis"]
-                            if isinstance(analysis, str):
-                                try:
-                                    analysis = json.loads(analysis)
-                                except:
-                                    pass
-                            st.session_state.analysis = analysis
-                            
-                            # Extraire draft
-                            draft = ""
-                            if isinstance(analysis, dict):
-                                draft = analysis.get("draft_email", "")
-                            elif isinstance(analysis, str):
-                                import re
-                                match = re.search(r'"draft_email"\s*:\s*"(.*?)"(?=\s*[,}])', analysis, re.DOTALL)
-                                if match:
-                                    draft = match.group(1).replace('\\n', '\n').replace('\\"', '"')
-                            
-                            st.session_state.draft = draft if draft else "Email a rediger manuellement."
-                            
-                            status.update(label="✅ Analyse terminee!", state="complete", expanded=False)
-                            st.rerun()
+            if rows:
+                emails_from_db = []
+                for row in rows:
+                    try:
+                        email_dict = dict(row)
+                        # Parse date
+                        if email_dict.get('date'):
+                            try:
+                                email_dict['date'] = datetime.fromisoformat(email_dict['date'])
+                            except:
+                                email_dict['date'] = datetime.now()
                         else:
-                            st.error(f"Erreur: {result.get('error')}")
-
-        # Tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📨 Email", "📜 Historique", "📊 Analyse", "✉️ Reponse", "📈 Dashboard"])
-
-        with tab1:
-            st.markdown(f'<div class="bilan-card">{html.escape(email_data.get("body", ""))}</div>', unsafe_allow_html=True)
-            if email_data.get("attachments"):
-                st.subheader("📎 Pieces jointes")
-                display_attachments(email_data["attachments"])
-
-        with tab2:
-            for hist_email in st.session_state.history:
-                direction = hist_email.get("direction", "received")
-                icon = "📥" if direction == "received" else "📤"
-                date_val = hist_email['date']
-                date_str = date_val.strftime('%d/%m/%Y') if isinstance(date_val, datetime) else str(date_val)[:10]
-
-                with st.expander(f"{icon} {date_str} - {hist_email['subject'][:50]}"):
-                    st.write(hist_email.get("body", "")[:1000])
-                    if hist_email.get("attachments"):
-                        st.caption(f"📎 {len(hist_email['attachments'])} piece(s) jointe(s)")
-                        display_attachments(hist_email["attachments"])
-
-        with tab3:
-            if st.session_state.analysis:
-                analysis = st.session_state.analysis
-                st.subheader("📝 Resume")
-                st.info(analysis.get("resume", ""))
-                st.subheader("📊 KPIs")
-                display_kpis(analysis.get("kpis", {}))
-
-            else:
-                st.info("👆 Clique sur 'Analyser' pour lancer l'analyse IA")
-
-        with tab4:
-            if st.session_state.analysis:
-                st.subheader("✉️ Email de reponse")
-                st.text_area("Draft", value=st.session_state.draft, height=400)
-                # ... Boutons d'envoi ...
-                if st.button("📤 Envoyer", type="primary"):
-                    st.warning("Fonction envoi a reconnecter avec la nouvelle architecture")
-            else:
-                st.info("Lance l'analyse d'abord")
+                            email_dict['date'] = datetime.now()
+                        emails_from_db.append(email_dict)
+                    except:
+                        continue
                 
-        with tab5:
-            if st.button("Generer Dashboard HTML"):
-                html_dash = generate_client_dashboard(st.session_state.history)
-                st.components.v1.html(html_dash, height=800, scrolling=True)
+                st.session_state.emails = emails_from_db
+                st.info(f"📧 {len(emails_from_db)} email(s) depuis la base de données")
+            else:
+                st.session_state.emails = []
+                st.info("👆 Clique sur 'Synchroniser Gmail' pour charger les emails")
+        except Exception as e:
+             pass
 
-    else:
-        st.info("👈 Synchronise Gmail puis cherche un client dans la sidebar")
-        st.markdown("""
-        ### 🚀 Nouveau Mode CRM v3.0
+    # --- NAVIGATION PRINCIPALE ---
+    
+    # ÉTAT A: AUCUN EMAIL SÉLECTIONNÉ -> TABLEAU DE BORD (LISTE)
+    if not st.session_state.selected_email:
+        st.subheader("📬 Boîte de Réception (Non Lus & Récents)")
         
-        1. **Synchroniser** : Telecharge les nouveaux emails et les stocke sur le Disque Persistant.
-        2. **Chercher** : Tape l'email d'un client pour voir tout son dossier instantanement.
-        3. **Analyser** : L'IA a acces a tout l'historique local ultra-rapidement.
-        """)
+        # KPI rapide
+        st.metric("Emails en attente", len(st.session_state.emails))
+        
+        # Liste des emails
+        if st.session_state.emails:
+            for i, email in enumerate(st.session_state.emails):
+                with st.container():
+                    # Style Card
+                    st.markdown(f"""
+                    <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-weight: bold; font-size: 1.1rem; color: #333;">{email.get('subject', 'Sans sujet')}</div>
+                        <div style="color: #666; font-size: 0.9rem; margin-bottom: 5px;">
+                            👤 <b>{email.get('client_email', 'Inconnu')}</b> | 📅 {email.get('date').strftime('%d/%m/%Y %H:%M') if isinstance(email.get('date'), datetime) else str(email.get('date'))}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Actions
+                    c1, c2, c3 = st.columns([1, 1, 4])
+                    with c1:
+                        if st.button("🔍 Ouvrir & Analyser", key=f"btn_open_{i}_{email.get('message_id')}", use_container_width=True):
+                            st.session_state.selected_email = email
+                            st.session_state.analysis = None
+                            st.session_state.history = [] # Forcer le rechargement de l'historique
+                            st.rerun()
+                    with c2:
+                         if st.button("🗑️ Ignorer", key=f"btn_ignore_{i}_{email.get('message_id')}", use_container_width=True):
+                            # TODO: Marquer comme lu en DB
+                            st.info("Email ignoré (visuellement)")
+        else:
+            st.info("📭 Aucun email à afficher. Lance une synchronisation dans la barre latérale !")
+
+    # ÉTAT B: EMAIL SÉLECTIONNÉ -> VUE DÉTAILLÉE AVEC ONGLETS
+    else:
+        if st.button("⬅️ Retour à la liste", use_container_width=True):
+            st.session_state.selected_email = None
+            st.session_state.analysis = None
+            st.session_state.history = []
+            st.rerun()
+            
+        email = st.session_state.selected_email
+        client_email = email.get('client_email', '')
+        
+        st.header(f"📧 {email.get('subject', 'Sans sujet')}")
+        st.caption(f"De: **{client_email}** | Date: {email.get('date')}")
+        
+        # 1. Charger le contenu complet SI manquant
+        if not email.get('body') and email.get('email_id'):
+            with st.spinner("🔌 Chargement du contenu Gmail..."):
+                full_data = st.session_state.reader.load_email_content(email['email_id'])
+                if full_data.get('loaded'):
+                    email['body'] = full_data['body']
+                    email['attachments'] = full_data['attachments']
+                    # Garder en session
+                    st.session_state.selected_email = email
+        
+        # 2. Charger l'historique complet pour l'IA
+        if not st.session_state.history:
+            with st.spinner("📜 Récupération de l'historique client..."):
+                st.session_state.history = st.session_state.db.get_client_history(client_email, load_attachments=True)
+        
+        # 3. ONGLETS
+        tab1, tab2, tab3, tab4 = st.tabs(["📨 Email Actuel", "📜 Historique Complet", "🤖 Analyse IA", "✉️ Email de Réponse"])
+        
+        with tab1:
+            st.markdown(f'<div class="bilan-card">{html.escape(email.get("body", ""))}</div>', unsafe_allow_html=True)
+            if email.get('attachments'):
+                st.subheader(f"📎 Pièces jointes ({len(email['attachments'])})")
+                display_attachments(email['attachments'])
+        
+        with tab2:
+            st.subheader(f"Historique de {client_email}")
+            if st.session_state.history:
+                for h_email in reversed(st.session_state.history): # Plus récent en haut
+                    direction = "📥" if h_email.get('direction') == 'received' else "📤"
+                    with st.expander(f"{direction} {h_email.get('date').strftime('%d/%m/%Y')} - {h_email.get('subject')}"):
+                        st.write(h_email.get('body', '')[:1000])
+            else:
+                st.info("Aucun historique trouvé pour ce client.")
+        
+        with tab3:
+            st.subheader("🤖 Analyse par Claude 3.5 Sonnet")
+            
+            # Si déjà analysé, afficher
+            if st.session_state.analysis:
+                res = st.session_state.analysis
+                st.info(res.get("resume", ""))
+                
+                # KPIs
+                if res.get("kpis"):
+                    display_kpis(res["kpis"])
+                
+                # Points positifs / améliorations
+                c_pos, c_neg = st.columns(2)
+                with c_pos:
+                    st.success("✅ Points Positifs")
+                    for p in res.get("points_positifs", []): st.write(f"- {p}")
+                with c_neg:
+                    st.error("⚠️ À Améliorer")
+                    for p in res.get("points_ameliorer", []): 
+                        if isinstance(p, dict): st.write(f"- **{p.get('probleme')}**: {p.get('solution')}")
+                        else: st.write(f"- {p}")
+            
+            # Bouton Lancer Analyse
+            if st.button("✨ Lancer l'Analyse IA (Historique + Photos)", type="primary", use_container_width=True):
+                with st.status("🧠 Analyse en cours par Claude 3.5...", expanded=True) as status:
+                    st.write("Déchiffrage du bilan et analyse de l'historique...")
+                    result = analyze_coaching_bilan(email, st.session_state.history, client_email)
+                    
+                    if result.get("success"):
+                        st.session_state.analysis = result["analysis"]
+                        st.session_state.draft = result["analysis"].get("draft_email", "")
+                        status.update(label="✅ Analyse terminée !", state="complete")
+                        st.rerun()
+                    else:
+                        st.error(f"Erreur IA: {result.get('error')}")
+                        status.update(label="❌ Erreur IA", state="error")
+        
+        with tab4:
+            st.subheader("✉️ Brouillon de Réponse")
+            if st.session_state.draft:
+                draft = st.text_area("Modifier l'email :", value=st.session_state.draft, height=400)
+                st.session_state.draft = draft
+                
+                col_send, col_regen = st.columns(2)
+                with col_send:
+                    if st.button("📤 Envoyer par Gmail", type="primary", use_container_width=True):
+                        st.warning("Fonction d'envoi à configurer (App Password requis)")
+                with col_regen:
+                    if st.button("🔄 Régénérer", use_container_width=True):
+                         # Logique de régénération...
+                         pass
+            else:
+                st.info("Lance l'analyse IA d'abord pour générer un brouillon.")
 
 if __name__ == "__main__":
     main()
