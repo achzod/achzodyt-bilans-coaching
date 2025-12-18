@@ -1,5 +1,5 @@
 """
-Module d'analyse IA des bilans de coaching - GPT-5.2 + Gemini 3 Pro
+Module d'analyse IA des bilans de coaching - Claude Sonnet 4.5
 """
 
 import os
@@ -10,7 +10,7 @@ import re
 import requests
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from openai import OpenAI
+from anthropic import Anthropic
 from dotenv import load_dotenv
 from PIL import Image
 
@@ -24,8 +24,8 @@ except ImportError:
 
 load_dotenv()
 
-# Clients IA
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=55.0)
+# Client Claude
+anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 MAX_IMAGE_SIZE = 4 * 1024 * 1024
@@ -315,24 +315,28 @@ JSON:
 {{"resume":"analyse","analyse_photos":{{"masse_grasse_actuelle":"X%","evolution":"desc"}},"evolution_metriques":{{"poids":{{"jour1":"Xkg","actuel":"Xkg","diff":"-Xkg"}}}},"points_positifs":["x"],"points_ameliorer":[{{"probleme":"x","solution":"y"}}],"plan_action":{{"training":"x","nutrition":"x","cardio":"x"}},"draft_email":"HTML COMPLET"}}"""
 
 
-def call_gpt4(prompt: str, images: list) -> Dict:
-    """Appel GPT-5.2 (dernier modele OpenAI - Dec 2025)"""
+def call_claude(prompt: str, images: list) -> Dict:
+    """Appel Claude Sonnet 4.5 via Anthropic API"""
     try:
         content = [{"type": "text", "text": prompt}]
         for img_data, img_type in images:
             content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{img_type};base64,{img_data}", "detail": "high"}
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": img_type,
+                    "data": img_data
+                }
             })
 
-        response = openai_client.chat.completions.create(
-            model="gpt-5.2-pro",  # GPT-5.2 Pro - Top tier OpenAI (Dec 2025)
-            max_completion_tokens=8000,
+        response = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=8000,
             messages=[{"role": "user", "content": content}]
         )
-        return {"success": True, "text": response.choices[0].message.content, "model": "GPT-5.2-Pro"}
+        return {"success": True, "text": response.content[0].text, "model": "Claude-Sonnet-4.5"}
     except Exception as e:
-        return {"success": False, "error": str(e), "model": "GPT-5.2-Pro"}
+        return {"success": False, "error": str(e), "model": "Claude-Sonnet-4.5"}
 
 
 def call_gemini(prompt: str, images: list) -> Dict:
@@ -340,7 +344,6 @@ def call_gemini(prompt: str, images: list) -> Dict:
 
     # Liste des modeles a essayer (du plus recent au plus stable)
     models_to_try = [
-        "gemini-3.0-pro",
         "gemini-2.0-flash-exp",
         "gemini-1.5-pro-latest",
         "gemini-1.5-flash"
@@ -455,14 +458,14 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
         except:
             pass
 
-    print(f"[ANALYZE] Running GPT-5.2 and Gemini 3 Pro in parallel with {len(images)} images...")
+    print(f"[ANALYZE] Running Claude Sonnet 4.5 and Gemini in parallel with {len(images)} images...")
 
     # Appels en parallele
-    results = {"gpt4": None, "gemini": None}
+    results = {"claude": None, "gemini": None}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = {
-            executor.submit(call_gpt4, prompt, images): "gpt4",
+            executor.submit(call_claude, prompt, images): "claude",
             executor.submit(call_gemini, prompt, images): "gemini"
         }
         for future in as_completed(futures):
@@ -487,7 +490,7 @@ def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
     # Retourner les 2 analyses
     return {
         "success": True,
-        "gpt4": analyses.get("gpt4", {}),
+        "gpt4": analyses.get("claude", {}),  # Claude remplace GPT
         "gemini": analyses.get("gemini", {}),
         "photos_analyzed": len(images)
     }
@@ -509,7 +512,7 @@ def _build_history_context(history):
 
 
 def regenerate_email_draft(analysis, instructions, current_draft):
-    """Regenere le draft avec GPT-5.2"""
+    """Regenere le draft avec Claude Sonnet 4.5"""
     prompt = f"""Tu es Achzod, coach expert. JAMAIS d'asterisques.
 Analyse: {json.dumps(analysis, ensure_ascii=False)[:3000]}
 Draft actuel: {current_draft}
@@ -517,11 +520,11 @@ Instructions: {instructions}
 Reecris email 250-400 mots MAXIMUM, sans asterisques, style direct expert tutoiement."""
 
     try:
-        r = openai_client.chat.completions.create(
-            model="gpt-5.2-pro",  # GPT-5.2 Pro pour regeneration
-            max_completion_tokens=2000,
+        r = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
-        return r.choices[0].message.content
+        return r.content[0].text
     except Exception as e:
         return f"Erreur: {e}"

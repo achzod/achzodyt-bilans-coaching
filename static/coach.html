@@ -341,7 +341,7 @@ async function analyzeAll() {
     const btn = document.querySelector('.main-actions .btn-primary');
     btn.disabled = true;
     btn.textContent = 'Analyse en cours...';
-    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">GPT + Gemini en parallele (30-90s max)...</div></div>';
+    document.getElementById('ai-result').innerHTML = '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Claude Sonnet 4.5 + Gemini en parallele (30-90s max)...</div></div>';
 
     try {
         console.log('[ANALYZE] Starting analysis for', currentClient);
@@ -384,7 +384,7 @@ async function analyzeAll() {
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
             <div style="border:2px solid #10b981;border-radius:12px;padding:16px;background:#10b98110;">
                 <div style="font-weight:bold;font-size:1.1rem;color:#10b981;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-                    <span>🤖 GPT-5.2 Pro</span>
+                    <span>🤖 Claude Sonnet 4.5</span>
                     <button class="btn btn-sm btn-success" onclick="selectAI('gpt4')">Utiliser</button>
                 </div>
                 <div style="font-size:0.85rem;line-height:1.5;max-height:200px;overflow-y:auto;">
@@ -406,7 +406,7 @@ async function analyzeAll() {
 
         document.getElementById('ai-result').innerHTML = html;
 
-        // Par defaut, afficher GPT-5.2
+        // Par defaut, afficher Claude
         if (gpt4Analysis?.draft) {
             document.getElementById('draft-text').value = gpt4Analysis.draft;
             currentAnalysis = gpt4Analysis.analysis;
@@ -438,12 +438,12 @@ async function analyzeAll() {
     btn.disabled = false;
 }
 
-// SELECT AI - Choisir entre GPT-5.2 et Gemini 3 Pro
+// SELECT AI - Choisir entre Claude Sonnet 4.5 et Gemini
 function selectAI(aiName) {
     if (aiName === 'gpt4' && gpt4Analysis?.draft) {
         document.getElementById('draft-text').value = gpt4Analysis.draft;
         currentAnalysis = gpt4Analysis.analysis;
-        showNotification('GPT-5.2 Pro selectionne!', 'success');
+        showNotification('Claude Sonnet 4.5 selectionne!', 'success');
     } else if (aiName === 'gemini' && geminiAnalysis?.draft) {
         document.getElementById('draft-text').value = geminiAnalysis.draft;
         currentAnalysis = geminiAnalysis.analysis;
