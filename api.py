@@ -555,9 +555,10 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
         filtered = 0
 
         for email_data in emails[:200]:  # Max 200 emails
-            if is_spam_email(email_data):
-                filtered += 1
-                continue
+            # SPAM FILTER DISABLED - let all emails through
+            # if is_spam_email(email_data):
+            #     filtered += 1
+            #     continue
 
             email_data['direction'] = 'received'
             if save_email(email_data):
