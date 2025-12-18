@@ -311,24 +311,24 @@ def get_all_emails_grouped() -> Dict:
     conn = get_db()
     c = conn.cursor()
 
-    # Get clients with their email counts - SEULEMENT status='new' (jamais ouvert)
+    # Get clients with their email counts - ALL unreplied emails (status != 'replied')
     c.execute('''
         SELECT c.*,
-               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new' AND direction = 'received') as unread_count,
-               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status = 'new' AND direction = 'received') as unreplied_count
+               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status != 'replied' AND direction = 'received') as unread_count,
+               (SELECT COUNT(*) FROM gmail_emails WHERE sender_email = c.email AND status != 'replied' AND direction = 'received') as unreplied_count
         FROM clients c
         ORDER BY c.last_email_date DESC
     ''')
     all_clients = [dict(row) for row in c.fetchall()]
-    # Filtrer: seulement les clients avec au moins 1 mail NEW
+    # Filtrer: seulement les clients avec au moins 1 mail non repondu
     clients = [c for c in all_clients if c.get('unread_count', 0) > 0]
 
-    # Get recent emails - SEULEMENT status='new' (jamais ouvert)
+    # Get recent emails - ALL unreplied (status != 'replied')
     c.execute('''
         SELECT * FROM gmail_emails
-        WHERE direction = 'received' AND status = 'new'
+        WHERE direction = 'received' AND status != 'replied'
         ORDER BY date_sent DESC
-        LIMIT 100
+        LIMIT 200
     ''')
     recent_emails = [dict(row) for row in c.fetchall()]
 
@@ -521,10 +521,10 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
     def do_sync():
         reader = EmailReader()
         try:
-            print(f"[SYNC] Starting sync for last {days} days (UNSEEN emails)...")
-            # Get UNSEEN (unread) emails specifically - increased max to 500
-            emails = reader.get_all_emails(days=days, unread_only=True, max_emails=500)
-            print(f"[SYNC] Found {len(emails)} UNSEEN emails")
+            print(f"[SYNC] Starting sync for last {days} days (ALL emails, not just unread)...")
+            # Get ALL emails (not just unread) - we track status in our DB
+            emails = reader.get_all_emails(days=days, unread_only=False, max_emails=500)
+            print(f"[SYNC] Found {len(emails)} emails from Gmail")
             reader.disconnect()
             return emails
         except Exception as e:
@@ -572,7 +572,7 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
         total = c.fetchone()['total']
         c.execute('SELECT COUNT(DISTINCT sender_email) as clients FROM gmail_emails WHERE direction = "received"')
         clients_count = c.fetchone()['clients']
-        c.execute('SELECT COUNT(*) as unread FROM gmail_emails WHERE status = "new"')
+        c.execute('SELECT COUNT(*) as unread FROM gmail_emails WHERE status != "replied" AND direction = "received"')
         unread = c.fetchone()['unread']
         conn.close()
 
@@ -644,7 +644,7 @@ async def coach_dashboard(user: Dict = Depends(get_current_coach)):
     c = conn.cursor()
     c.execute('SELECT COUNT(*) as total FROM gmail_emails WHERE direction = "received"')
     total_received = c.fetchone()['total']
-    c.execute('SELECT COUNT(*) as total FROM gmail_emails WHERE status = "new"')
+    c.execute('SELECT COUNT(*) as total FROM gmail_emails WHERE status != "replied" AND direction = "received"')
     total_new = c.fetchone()['total']
     conn.close()
 
@@ -764,10 +764,10 @@ async def analyze_all_unreplied(client_email: str, user: Dict = Depends(get_curr
     conn = get_db()
     c = conn.cursor()
 
-    # Get only NEW emails for this client (not read, not replied)
+    # Get ALL unreplied emails for this client
     c.execute('''
         SELECT * FROM gmail_emails
-        WHERE sender_email = ? AND direction = 'received' AND status = 'new'
+        WHERE sender_email = ? AND direction = 'received' AND status != 'replied'
         ORDER BY date_sent ASC
     ''', (client_email.lower(),))
     unreplied_emails = [dict(r) for r in c.fetchall()]
