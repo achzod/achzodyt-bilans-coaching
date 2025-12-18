@@ -24,31 +24,56 @@ MAIL_PASS = os.getenv("MAIL_PASS")
 
 
 def create_connection():
-    """Cree une nouvelle connexion IMAP avec debugging intense"""
-    # imaplib.Debug = 4 # Trop verbeux pour prod, mais utile ici - Activé via env si besoin
+    """Cree une nouvelle connexion IMAP avec diagnostics"""
+    import sys
+    
+    # Validation env
+    if not MAIL_USER or not MAIL_PASS:
+        print("[IMAP] ERREUR: MAIL_USER ou MAIL_PASS non definis dans l'environnement!")
+        sys.stdout.flush()
+        return None
+
     try:
         import socket
-        timeout = 30
+        timeout = 10
         socket.setdefaulttimeout(timeout)
         
-        print(f"[IMAP] Tentative de connexion vers {IMAP_SERVER}:{IMAP_PORT} (timeout={timeout})...")
+        print(f"[IMAP] 1. Test socket vers {IMAP_SERVER}:{IMAP_PORT}...")
+        sys.stdout.flush()
         
-        # 1. Connexion SSL
+        # Test socket pur avant SSL
+        try:
+            sock = socket.create_connection((IMAP_SERVER, IMAP_PORT), timeout=5)
+            sock.close()
+            print("[IMAP] TCP Port OK")
+            sys.stdout.flush()
+        except Exception as se:
+            print(f"[IMAP] TCP Port ECHEC: {se}")
+            sys.stdout.flush()
+            return None
+
+        print(f"[IMAP] 2. Connexion SSL imaplib (timeout={timeout})...")
+        sys.stdout.flush()
+        
         start_time = time.time()
         conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
         print(f"[IMAP] SSL Connect OK en {time.time() - start_time:.2f}s")
+        sys.stdout.flush()
         
-        # 2. Login
-        print(f"[IMAP] Tentative login pour {MAIL_USER}...")
+        print(f"[IMAP] 3. Login pour {MAIL_USER}...")
+        sys.stdout.flush()
+        
         start_time = time.time()
         conn.login(MAIL_USER, MAIL_PASS)
         print(f"[IMAP] Login OK en {time.time() - start_time:.2f}s")
+        sys.stdout.flush()
         
         return conn
     except Exception as e:
         print(f"[IMAP] ECHEC CRITIQUE: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+        sys.stdout.flush()
         return None
 
 

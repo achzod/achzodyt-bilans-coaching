@@ -661,33 +661,39 @@ def main():
             else:
                 # DB VIDE -> Synchro automatique !
                 st.session_state.emails = []
-                st.warning("⚠️ Base de données vide. Synchronisation automatique en cours...")
                 
-                # Lancer synchro légère (3 jours, 20 emails max)
-                try:
-                    if st.session_state.reader is None:
-                        st.session_state.reader = EmailReader()
-                    
-                    with st.spinner("🔄 Chargement initial des emails depuis Gmail..."):
-                        new_emails = st.session_state.reader.get_recent_emails(days=3, unread_only=True, max_emails=20)
+                # Sur Render, on évite de bloquer trop longtemps au startup pour la health check
+                is_render = os.getenv("RENDER") is not None
+                
+                if is_render:
+                    st.info("ℹ️ Base de données vide. Cliquez sur 'Synchroniser' pour charger les emails.")
+                else:
+                    st.warning("⚠️ Base de données vide. Synchronisation automatique en cours...")
+                    try:
+                        if st.session_state.reader is None:
+                            st.session_state.reader = EmailReader()
                         
-                        if new_emails and isinstance(new_emails, list):
-                            saved = 0
-                            for email in new_emails:
-                                if isinstance(email, dict):
-                                    message_id = email.get('message_id') or email.get('id')
-                                    if message_id and not st.session_state.db.email_exists(str(message_id)):
-                                        email['body'] = ''
-                                        email['attachments'] = []
-                                        if st.session_state.db.save_email(email):
-                                            saved += 1
+                        # Synchro légère et RAPIDE
+                        with st.spinner("🔄 Chargement initial..."):
+                            import socket
+                            socket.setdefaulttimeout(5) # Très court pour le startup
+                            new_emails = st.session_state.reader.get_recent_emails(days=2, unread_only=True, max_emails=10)
                             
-                            st.success(f"✅ {saved} emails chargés ! Rafraîchis la page.")
-                            st.rerun()
-                        else:
-                            st.error("❌ Impossible de charger les emails. Vérifie les variables d'environnement.")
-                except Exception as e:
-                    st.error(f"❌ Erreur synchro: {e}")
+                            if new_emails and isinstance(new_emails, list):
+                                saved = 0
+                                for email in new_emails:
+                                    if isinstance(email, dict):
+                                        msg_id = email.get('message_id') or email.get('id')
+                                        if msg_id and not st.session_state.db.email_exists(str(msg_id)):
+                                            email['body'] = ''
+                                            email['attachments'] = []
+                                            if st.session_state.db.save_email(email):
+                                                saved += 1
+                                if saved > 0:
+                                    st.success(f"✅ {saved} emails chargés !")
+                                    st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erreur synchro initiale: {e}")
         except Exception as e:
             st.error(f"Erreur DB: {e}")
 
