@@ -221,6 +221,29 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
     motivation_trend = data.get("motivation_level", {}).get("trend", "stable")
     trend_class = "positive" if motivation_trend == "hausse" else "negative" if motivation_trend == "baisse" else ""
 
+    # Prepare chart data from weekly_scores
+    weekly_scores = data.get("weekly_scores", [])
+    if weekly_scores:
+        weeks_labels = [f"S{w.get('week', i+1)}" for i, w in enumerate(weekly_scores)]
+        training_data = [w.get("training", 7) for w in weekly_scores]
+        nutrition_data = [w.get("nutrition", 7) for w in weekly_scores]
+        energy_data = [w.get("energy", 7) for w in weekly_scores]
+    else:
+        weeks_labels = ['S1', 'S2', 'S3', 'S4']
+        training_data = [7, 7, 8, 8]
+        nutrition_data = [6, 7, 7, 8]
+        energy_data = [7, 6, 7, 8]
+
+    # Radar chart data for lifestyle
+    lifestyle = data.get("lifestyle_factors", {})
+    radar_data = [
+        lifestyle.get("sleep_quality", 7),
+        10 - lifestyle.get("stress_level", 5),  # Inverted: low stress = high score
+        lifestyle.get("hydration", 7),
+        lifestyle.get("recovery", 6),
+        data.get("motivation_level", {}).get("current", 7)
+    ]
+
     html = f'''<!DOCTYPE html>
 <html lang="fr">
 <head>
