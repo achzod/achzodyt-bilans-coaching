@@ -57,16 +57,17 @@ class DatabaseManager:
                         is_bilan BOOLEAN,
                         analysis_json TEXT, -- Resultat analyse IA stocke
                         body_loaded BOOLEAN DEFAULT 0, -- 1 si body/attachments sont charges
-                        email_id TEXT, -- ID IMAP pour charger le contenu a la demande
+                        imap_uid TEXT, -- ID IMAP pour charger le contenu a la demande
                         FOREIGN KEY(client_email) REFERENCES clients(email))''')
             
-            # Migration: Ajouter les colonnes si elles n'existent pas
+            # Migration: s'assurer que imap_uid existe
+            try:
+                c.execute("ALTER TABLE emails ADD COLUMN imap_uid TEXT")
+            except:
+                pass # Deja la
+            
             try:
                 c.execute("ALTER TABLE emails ADD COLUMN body_loaded BOOLEAN DEFAULT 0")
-            except:
-                pass  # Colonne existe deja
-            try:
-                c.execute("ALTER TABLE emails ADD COLUMN email_id TEXT")
             except:
                 pass  # Colonne existe deja
                         
@@ -180,12 +181,12 @@ class DatabaseManager:
                 
             # Determiner si le body est charge
             body_loaded = 1 if body else 0
-            email_id_imap = email_data.get('id', '')  # ID IMAP pour charger a la demande
+            imap_uid = email_data.get('id', '')  # ID IMAP (UID) pour charger a la demande
             
             c.execute("""INSERT OR REPLACE INTO emails 
-                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json, body_loaded, email_id)
+                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json, body_loaded, imap_uid)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json, body_loaded, email_id_imap))
+                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json, body_loaded, imap_uid))
             
             conn.commit()  # FORCER le commit immédiatement
             
@@ -299,13 +300,13 @@ class DatabaseManager:
                     
                     # CHARGER les attachments si demandé (pour l'analyse IA complète)
                     email_dict['body_loaded'] = email_dict.get('body_loaded', 0)
-                    email_dict['email_id'] = email_dict.get('email_id', '')
+                    email_dict['imap_uid'] = email_dict.get('imap_uid', '')
                     
                     if load_attachments:
                         # Charger les attachments depuis la DB
                         message_id = email_dict.get('message_id')
                         if message_id:
-                            c.execute("SELECT filename, filepath FROM attachments WHERE email_id = ?", (message_id,))
+                            c.execute("SELECT filename, filepath FROM attachments WHERE message_id = ?", (message_id,))
                             attachments = []
                             for att_row in c.fetchall():
                                 att_dict = dict(att_row)
@@ -499,12 +500,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Init session state
-if 'reader' not in st.session_state:
-    st.session_state.reader = EmailReader()  # Initialiser dès le début
+# Init session state
 if 'db' not in st.session_state:
     st.session_state.db = DatabaseManager()
+
+is_render = os.getenv("RENDER") is not None
+if 'reader' not in st.session_state:
+    if is_render:
+        st.session_state.reader = None # No instantation on startup for Render
+    else:
+        st.session_state.reader = EmailReader()
+
 if 'emails' not in st.session_state:
     st.session_state.emails = []
+# ... rest of init remains same
 if 'selected_email' not in st.session_state:
     st.session_state.selected_email = None
 if 'analysis' not in st.session_state:
@@ -660,33 +669,39 @@ def main():
             else:
                 # DB VIDE -> Synchro automatique !
                 st.session_state.emails = []
-                st.warning("⚠️ Base de données vide. Synchronisation automatique en cours...")
                 
-                # Lancer synchro légère (3 jours, 20 emails max)
-                try:
-                    if st.session_state.reader is None:
-                        st.session_state.reader = EmailReader()
-                    
-                    with st.spinner("🔄 Chargement initial des emails depuis Gmail..."):
-                        new_emails = st.session_state.reader.get_recent_emails(days=3, unread_only=True, max_emails=20)
+                # Sur Render, on évite de bloquer trop longtemps au startup pour la health check
+                is_render = os.getenv("RENDER") is not None
+                
+                if is_render:
+                    st.info("ℹ️ Base de données vide. Cliquez sur 'Synchroniser' pour charger les emails.")
+                else:
+                    st.warning("⚠️ Base de données vide. Synchronisation automatique en cours...")
+                    try:
+                        if st.session_state.reader is None:
+                            st.session_state.reader = EmailReader()
                         
-                        if new_emails and isinstance(new_emails, list):
-                            saved = 0
-                            for email in new_emails:
-                                if isinstance(email, dict):
-                                    message_id = email.get('message_id') or email.get('id')
-                                    if message_id and not st.session_state.db.email_exists(str(message_id)):
-                                        email['body'] = ''
-                                        email['attachments'] = []
-                                        if st.session_state.db.save_email(email):
-                                            saved += 1
+                        # Synchro légère et RAPIDE
+                        with st.spinner("🔄 Chargement initial..."):
+                            import socket
+                            socket.setdefaulttimeout(5) # Très court pour le startup
+                            new_emails = st.session_state.reader.get_recent_emails(days=2, unread_only=True, max_emails=10)
                             
-                            st.success(f"✅ {saved} emails chargés ! Rafraîchis la page.")
-                            st.rerun()
-                        else:
-                            st.error("❌ Impossible de charger les emails. Vérifie les variables d'environnement.")
-                except Exception as e:
-                    st.error(f"❌ Erreur synchro: {e}")
+                            if new_emails and isinstance(new_emails, list):
+                                saved = 0
+                                for email in new_emails:
+                                    if isinstance(email, dict):
+                                        msg_id = email.get('message_id') or email.get('id')
+                                        if msg_id and not st.session_state.db.email_exists(str(msg_id)):
+                                            email['body'] = ''
+                                            email['attachments'] = []
+                                            if st.session_state.db.save_email(email):
+                                                saved += 1
+                                if saved > 0:
+                                    st.success(f"✅ {saved} emails chargés !")
+                                    st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erreur synchro initiale: {e}")
         except Exception as e:
             st.error(f"Erreur DB: {e}")
 
@@ -909,9 +924,9 @@ def main():
         st.caption(f"De: **{client_email}** | Date: {email.get('date')}")
         
         # 1. Charger le contenu complet SI manquant
-        if not email.get('body') and email.get('email_id'):
+        if not email.get('body') and email.get('imap_uid'):
             with st.spinner("🔌 Chargement du contenu Gmail..."):
-                full_data = st.session_state.reader.load_email_content(email['email_id'])
+                full_data = st.session_state.reader.load_email_content(email['imap_uid'])
                 if full_data.get('loaded'):
                     email['body'] = full_data['body']
                     email['attachments'] = full_data['attachments']
