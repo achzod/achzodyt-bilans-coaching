@@ -522,8 +522,8 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
         reader = EmailReader()
         try:
             print(f"[SYNC] Starting sync for last {days} days (UNSEEN emails)...")
-            # Get UNSEEN (unread) emails specifically
-            emails = reader.get_all_emails(days=days, unread_only=True, max_emails=200)
+            # Get UNSEEN (unread) emails specifically - increased max to 500
+            emails = reader.get_all_emails(days=days, unread_only=True, max_emails=500)
             print(f"[SYNC] Found {len(emails)} UNSEEN emails")
             reader.disconnect()
             return emails
@@ -535,13 +535,13 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
                 pass
             return []
 
-    # Run sync with 30s timeout
+    # Run sync with 60s timeout (increased for more emails)
     try:
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as pool:
             emails = await asyncio.wait_for(
                 loop.run_in_executor(pool, do_sync),
-                timeout=30.0
+                timeout=60.0
             )
     except asyncio.TimeoutError:
         return {"success": False, "error": "Sync timeout (30s) - essaie encore", "synced": 0}
@@ -555,7 +555,7 @@ async def sync_all_gmail(user: Dict = Depends(get_current_coach), days: int = 30
         synced = 0
         filtered = 0
 
-        for email_data in emails[:200]:  # Max 200 emails
+        for email_data in emails[:500]:  # Max 500 emails
             # SPAM FILTER DISABLED - let all emails through
             # if is_spam_email(email_data):
             #     filtered += 1

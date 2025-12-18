@@ -572,7 +572,7 @@ class EmailReader:
         """Deprecated: utiliser _batch_fetch_full_emails"""
         return None
 
-    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, max_emails: int = 200) -> List[Dict[str, Any]]:
+    def get_all_emails(self, days: int = 7, folder: str = "INBOX", unread_only: bool = True, max_emails: int = 500) -> List[Dict[str, Any]]:
         """
         Recupere tous les emails (lus ou non)
         """
