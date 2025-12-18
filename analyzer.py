@@ -71,9 +71,56 @@ def detect_image_type(b64_data: str) -> Optional[str]:
 
 
 def analyze_coaching_bilan(current_email, conversation_history, client_name=""):
+    # Construire l'historique complet avec TOUTES les pièces jointes depuis le début
     history_text = _build_history_context(conversation_history)
-    photos = [att for att in current_email.get("attachments", []) if att["content_type"].startswith("image/")]
-    pdfs = [att for att in current_email.get("attachments", []) if "pdf" in att["content_type"].lower()]
+    
+    # Récupérer TOUTES les photos de TOUT l'historique (pas seulement l'email actuel)
+    all_photos = []
+    all_pdfs = []
+    
+    # Photos de l'email actuel
+    photos = [att for att in current_email.get("attachments", []) if att.get("content_type", "").startswith("image/")]
+    pdfs = [att for att in current_email.get("attachments", []) if "pdf" in att.get("content_type", "").lower()]
+    all_photos.extend(photos)
+    all_pdfs.extend(pdfs)
+    
+    # Photos de TOUT l'historique
+    for hist_email in conversation_history:
+        if not isinstance(hist_email, dict):
+            continue
+        hist_attachments = hist_email.get("attachments", [])
+        for att in hist_attachments:
+            if isinstance(att, dict):
+                content_type = att.get("content_type", "")
+                if content_type.startswith("image/"):
+                    # Charger l'image depuis le filepath si disponible
+                    filepath = att.get("filepath")
+                    if filepath and os.path.exists(filepath):
+                        try:
+                            with open(filepath, "rb") as f:
+                                img_data = base64.b64encode(f.read()).decode('utf-8')
+                                all_photos.append({
+                                    "data": img_data,
+                                    "content_type": content_type,
+                                    "filename": att.get("filename", ""),
+                                    "from_email": hist_email.get("from_email", ""),
+                                    "date": hist_email.get("date")
+                                })
+                        except:
+                            pass
+                elif "pdf" in content_type.lower():
+                    filepath = att.get("filepath")
+                    if filepath and os.path.exists(filepath):
+                        all_pdfs.append({
+                            "filepath": filepath,
+                            "filename": att.get("filename", ""),
+                            "from_email": hist_email.get("from_email", ""),
+                            "date": hist_email.get("date")
+                        })
+    
+    # Utiliser toutes les photos trouvées
+    photos = all_photos
+    pdfs = all_pdfs
 
     content = []
 
@@ -297,13 +344,29 @@ Reponds en JSON valide avec cette structure:
 
 
 def _build_history_context(history):
+    """Construit le contexte complet depuis le début - TOUT l'historique"""
     if not history:
         return "Aucun historique - premier contact."
-    parts = [f"=== {len(history)} EMAILS ==="]
-    for i, e in enumerate(history[-10:], 1):
+    
+    # TOUT l'historique depuis le début (pas de limite)
+    parts = [f"=== HISTORIQUE COMPLET: {len(history)} EMAILS DEPUIS LE DEBUT ==="]
+    
+    for i, e in enumerate(history, 1):  # TOUS les emails, pas seulement les 10 derniers
         d = "CLIENT" if e.get("direction") == "received" else "TOI"
         dt = e.get("date").strftime("%d/%m/%Y") if e.get("date") else "?"
-        parts.append(f"--- {d} ({dt}) ---" + chr(10) + e.get('body', '')[:800])
+        subject = e.get('subject', 'Sans sujet')
+        body = e.get('body', '')
+        
+        # Inclure les infos sur les pièces jointes
+        attachments_info = ""
+        atts = e.get('attachments', [])
+        if atts:
+            att_names = [att.get('filename', '') for att in atts if isinstance(att, dict)]
+            if att_names:
+                attachments_info = f"\n[PIECES JOINTES: {', '.join(att_names)}]"
+        
+        parts.append(f"--- Email #{i}: {d} ({dt}) - {subject} ---{attachments_info}\n{body[:1000]}")
+    
     return chr(10).join(parts)
 
 
