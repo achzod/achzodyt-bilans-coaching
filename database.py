@@ -36,6 +36,7 @@ class DatabaseManager:
         # Table Emails (Historique complet)
         c.execute('''CREATE TABLE IF NOT EXISTS emails
                      (message_id TEXT PRIMARY KEY,
+                      imap_uid TEXT,
                       client_email TEXT,
                       subject TEXT,
                       date TIMESTAMP,
@@ -94,10 +95,11 @@ class DatabaseManager:
                 date_val = date_val.isoformat()
                 
             c.execute("""INSERT OR IGNORE INTO emails 
-                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (email_data['message_id'], 
-                       email_data.get('from_email') if email_data.get('direction') == 'received' else email_data.get('to_email'), # A ajuster selon logique
+                         (message_id, imap_uid, client_email, subject, date, body, direction, is_bilan, analysis_json)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                      (email_data['message_id'],
+                       email_data.get('id'), # IMAP UID
+                       email_data.get('from_email') if email_data.get('direction') == 'received' else email_data.get('to_email'),
                        email_data['subject'], 
                        date_val, 
                        email_data.get('body', ''),
@@ -170,4 +172,6 @@ class DatabaseManager:
         exists = c.fetchone() is not None
         conn.close()
         return exists
+
+
 

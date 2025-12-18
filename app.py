@@ -57,16 +57,17 @@ class DatabaseManager:
                         is_bilan BOOLEAN,
                         analysis_json TEXT, -- Resultat analyse IA stocke
                         body_loaded BOOLEAN DEFAULT 0, -- 1 si body/attachments sont charges
-                        email_id TEXT, -- ID IMAP pour charger le contenu a la demande
+                        imap_uid TEXT, -- ID IMAP pour charger le contenu a la demande
                         FOREIGN KEY(client_email) REFERENCES clients(email))''')
             
-            # Migration: Ajouter les colonnes si elles n'existent pas
+            # Migration: s'assurer que imap_uid existe
+            try:
+                c.execute("ALTER TABLE emails ADD COLUMN imap_uid TEXT")
+            except:
+                pass # Deja la
+            
             try:
                 c.execute("ALTER TABLE emails ADD COLUMN body_loaded BOOLEAN DEFAULT 0")
-            except:
-                pass  # Colonne existe deja
-            try:
-                c.execute("ALTER TABLE emails ADD COLUMN email_id TEXT")
             except:
                 pass  # Colonne existe deja
                         
@@ -180,12 +181,12 @@ class DatabaseManager:
                 
             # Determiner si le body est charge
             body_loaded = 1 if body else 0
-            email_id_imap = email_data.get('id', '')  # ID IMAP pour charger a la demande
+            imap_uid = email_data.get('id', '')  # ID IMAP (UID) pour charger a la demande
             
             c.execute("""INSERT OR REPLACE INTO emails 
-                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json, body_loaded, email_id)
+                         (message_id, client_email, subject, date, body, direction, is_bilan, analysis_json, body_loaded, imap_uid)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json, body_loaded, email_id_imap))
+                      (message_id, client_email, subject, date_val, body, direction, is_bilan, analysis_json, body_loaded, imap_uid))
             
             conn.commit()  # FORCER le commit immédiatement
             
@@ -299,13 +300,13 @@ class DatabaseManager:
                     
                     # CHARGER les attachments si demandé (pour l'analyse IA complète)
                     email_dict['body_loaded'] = email_dict.get('body_loaded', 0)
-                    email_dict['email_id'] = email_dict.get('email_id', '')
+                    email_dict['imap_uid'] = email_dict.get('imap_uid', '')
                     
                     if load_attachments:
                         # Charger les attachments depuis la DB
                         message_id = email_dict.get('message_id')
                         if message_id:
-                            c.execute("SELECT filename, filepath FROM attachments WHERE email_id = ?", (message_id,))
+                            c.execute("SELECT filename, filepath FROM attachments WHERE message_id = ?", (message_id,))
                             attachments = []
                             for att_row in c.fetchall():
                                 att_dict = dict(att_row)
@@ -909,9 +910,9 @@ def main():
         st.caption(f"De: **{client_email}** | Date: {email.get('date')}")
         
         # 1. Charger le contenu complet SI manquant
-        if not email.get('body') and email.get('email_id'):
+        if not email.get('body') and email.get('imap_uid'):
             with st.spinner("🔌 Chargement du contenu Gmail..."):
-                full_data = st.session_state.reader.load_email_content(email['email_id'])
+                full_data = st.session_state.reader.load_email_content(email['imap_uid'])
                 if full_data.get('loaded'):
                     email['body'] = full_data['body']
                     email['attachments'] = full_data['attachments']
