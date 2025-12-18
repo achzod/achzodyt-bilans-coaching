@@ -36,7 +36,7 @@ def create_connection():
     try:
         import socket
         timeout = 10
-        socket.setdefaulttimeout(timeout)
+        # socket.setdefaulttimeout(timeout) # Deactive pour eviter de bloquer d'autres threads
         
         print(f"[IMAP] 1. Test socket vers {IMAP_SERVER}:{IMAP_PORT}...")
         sys.stdout.flush()

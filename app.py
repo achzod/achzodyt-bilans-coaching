@@ -500,12 +500,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Init session state
-if 'reader' not in st.session_state:
-    st.session_state.reader = EmailReader()  # Initialiser dès le début
+# Init session state
 if 'db' not in st.session_state:
     st.session_state.db = DatabaseManager()
+
+is_render = os.getenv("RENDER") is not None
+if 'reader' not in st.session_state:
+    if is_render:
+        st.session_state.reader = None # No instantation on startup for Render
+    else:
+        st.session_state.reader = EmailReader()
+
 if 'emails' not in st.session_state:
     st.session_state.emails = []
+# ... rest of init remains same
 if 'selected_email' not in st.session_state:
     st.session_state.selected_email = None
 if 'analysis' not in st.session_state:
