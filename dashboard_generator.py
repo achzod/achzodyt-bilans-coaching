@@ -14,6 +14,21 @@ load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
+def _format_improvement_items(items):
+    """Formate les items d'amélioration en HTML"""
+    result = []
+    for item in items:
+        priority = item.get("priority", "medium") if isinstance(item, dict) else "medium"
+        priority_class = priority.replace("haute", "high").replace("moyenne", "medium").replace("basse", "low")
+        area = item.get("area", item) if isinstance(item, dict) else item
+        priority_text = item.get("priority", "") if isinstance(item, dict) else ""
+        result.append(f'''<li>
+                        <span class="badge badge-{priority_class}">{priority_text}</span>
+                        <span>{area}</span>
+                    </li>''')
+    return "".join(result)
+
+
 def generate_client_dashboard(client_email: str, conversation_history: List[Dict], analyses: List[Dict] = None) -> str:
     """
     Genere un dashboard HTML complet d'evolution du client
@@ -190,22 +205,21 @@ Reponds UNIQUEMENT avec le JSON, sans texte avant ou apres."""
 def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
     """Genere le HTML du dashboard"""
 
-    # Preparer les donnees pour les graphiques
-    weekly_scores = data.get("weekly_scores", [])
-    weeks_labels = [f"S{s.get('week', i+1)}" for i, s in enumerate(weekly_scores)]
-    training_data = [s.get("training", 7) for s in weekly_scores]
-    nutrition_data = [s.get("nutrition", 7) for s in weekly_scores]
-    energy_data = [s.get("energy", 7) for s in weekly_scores]
+    # Calculer les composants HTML avant le template f-string pour éviter les erreurs de syntaxe
+    achievement_items = "".join([f'<li><span class="list-icon">✅</span><span>{a}</span></li>' for a in data.get("key_achievements", ["Aucune donnee"])[:5]])
+    strength_items = "".join([f'<li><span class="list-icon">💪</span><span>{s}</span></li>' for s in data.get("current_strengths", ["Aucune donnee"])[:5]])
+    nutrition_items = "".join([f'<li><span class="list-icon">✓</span><span>{s}</span></li>' for s in data.get("nutrition_habits", {}).get("strengths", [])[:3]])
+    photo_items = "".join([f'<li><span class="list-icon">👁️</span><span>{c}</span></li>' for c in data.get("photos_analysis", {}).get("visible_changes", ["Aucune donnee"])[:4]])
+    recommendation_items = "".join([f'<li><span class="list-icon">➡️</span><span style="font-weight: 500;">{r}</span></li>' for r in data.get("coach_recommendations", ["Aucune recommandation"])[:6]])
+    improvement_items = _format_improvement_items(data.get("areas_to_improve", [])[:5])
 
-    # Lifestyle radar data
-    lifestyle = data.get("lifestyle_factors", {})
-    radar_data = [
-        lifestyle.get("sleep_quality", 7),
-        lifestyle.get("stress_level", 5),
-        lifestyle.get("hydration", 7),
-        lifestyle.get("recovery", 6),
-        data.get("motivation_level", {}).get("current", 7)
-    ]
+    # Classes de couleur pour le score global
+    overall_score = data.get("overall_progress_score", 7)
+    score_class = "score-green" if overall_score >= 7 else "score-yellow" if overall_score >= 5 else "score-red"
+    
+    # Motivation trend class
+    motivation_trend = data.get("motivation_level", {}).get("trend", "stable")
+    trend_class = "positive" if motivation_trend == "hausse" else "negative" if motivation_trend == "baisse" else ""
 
     html = f'''<!DOCTYPE html>
 <html lang="fr">
@@ -490,8 +504,8 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-icon" style="background: rgba(141, 255, 224, 0.2);">📊</div>
                     <div class="card-title">Progression Globale</div>
                 </div>
-                <div class="score-big {'score-green' if data.get('overall_progress_score', 7) >= 7 else 'score-yellow' if data.get('overall_progress_score', 7) >= 5 else 'score-red'}">
-                    {data.get("overall_progress_score", 7)}<span style="font-size: 1.5rem; color: #888;">/10</span>
+                <div class="score-big {score_class}">
+                    {overall_score}<span style="font-size: 1.5rem; color: #888;">/10</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill progress-green" style="width: {data.get('overall_progress_score', 7) * 10}%;"></div>
@@ -543,7 +557,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Victoires</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">✅</span><span>{achievement}</span></li>' for achievement in data.get("key_achievements", ["Aucune donnee"])[:5]])}
+                    {achievement_items}
                 </ul>
             </div>
 
@@ -554,7 +568,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Points Forts</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">💪</span><span>{strength}</span></li>' for strength in data.get("current_strengths", ["Aucune donnee"])[:5]])}
+                    {strength_items}
                 </ul>
             </div>
 
@@ -575,7 +589,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     </div>
                 </div>
                 <ul class="list" style="margin-top: 15px;">
-                    {"".join([f'<li><span class="list-icon">✓</span><span>{s}</span></li>' for s in data.get("nutrition_habits", {}).get("strengths", [])[:3]])}
+                    {nutrition_items}
                 </ul>
             </div>
 
@@ -623,7 +637,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                 </div>
                 <p style="font-weight: 600; margin-bottom: 10px;">Changements visibles:</p>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">👁️</span><span>{change}</span></li>' for change in data.get("photos_analysis", {}).get("visible_changes", ["Aucune donnee"])[:4]])}
+                    {photo_items}
                 </ul>
             </div>
 
@@ -637,7 +651,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     {data.get("motivation_level", {}).get("current", 7)}<span style="font-size: 1rem; color: #888;">/10</span>
                 </div>
                 <p style="text-align: center;">
-                    Tendance: <span class="{'positive' if data.get('motivation_level', {}).get('trend') == 'hausse' else 'negative' if data.get('motivation_level', {}).get('trend') == 'baisse' else ''}">{data.get("motivation_level", {}).get("trend", "stable")}</span>
+                    Tendance: <span class="{trend_class}">{motivation_trend}</span>
                 </p>
             </div>
 
@@ -648,10 +662,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Points a Ameliorer</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'''<li>
-                        <span class="badge badge-{item.get("priority", "medium").replace("haute", "high").replace("moyenne", "medium").replace("basse", "low")}">{item.get("priority", "")}</span>
-                        <span>{item.get("area", item) if isinstance(item, dict) else item}</span>
-                    </li>''' for item in data.get("areas_to_improve", [])[:5]])}
+                    {improvement_items}
                 </ul>
             </div>
 
@@ -678,7 +689,7 @@ def _generate_html(data: Dict, client_email: str, total_emails: int) -> str:
                     <div class="card-title">Recommandations du Coach</div>
                 </div>
                 <ul class="list">
-                    {"".join([f'<li><span class="list-icon">➡️</span><span style="font-weight: 500;">{rec}</span></li>' for rec in data.get("coach_recommendations", ["Aucune recommandation"])[:6]])}
+                    {recommendation_items}
                 </ul>
             </div>
         </div>
